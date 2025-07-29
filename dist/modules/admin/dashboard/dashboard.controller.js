@@ -11,7 +11,6 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DashboardController = void 0;
 const common_1 = require("@nestjs/common");
@@ -71,6 +70,6 @@ __decorate([
 exports.DashboardController = DashboardController = __decorate([
     (0, swagger_1.ApiTags)('admin-dashboard'),
     (0, common_1.Controller)('admin/dashboard'),
-    __metadata("design:paramtypes", [typeof (_a = typeof dashboard_service_1.DashboardService !== "undefined" && dashboard_service_1.DashboardService) === "function" ? _a : Object])
+    __metadata("design:paramtypes", [dashboard_service_1.DashboardService])
 ], DashboardController);
 //# sourceMappingURL=dashboard.controller.js.map

@@ -18,12 +18,12 @@ export declare class SessionService {
             name: string;
             id: string;
             schoolId: string;
-            startDate: Date;
-            endDate: Date;
             isActive: boolean;
-            isCurrent: boolean;
             createdAt: Date;
             updatedAt: Date;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         })[];
         pagination: {
             page: number;
@@ -41,24 +41,24 @@ export declare class SessionService {
         terms: {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
-            startDate: Date;
-            endDate: Date;
             isActive: boolean;
-            isCurrent: boolean;
             createdAt: Date;
             updatedAt: Date;
             sessionId: string;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         }[];
     } & {
         name: string;
         id: string;
         schoolId: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     getSessionById(id: string): Promise<{
         school: {
@@ -69,24 +69,24 @@ export declare class SessionService {
         terms: {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
-            startDate: Date;
-            endDate: Date;
             isActive: boolean;
-            isCurrent: boolean;
             createdAt: Date;
             updatedAt: Date;
             sessionId: string;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         }[];
     } & {
         name: string;
         id: string;
         schoolId: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     createSession(createSessionDto: CreateSessionDto): Promise<{
         school: {
@@ -98,12 +98,12 @@ export declare class SessionService {
         name: string;
         id: string;
         schoolId: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     updateSession(id: string, updateSessionDto: UpdateSessionDto): Promise<{
         school: {
@@ -115,12 +115,12 @@ export declare class SessionService {
         name: string;
         id: string;
         schoolId: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     deleteSession(id: string): Promise<{
         message: string;
@@ -128,24 +128,24 @@ export declare class SessionService {
             terms: {
                 name: import(".prisma/client").$Enums.TermType;
                 id: string;
-                startDate: Date;
-                endDate: Date;
                 isActive: boolean;
-                isCurrent: boolean;
                 createdAt: Date;
                 updatedAt: Date;
                 sessionId: string;
+                startDate: Date;
+                endDate: Date;
+                isCurrent: boolean;
             }[];
         } & {
             name: string;
             id: string;
             schoolId: string;
-            startDate: Date;
-            endDate: Date;
             isActive: boolean;
-            isCurrent: boolean;
             createdAt: Date;
             updatedAt: Date;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         };
     }>;
     activateSession(id: string): Promise<{
@@ -158,12 +158,12 @@ export declare class SessionService {
         name: string;
         id: string;
         schoolId: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     deactivateSession(id: string): Promise<{
         school: {
@@ -175,22 +175,22 @@ export declare class SessionService {
         name: string;
         id: string;
         schoolId: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     getSessionTerms(id: string): Promise<{
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }[]>;
 }

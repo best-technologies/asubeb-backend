@@ -307,4 +307,4 @@ exports.DashboardService = DashboardService = DashboardService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], DashboardService);
-//# sourceMappingURL=dashboard.service.js.map
+//# sourceMappingURL=dashboard.service.ts.js.map

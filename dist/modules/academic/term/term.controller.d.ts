@@ -19,13 +19,13 @@ export declare class TermController {
         } & {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
-            startDate: Date;
-            endDate: Date;
             isActive: boolean;
-            isCurrent: boolean;
             createdAt: Date;
             updatedAt: Date;
             sessionId: string;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         })[];
         pagination: {
             page: number;
@@ -47,13 +47,13 @@ export declare class TermController {
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     getTermById(id: string): Promise<{
         session: {
@@ -69,14 +69,14 @@ export declare class TermController {
             description: string | null;
             type: import(".prisma/client").$Enums.AssessmentType;
             id: string;
+            title: string;
+            classId: string;
             createdAt: Date;
             updatedAt: Date;
-            teacherId: string | null;
             studentId: string;
-            classId: string;
-            termId: string;
+            teacherId: string | null;
             subjectId: string;
-            title: string;
+            termId: string;
             maxScore: number;
             score: number;
             percentage: number;
@@ -89,13 +89,13 @@ export declare class TermController {
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     createTerm(createTermDto: any): Promise<{
         session: {
@@ -110,13 +110,13 @@ export declare class TermController {
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     updateTerm(id: string, updateTermDto: any): Promise<{
         session: {
@@ -131,13 +131,13 @@ export declare class TermController {
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     deleteTerm(id: string): Promise<{
         message: string;
@@ -146,14 +146,14 @@ export declare class TermController {
                 description: string | null;
                 type: import(".prisma/client").$Enums.AssessmentType;
                 id: string;
+                title: string;
+                classId: string;
                 createdAt: Date;
                 updatedAt: Date;
-                teacherId: string | null;
                 studentId: string;
-                classId: string;
-                termId: string;
+                teacherId: string | null;
                 subjectId: string;
-                title: string;
+                termId: string;
                 maxScore: number;
                 score: number;
                 percentage: number;
@@ -166,13 +166,13 @@ export declare class TermController {
         } & {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
-            startDate: Date;
-            endDate: Date;
             isActive: boolean;
-            isCurrent: boolean;
             createdAt: Date;
             updatedAt: Date;
             sessionId: string;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         };
     }>;
     activateTerm(id: string): Promise<{
@@ -188,13 +188,13 @@ export declare class TermController {
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     deactivateTerm(id: string): Promise<{
         session: {
@@ -209,13 +209,13 @@ export declare class TermController {
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
         createdAt: Date;
         updatedAt: Date;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     getTermAssessments(id: string): Promise<({
         student: {
@@ -233,14 +233,14 @@ export declare class TermController {
         description: string | null;
         type: import(".prisma/client").$Enums.AssessmentType;
         id: string;
+        title: string;
+        classId: string;
         createdAt: Date;
         updatedAt: Date;
-        teacherId: string | null;
         studentId: string;
-        classId: string;
-        termId: string;
+        teacherId: string | null;
         subjectId: string;
-        title: string;
+        termId: string;
         maxScore: number;
         score: number;
         percentage: number;

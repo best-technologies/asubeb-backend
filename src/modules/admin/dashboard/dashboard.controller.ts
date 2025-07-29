@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
+import { TermType } from '@prisma/client';
 
 @ApiTags('admin-dashboard')
 @Controller('admin/dashboard')
@@ -17,7 +18,7 @@ export class DashboardController {
     @Query('session') session: string,
     @Query('term') term: string,
   ) {
-    return this.dashboardService.getAdminDashboard(session, term);
+    return this.dashboardService.getAdminDashboard(session, term as TermType);
   }
 
   @Get('performance-table')
@@ -44,7 +45,7 @@ export class DashboardController {
   ) {
     return this.dashboardService.fetchDashboardPerformanceTable(
       session,
-      term,
+      term as TermType,
       page,
       limit,
       search,

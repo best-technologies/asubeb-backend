@@ -1,0 +1,343 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Gender Enum
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+// School Level Enum
+enum SchoolLevel {
+  PRIMARY
+  SECONDARY
+}
+
+// Term Type Enum
+enum TermType {
+  FIRST_TERM
+  SECOND_TERM
+  THIRD_TERM
+}
+
+// Assessment Type Enum
+enum AssessmentType {
+  CA
+  EXAM
+  ASSIGNMENT
+  PROJECT
+  QUIZ
+}
+
+// User model for authentication
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  firstName String?
+  lastName  String?
+  role      String   @default("USER") // ADMIN, TEACHER, STUDENT, PARENT
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  teacher Teacher?
+  student Student?
+  parent  Parent?
+
+  @@map("users")
+}
+
+// Local Government Area
+model LocalGovernmentArea {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  state       String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  schools School[]
+
+  @@map("local_government_areas")
+}
+
+// School model
+model School {
+  id              String      @id @default(cuid())
+  name            String
+  code            String      @unique
+  level           SchoolLevel
+  address         String
+  phone           String?
+  email           String?
+  website         String?
+  principalName   String?
+  principalPhone  String?
+  principalEmail  String?
+  establishedYear Int?
+  totalStudents   Int         @default(0)
+  totalTeachers   Int         @default(0)
+  capacity        Int?
+  lgaId           String
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  lga      LocalGovernmentArea @relation(fields: [lgaId], references: [id])
+  classes  Class[]
+  teachers Teacher[]
+  students Student[]
+  sessions Session[]
+
+  @@map("schools")
+}
+
+// Class model
+model Class {
+  id                String   @id @default(cuid())
+  name              String // e.g., "Class 1A", "JSS 1A"
+  grade             String // e.g., "1", "2", "JSS 1", "SSS 1"
+  section           String // e.g., "A", "B", "C"
+  schoolId          String
+  teacherId         String?
+  capacity          Int      @default(30)
+  currentEnrollment Int      @default(0)
+  academicYear      String // e.g., "2023-2024"
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  school      School         @relation(fields: [schoolId], references: [id])
+  teacher     Teacher?       @relation(fields: [teacherId], references: [id])
+  students    Student[]
+  subjects    ClassSubject[]
+  assessments Assessment[]
+
+  @@unique([schoolId, name, academicYear])
+  @@map("classes")
+}
+
+// Teacher model
+model Teacher {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  teacherId      String    @unique // Custom teacher ID
+  schoolId       String
+  firstName      String
+  lastName       String
+  email          String    @unique
+  phone          String?
+  dateOfBirth    DateTime?
+  gender         Gender
+  address        String?
+  qualification  String?
+  specialization String?
+  hireDate       DateTime  @default(now())
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  user        User             @relation(fields: [userId], references: [id])
+  school      School           @relation(fields: [schoolId], references: [id])
+  classes     Class[]
+  subjects    TeacherSubject[]
+  assessments Assessment[]
+
+  @@map("teachers")
+}
+
+// Student model
+model Student {
+  id             String   @id @default(cuid())
+  userId         String?  @unique
+  studentId      String   @unique // Custom student ID
+  schoolId       String
+  classId        String?
+  firstName      String
+  lastName       String
+  email          String?  @unique
+  phone          String?
+  dateOfBirth    DateTime
+  gender         Gender
+  address        String?
+  enrollmentDate DateTime @default(now())
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  user        User?        @relation(fields: [userId], references: [id])
+  school      School       @relation(fields: [schoolId], references: [id])
+  class       Class?       @relation(fields: [classId], references: [id])
+  parent      Parent?      @relation(fields: [parentId], references: [id])
+  parentId    String?
+  assessments Assessment[]
+
+  @@map("students")
+}
+
+// Parent model
+model Parent {
+  id         String   @id @default(cuid())
+  userId     String?  @unique
+  firstName  String
+  lastName   String
+  email      String   @unique
+  phone      String
+  address    String?
+  occupation String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user     User?     @relation(fields: [userId], references: [id])
+  students Student[]
+
+  @@map("parents")
+}
+
+// Subject model
+model Subject {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  code        String      @unique
+  level       SchoolLevel
+  description String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  classSubjects   ClassSubject[]
+  teacherSubjects TeacherSubject[]
+  assessments     Assessment[]
+
+  @@map("subjects")
+}
+
+// Class-Subject relationship (Many-to-Many)
+model ClassSubject {
+  id        String   @id @default(cuid())
+  classId   String
+  subjectId String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  class   Class   @relation(fields: [classId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([classId, subjectId])
+  @@map("class_subjects")
+}
+
+// Teacher-Subject relationship (Many-to-Many)
+model TeacherSubject {
+  id        String   @id @default(cuid())
+  teacherId String
+  subjectId String
+  score     Float?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([teacherId, subjectId])
+  @@map("teacher_subjects")
+}
+
+// Session model (Academic Year)
+model Session {
+  id        String   @id @default(cuid())
+  name      String   @unique // e.g., "2023-2024"
+  schoolId  String
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  isCurrent Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  school School @relation(fields: [schoolId], references: [id])
+  terms  Term[]
+
+  @@map("sessions")
+}
+
+// Term model
+model Term {
+  id        String   @id @default(cuid())
+  sessionId String
+  name      TermType
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  isCurrent Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  session     Session      @relation(fields: [sessionId], references: [id])
+  assessments Assessment[]
+
+  @@unique([sessionId, name])
+  @@map("terms")
+}
+
+// Assessment model (CA, Exams, etc.)
+model Assessment {
+  id            String         @id @default(cuid())
+  studentId     String
+  subjectId     String
+  classId       String
+  termId        String
+  teacherId     String?
+  type          AssessmentType
+  title         String // e.g., "First CA", "Mid-term Exam"
+  description   String?
+  maxScore      Float
+  score         Float
+  percentage    Float // Percentage weight of this assessment
+  remarks       String?
+  dateGiven     DateTime
+  dateSubmitted DateTime?
+  isSubmitted   Boolean        @default(false)
+  isGraded      Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+  term    Term    @relation(fields: [termId], references: [id])
+  teacher Teacher? @relation(fields: [teacherId], references: [id])
+
+  @@unique([studentId, subjectId, classId, termId, type, title])
+  @@map("assessments")
+}

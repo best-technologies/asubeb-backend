@@ -21,6 +21,34 @@ let StudentController = class StudentController {
     constructor(studentService) {
         this.studentService = studentService;
     }
+    async getStudentDashboard(session, term, schoolId, classId, subject, gender, search) {
+        const filters = {
+            session,
+            term: term,
+            schoolId,
+            classId,
+            subject,
+            gender,
+            search,
+        };
+        return this.studentService.getStudentDashboard(filters);
+    }
+    async searchFilterPaginationStudents(page = 1, limit = 10, search, lgaId, schoolId, classId, gender, subject, session, term, sortBy, sortOrder) {
+        return this.studentService.searchFilterPaginationStudents({
+            page,
+            limit,
+            search,
+            lgaId,
+            schoolId,
+            classId,
+            gender,
+            subject,
+            session,
+            term: term,
+            sortBy,
+            sortOrder,
+        });
+    }
     async getAllStudents(page = 1, limit = 10, schoolId) {
         return this.studentService.getAllStudents(page, limit, schoolId);
     }
@@ -45,8 +73,62 @@ let StudentController = class StudentController {
 };
 exports.StudentController = StudentController;
 __decorate([
+    (0, common_1.Get)('dashboard'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get student dashboard data with advanced filtering' }),
+    (0, swagger_1.ApiQuery)({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025)' }),
+    (0, swagger_1.ApiQuery)({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)' }),
+    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false, description: 'Filter by school ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'classId', required: false, description: 'Filter by class ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'subject', required: false, description: 'Filter by subject name' }),
+    (0, swagger_1.ApiQuery)({ name: 'gender', required: false, description: 'Gender (MALE, FEMALE, OTHER)' }),
+    (0, swagger_1.ApiQuery)({ name: 'search', required: false, description: 'Search by student name or ID' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Student dashboard data retrieved successfully' }),
+    __param(0, (0, common_1.Query)('session')),
+    __param(1, (0, common_1.Query)('term')),
+    __param(2, (0, common_1.Query)('schoolId')),
+    __param(3, (0, common_1.Query)('classId')),
+    __param(4, (0, common_1.Query)('subject')),
+    __param(5, (0, common_1.Query)('gender')),
+    __param(6, (0, common_1.Query)('search')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String, String, String, String]),
+    __metadata("design:returntype", Promise)
+], StudentController.prototype, "getStudentDashboard", null);
+__decorate([
+    (0, common_1.Get)('search'),
+    (0, swagger_1.ApiOperation)({ summary: 'Search, filter, and paginate students with comprehensive options' }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: 'Page number (default: 1)', example: 1 }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: 'Items per page (default: 10)', example: 10 }),
+    (0, swagger_1.ApiQuery)({ name: 'search', required: false, description: 'Search by student name, ID, or email' }),
+    (0, swagger_1.ApiQuery)({ name: 'lgaId', required: false, description: 'Filter by Local Government Area ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false, description: 'Filter by school ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'classId', required: false, description: 'Filter by class ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'gender', required: false, description: 'Filter by gender (MALE, FEMALE, OTHER)' }),
+    (0, swagger_1.ApiQuery)({ name: 'subject', required: false, description: 'Filter by subject name' }),
+    (0, swagger_1.ApiQuery)({ name: 'session', required: false, description: 'Academic session (e.g., 2023-2024)' }),
+    (0, swagger_1.ApiQuery)({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)' }),
+    (0, swagger_1.ApiQuery)({ name: 'sortBy', required: false, description: 'Sort by field (firstName, lastName, studentId, email, gender, enrollmentDate)', example: 'firstName' }),
+    (0, swagger_1.ApiQuery)({ name: 'sortOrder', required: false, description: 'Sort order (asc, desc)', example: 'asc' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Students retrieved successfully' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('search')),
+    __param(3, (0, common_1.Query)('lgaId')),
+    __param(4, (0, common_1.Query)('schoolId')),
+    __param(5, (0, common_1.Query)('classId')),
+    __param(6, (0, common_1.Query)('gender')),
+    __param(7, (0, common_1.Query)('subject')),
+    __param(8, (0, common_1.Query)('session')),
+    __param(9, (0, common_1.Query)('term')),
+    __param(10, (0, common_1.Query)('sortBy')),
+    __param(11, (0, common_1.Query)('sortOrder')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number, String, String, String, String, String, String, String, String, String, String]),
+    __metadata("design:returntype", Promise)
+], StudentController.prototype, "searchFilterPaginationStudents", null);
+__decorate([
     (0, common_1.Get)(),
-    (0, swagger_1.ApiOperation)({ summary: 'Get all students' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Get all students (legacy endpoint)' }),
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: 'Page number' }),
     (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: 'Items per page' }),
     (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false, description: 'Filter by school ID' }),

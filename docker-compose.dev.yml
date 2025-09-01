@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: asubeb_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: asubeb_db_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - asubeb_dev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d asubeb_db_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NestJS Backend Application (Development)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: asubeb_backend_dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      API_PREFIX: api/v1
+      CORS_ORIGIN: http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8080
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRES_IN: 7d
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/asubeb_db_dev
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: password
+      DB_NAME: asubeb_db_dev
+      DB_SCHEMA: public
+      DB_SSL: false
+      DB_MAX_CONNECTIONS: 10
+      DB_IDLE_TIMEOUT: 30000
+      DB_CONNECTION_TIMEOUT: 2000
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Debug port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./uploads:/app/uploads
+    networks:
+      - asubeb_dev_network
+    command: npm run start:dev
+
+  # Prisma Studio (Development)
+  prisma-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: asubeb_prisma_studio_dev
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/asubeb_db_dev
+    ports:
+      - "5555:5555"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - asubeb_dev_network
+    command: npx prisma studio --hostname 0.0.0.0 --port 5555
+
+volumes:
+  postgres_dev_data:
+    driver: local
+
+networks:
+  asubeb_dev_network:
+    driver: bridge

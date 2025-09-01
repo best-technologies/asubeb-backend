@@ -10,13 +10,7 @@ export class CreateSessionDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({
-    description: 'School ID',
-    example: 'school-uuid',
-  })
-  @IsString()
-  @IsNotEmpty()
-  schoolId: string;
+
 
   @ApiProperty({
     description: 'Session start date',

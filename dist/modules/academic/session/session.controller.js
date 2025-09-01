@@ -22,8 +22,8 @@ let SessionController = class SessionController {
     constructor(sessionService) {
         this.sessionService = sessionService;
     }
-    async getAllSessions(page = 1, limit = 10, schoolId, isActive) {
-        return this.sessionService.getAllSessions(page, limit, schoolId, isActive);
+    async getAllSessions(page = 1, limit = 10, isActive) {
+        return this.sessionService.getAllSessions(page, limit, isActive);
     }
     async getCurrentSession() {
         return this.sessionService.getCurrentSession();
@@ -56,15 +56,13 @@ __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Get all sessions' }),
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: 'Page number' }),
     (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: 'Items per page' }),
-    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false, description: 'Filter by school ID' }),
     (0, swagger_1.ApiQuery)({ name: 'isActive', required: false, description: 'Filter by active status' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Sessions retrieved successfully' }),
     __param(0, (0, common_1.Query)('page')),
     __param(1, (0, common_1.Query)('limit')),
-    __param(2, (0, common_1.Query)('schoolId')),
-    __param(3, (0, common_1.Query)('isActive')),
+    __param(2, (0, common_1.Query)('isActive')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object, String, Boolean]),
+    __metadata("design:paramtypes", [Object, Object, Boolean]),
     __metadata("design:returntype", Promise)
 ], SessionController.prototype, "getAllSessions", null);
 __decorate([

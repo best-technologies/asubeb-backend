@@ -20,21 +20,160 @@ let DashboardService = DashboardService_1 = class DashboardService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async getAdminDashboard(session, term) {
-        this.logger.log(`Fetching admin dashboard data for session: ${session}, term: ${term}`);
+    getOrderByClause(sortBy, sortOrder) {
+        const fieldMapping = {
+            name: 'firstName',
+            firstName: 'firstName',
+            lastName: 'lastName',
+            studentId: 'studentId',
+            totalStudents: 'totalStudents',
+            totalTeachers: 'totalTeachers',
+            createdAt: 'createdAt',
+            updatedAt: 'updatedAt',
+        };
+        const actualField = fieldMapping[sortBy] || 'firstName';
+        return { [actualField]: sortOrder };
+    }
+    async getAdminDashboard(query) {
+        const { session, term, page = 1, limit = 10, search, schoolId, classId, gender, schoolLevel, lgaId, sortBy = 'name', sortOrder = 'asc', includeStats = false, includePerformance = false, } = query;
+        const activeFilters = Object.entries(query)
+            .filter(([key, value]) => value !== undefined && value !== null && value !== '')
+            .reduce((obj, [key, value]) => {
+            obj[key] = value;
+            return obj;
+        }, {});
+        this.logger.log(`Fetching admin dashboard data with active filters: ${JSON.stringify(activeFilters)}`);
         try {
-            const sessionData = await this.prisma.session.findFirst({
-                where: { name: session },
+            const skip = (page - 1) * limit;
+            const availableSessions = await this.prisma.session.findMany({
+                where: { isActive: true },
+                select: {
+                    id: true,
+                    name: true,
+                    startDate: true,
+                    endDate: true,
+                    isCurrent: true,
+                    isActive: true,
+                },
+                orderBy: {
+                    name: 'desc',
+                },
             });
-            if (!sessionData) {
-                throw new Error('Session not found');
+            let sessionData;
+            if (session) {
+                sessionData = await this.prisma.session.findFirst({
+                    where: { name: session, isActive: true },
+                });
+                if (!sessionData) {
+                    throw new Error(`Session '${session}' not found or not active`);
+                }
+            }
+            else {
+                sessionData = await this.prisma.session.findFirst({
+                    where: { isCurrent: true, isActive: true },
+                });
+                if (!sessionData) {
+                    throw new Error('No current session found');
+                }
+            }
+            let termData;
+            if (term) {
+                termData = await this.prisma.term.findFirst({
+                    where: {
+                        name: term,
+                        sessionId: sessionData.id,
+                        isActive: true
+                    },
+                });
+                if (!termData) {
+                    throw new Error(`Term '${term}' not found for session '${sessionData.name}'`);
+                }
+            }
+            else {
+                termData = await this.prisma.term.findFirst({
+                    where: {
+                        sessionId: sessionData.id,
+                        isCurrent: true,
+                        isActive: true
+                    },
+                });
+                if (!termData) {
+                    throw new Error(`No current term found for session '${sessionData.name}'`);
+                }
+            }
+            const availableTerms = await this.prisma.term.findMany({
+                where: {
+                    sessionId: sessionData.id,
+                    isActive: true
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    startDate: true,
+                    endDate: true,
+                    isCurrent: true,
+                    isActive: true,
+                },
+                orderBy: {
+                    name: 'asc',
+                },
+            });
+            const schoolWhereConditions = { isActive: true };
+            if (schoolLevel) {
+                schoolWhereConditions.level = schoolLevel;
+            }
+            if (lgaId) {
+                schoolWhereConditions.lgaId = lgaId;
+            }
+            if (search) {
+                schoolWhereConditions.OR = [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { code: { contains: search, mode: 'insensitive' } },
+                ];
+            }
+            const studentWhereConditions = { isActive: true };
+            if (schoolId) {
+                studentWhereConditions.schoolId = schoolId;
+            }
+            if (classId) {
+                studentWhereConditions.classId = classId;
+            }
+            if (gender) {
+                studentWhereConditions.gender = gender;
+            }
+            if (search) {
+                studentWhereConditions.OR = [
+                    { firstName: { contains: search, mode: 'insensitive' } },
+                    { lastName: { contains: search, mode: 'insensitive' } },
+                    { studentId: { contains: search, mode: 'insensitive' } },
+                ];
+            }
+            const classWhereConditions = { isActive: true };
+            if (schoolId) {
+                classWhereConditions.schoolId = schoolId;
+            }
+            if (search) {
+                classWhereConditions.OR = [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { grade: { contains: search, mode: 'insensitive' } },
+                    { section: { contains: search, mode: 'insensitive' } },
+                ];
             }
             const totalStudents = await this.prisma.student.count({
+                where: studentWhereConditions,
+            });
+            const totalLgas = await this.prisma.localGovernmentArea.count({
                 where: { isActive: true },
+            });
+            const totalSchools = await this.prisma.school.count({
+                where: schoolWhereConditions,
+            });
+            const totalClasses = await this.prisma.class.count({
+                where: classWhereConditions,
             });
             const genderDistribution = await this.prisma.student.groupBy({
                 by: ['gender'],
-                where: { isActive: true },
+                where: studentWhereConditions,
                 _count: {
                     gender: true,
                 },
@@ -42,12 +181,18 @@ let DashboardService = DashboardService_1 = class DashboardService {
             const totalMale = genderDistribution.find(g => g.gender === 'MALE')?._count.gender || 0;
             const totalFemale = genderDistribution.find(g => g.gender === 'FEMALE')?._count.gender || 0;
             const schools = await this.prisma.school.findMany({
-                where: { isActive: true },
+                where: schoolWhereConditions,
                 select: {
                     id: true,
                     name: true,
                     code: true,
                     level: true,
+                    address: true,
+                    lga: {
+                        select: {
+                            name: true,
+                        },
+                    },
                     _count: {
                         select: {
                             students: {
@@ -59,12 +204,19 @@ let DashboardService = DashboardService_1 = class DashboardService {
                         },
                     },
                 },
+                skip,
+                take: limit,
+                orderBy: {
+                    name: sortOrder,
+                },
             });
             const schoolsWithCounts = schools.map(school => ({
                 id: school.id,
                 name: school.name,
                 code: school.code,
                 level: school.level,
+                address: school.address,
+                lga: school.lga?.name || 'N/A',
                 totalStudents: school._count.students,
                 totalTeachers: school._count.teachers,
             }));
@@ -76,9 +228,12 @@ let DashboardService = DashboardService_1 = class DashboardService {
                     code: true,
                     state: true,
                 },
+                orderBy: {
+                    name: 'asc',
+                },
             });
             const classes = await this.prisma.class.findMany({
-                where: { isActive: true },
+                where: classWhereConditions,
                 select: {
                     id: true,
                     name: true,
@@ -88,6 +243,7 @@ let DashboardService = DashboardService_1 = class DashboardService {
                     school: {
                         select: {
                             name: true,
+                            code: true,
                         },
                     },
                     _count: {
@@ -97,6 +253,11 @@ let DashboardService = DashboardService_1 = class DashboardService {
                             },
                         },
                     },
+                },
+                skip,
+                take: limit,
+                orderBy: {
+                    name: sortOrder,
                 },
             });
             const classesWithEnrollment = classes.map(cls => ({
@@ -108,6 +269,7 @@ let DashboardService = DashboardService_1 = class DashboardService {
                 currentEnrollment: cls._count.students,
                 school: {
                     name: cls.school.name,
+                    code: cls.school.code,
                 },
             }));
             const subjects = await this.prisma.subject.findMany({
@@ -118,9 +280,12 @@ let DashboardService = DashboardService_1 = class DashboardService {
                     code: true,
                     level: true,
                 },
+                orderBy: {
+                    name: 'asc',
+                },
             });
-            const topStudents = await this.prisma.student.findMany({
-                where: { isActive: true },
+            const students = await this.prisma.student.findMany({
+                where: studentWhereConditions,
                 select: {
                     id: true,
                     firstName: true,
@@ -130,6 +295,7 @@ let DashboardService = DashboardService_1 = class DashboardService {
                     school: {
                         select: {
                             name: true,
+                            code: true,
                         },
                     },
                     class: {
@@ -137,53 +303,202 @@ let DashboardService = DashboardService_1 = class DashboardService {
                             name: true,
                         },
                     },
-                    assessments: {
-                        where: {
-                            term: {
-                                name: term,
-                                session: {
-                                    name: session,
+                    ...(includePerformance && {
+                        assessments: {
+                            where: {
+                                term: {
+                                    name: termData.name,
+                                    session: {
+                                        name: sessionData.name,
+                                    },
+                                },
+                            },
+                            select: {
+                                score: true,
+                                maxScore: true,
+                                subject: {
+                                    select: {
+                                        name: true,
+                                    },
                                 },
                             },
                         },
-                        select: {
-                            score: true,
-                        },
-                    },
+                    }),
                 },
-                take: 10,
+                skip,
+                take: limit,
+                orderBy: this.getOrderByClause(sortBy, sortOrder),
             });
-            const studentsWithScores = topStudents.map(student => {
-                const totalScore = student.assessments.reduce((sum, assessment) => sum + assessment.score, 0);
-                return {
+            const studentsData = students.map(student => {
+                const baseData = {
                     id: student.id,
                     studentName: `${student.firstName} ${student.lastName}`,
                     examNumber: student.studentId,
                     school: student.school?.name || 'N/A',
+                    schoolCode: student.school?.code || 'N/A',
                     class: student.class?.name || 'N/A',
                     gender: student.gender,
-                    totalScore,
                 };
+                if (includePerformance && student.assessments) {
+                    const totalScore = student.assessments.reduce((sum, assessment) => sum + assessment.score, 0);
+                    const totalMaxScore = student.assessments.reduce((sum, assessment) => sum + assessment.maxScore, 0);
+                    const average = student.assessments.length > 0 ? totalScore / student.assessments.length : 0;
+                    const percentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
+                    return {
+                        ...baseData,
+                        totalScore,
+                        average: Math.round(average * 100) / 100,
+                        percentage: Math.round(percentage * 100) / 100,
+                        assessmentCount: student.assessments.length,
+                    };
+                }
+                return baseData;
             });
-            studentsWithScores.sort((a, b) => b.totalScore - a.totalScore);
-            const topStudentsWithPositions = studentsWithScores.map((student, index) => ({
-                position: index + 1,
-                ...student,
-            }));
-            return response_helper_1.ResponseHelper.success('Admin Dashboard Data retrieved successfully', {
-                session: sessionData.name,
-                term,
-                totalStudents,
-                totalMale,
-                totalFemale,
-                schools: schoolsWithCounts,
-                lgas,
-                classes: classesWithEnrollment,
-                genders: genderDistribution,
-                subjects,
-                topStudents: topStudentsWithPositions,
+            let topStudentsWithPositions = [];
+            if (includePerformance) {
+                const topStudents = await this.prisma.student.findMany({
+                    where: {
+                        ...studentWhereConditions,
+                        assessments: {
+                            some: {
+                                term: {
+                                    name: termData.name,
+                                    session: {
+                                        name: sessionData.name,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        studentId: true,
+                        gender: true,
+                        school: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                        class: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                        assessments: {
+                            where: {
+                                term: {
+                                    name: termData.name,
+                                    session: {
+                                        name: sessionData.name,
+                                    },
+                                },
+                            },
+                            select: {
+                                score: true,
+                            },
+                        },
+                    },
+                    take: 10,
+                });
+                const studentsWithScores = topStudents.map(student => {
+                    const totalScore = student.assessments.reduce((sum, assessment) => sum + assessment.score, 0);
+                    return {
+                        id: student.id,
+                        studentName: `${student.firstName} ${student.lastName}`,
+                        examNumber: student.studentId,
+                        school: student.school?.name || 'N/A',
+                        class: student.class?.name || 'N/A',
+                        gender: student.gender,
+                        totalScore,
+                    };
+                });
+                studentsWithScores.sort((a, b) => b.totalScore - a.totalScore);
+                topStudentsWithPositions = studentsWithScores.map((student, index) => ({
+                    position: index + 1,
+                    ...student,
+                }));
+            }
+            const responseData = {
+                currentSession: {
+                    id: sessionData.id,
+                    name: sessionData.name,
+                    startDate: sessionData.startDate,
+                    endDate: sessionData.endDate,
+                    isCurrent: sessionData.isCurrent,
+                },
+                currentTerm: {
+                    id: termData.id,
+                    name: termData.name,
+                    startDate: termData.startDate,
+                    endDate: termData.endDate,
+                    isCurrent: termData.isCurrent,
+                },
+                availableSessions,
+                availableTerms,
+                pagination: {
+                    page,
+                    limit,
+                    total: totalStudents,
+                    totalPages: Math.ceil(totalStudents / limit),
+                    hasNextPage: page < Math.ceil(totalStudents / limit),
+                    hasPreviousPage: page > 1,
+                    nextPage: page < Math.ceil(totalStudents / limit) ? page + 1 : null,
+                    previousPage: page > 1 ? page - 1 : null,
+                    startIndex: (page - 1) * limit + 1,
+                    endIndex: Math.min(page * limit, totalStudents),
+                },
+                summary: {
+                    totalStudents,
+                    totalMale,
+                    totalFemale,
+                    totalSchools,
+                    totalClasses,
+                    totalLgas,
+                },
+                filters: {
+                    search,
+                    schoolId,
+                    classId,
+                    gender,
+                    schoolLevel,
+                    lgaId,
+                },
+                data: {
+                    schools: schoolsWithCounts,
+                    lgas,
+                    classes: classesWithEnrollment,
+                    students: studentsData,
+                    subjects,
+                },
                 lastUpdated: new Date().toISOString(),
-            });
+            };
+            if (includeStats) {
+                responseData.statistics = {
+                    genderDistribution,
+                    schoolLevelDistribution: await this.prisma.school.groupBy({
+                        by: ['level'],
+                        where: { isActive: true },
+                        _count: {
+                            level: true,
+                        },
+                    }),
+                    classGradeDistribution: await this.prisma.class.groupBy({
+                        by: ['grade'],
+                        where: { isActive: true },
+                        _count: {
+                            grade: true,
+                        },
+                    }),
+                };
+            }
+            if (includePerformance) {
+                responseData.performance = {
+                    topStudents: topStudentsWithPositions,
+                };
+            }
+            return response_helper_1.ResponseHelper.success('Admin Dashboard Data retrieved successfully', responseData);
         }
         catch (error) {
             this.logger.error(`Error fetching admin dashboard: ${error.message}`, error.stack);
@@ -287,13 +602,13 @@ let DashboardService = DashboardService_1 = class DashboardService {
             }));
             const total = await this.prisma.student.count({ where: whereConditions });
             return response_helper_1.ResponseHelper.success('Performance table retrieved successfully', {
-                data: performanceTable,
                 pagination: {
                     page,
                     limit,
                     total,
                     totalPages: Math.ceil(total / limit),
                 },
+                data: performanceTable,
             });
         }
         catch (error) {

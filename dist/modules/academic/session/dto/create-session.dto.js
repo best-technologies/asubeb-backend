@@ -14,7 +14,6 @@ const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 class CreateSessionDto {
     name;
-    schoolId;
     startDate;
     endDate;
     isActive;
@@ -30,15 +29,6 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreateSessionDto.prototype, "name", void 0);
-__decorate([
-    (0, swagger_1.ApiProperty)({
-        description: 'School ID',
-        example: 'school-uuid',
-    }),
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", String)
-], CreateSessionDto.prototype, "schoolId", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({
         description: 'Session start date',

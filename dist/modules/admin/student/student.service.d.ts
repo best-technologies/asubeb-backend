@@ -1,7 +1,25 @@
 import { PrismaService } from '../../../prisma/prisma.service';
+import { TermType } from '@prisma/client';
 export declare class StudentService {
     private readonly prisma;
+    private readonly logger;
     constructor(prisma: PrismaService);
+    getStudentDashboard(filters?: {
+        session?: string;
+        term?: TermType;
+        schoolId?: string;
+        classId?: string;
+        subject?: string;
+        gender?: string;
+        search?: string;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
     getAllStudents(page?: number, limit?: number, schoolId?: string): Promise<{
         success: boolean;
         message: string;
@@ -59,4 +77,27 @@ export declare class StudentService {
         statusCode: number;
     }>;
     private updateSchoolStudentCount;
+    searchFilterPaginationStudents(query: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        lgaId?: string;
+        schoolId?: string;
+        classId?: string;
+        gender?: string;
+        subject?: string;
+        session?: string;
+        term?: TermType;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+    }): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
+    private getStudentOrderBy;
+    private getStudentFilterOptions;
 }

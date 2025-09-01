@@ -119,7 +119,7 @@ export class ExcelUploadService {
         data: {
           name: lgaName,
           code: lgaCode,
-          state: 'Abia State',
+          state: 'abia',
           isActive: true,
         }
       });
@@ -315,8 +315,7 @@ export class ExcelUploadService {
   private async getCurrentSessionId(schoolId: string): Promise<string> {
     let session = await this.prisma.session.findFirst({
       where: { 
-        name: '2024/2025',
-        schoolId: schoolId
+        name: '2024/2025'
       }
     });
     
@@ -324,7 +323,6 @@ export class ExcelUploadService {
       session = await this.prisma.session.create({
         data: {
           name: '2024/2025',
-          schoolId: schoolId,
           startDate: new Date('2024-09-01'),
           endDate: new Date('2025-07-31'),
           isActive: true,

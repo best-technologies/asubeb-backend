@@ -12,16 +12,14 @@ export class SessionController {
   @ApiOperation({ summary: 'Get all sessions' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page' })
-  @ApiQuery({ name: 'schoolId', required: false, description: 'Filter by school ID' })
   @ApiQuery({ name: 'isActive', required: false, description: 'Filter by active status' })
   @ApiResponse({ status: 200, description: 'Sessions retrieved successfully' })
   async getAllSessions(
     @Query('page') page = 1,
     @Query('limit') limit = 10,
-    @Query('schoolId') schoolId?: string,
     @Query('isActive') isActive?: boolean,
   ) {
-    return this.sessionService.getAllSessions(page, limit, schoolId, isActive);
+    return this.sessionService.getAllSessions(page, limit, isActive);
   }
 
   @Get('current')

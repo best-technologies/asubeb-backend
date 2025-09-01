@@ -37,13 +37,6 @@ let TermService = TermService_1 = class TermService {
                             select: {
                                 id: true,
                                 name: true,
-                                school: {
-                                    select: {
-                                        id: true,
-                                        name: true,
-                                        code: true,
-                                    },
-                                },
                             },
                         },
                         _count: {
@@ -84,13 +77,6 @@ let TermService = TermService_1 = class TermService {
                         select: {
                             id: true,
                             name: true,
-                            school: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    code: true,
-                                },
-                            },
                         },
                     },
                 },
@@ -117,13 +103,6 @@ let TermService = TermService_1 = class TermService {
                         select: {
                             id: true,
                             name: true,
-                            school: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    code: true,
-                                },
-                            },
                         },
                     },
                     assessments: {
@@ -184,13 +163,6 @@ let TermService = TermService_1 = class TermService {
                         select: {
                             id: true,
                             name: true,
-                            school: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    code: true,
-                                },
-                            },
                         },
                     },
                 },
@@ -246,13 +218,6 @@ let TermService = TermService_1 = class TermService {
                         select: {
                             id: true,
                             name: true,
-                            school: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    code: true,
-                                },
-                            },
                         },
                     },
                 },
@@ -318,13 +283,6 @@ let TermService = TermService_1 = class TermService {
                         select: {
                             id: true,
                             name: true,
-                            school: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    code: true,
-                                },
-                            },
                         },
                     },
                 },
@@ -355,13 +313,6 @@ let TermService = TermService_1 = class TermService {
                         select: {
                             id: true,
                             name: true,
-                            school: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    code: true,
-                                },
-                            },
                         },
                     },
                 },

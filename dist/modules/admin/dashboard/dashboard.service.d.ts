@@ -1,10 +1,12 @@
 import { PrismaService } from '../../../prisma/prisma.service';
 import { TermType } from '@prisma/client';
+import { DashboardQueryDto } from './dto';
 export declare class DashboardService {
     private readonly prisma;
     private readonly logger;
     constructor(prisma: PrismaService);
-    getAdminDashboard(session: string, term: TermType): Promise<{
+    private getOrderByClause;
+    getAdminDashboard(query: DashboardQueryDto): Promise<{
         success: boolean;
         message: string;
         data: any;

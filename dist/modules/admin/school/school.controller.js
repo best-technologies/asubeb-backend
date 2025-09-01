@@ -29,6 +29,14 @@ let SchoolController = SchoolController_1 = class SchoolController {
         this.logger.log(colors.cyan('Received school creation request'));
         return this.schoolService.createSchool(createSchoolDto);
     }
+    async getAllSchools(page = 1, limit = 10) {
+        this.logger.log(colors.cyan(`Received request to fetch schools - page: ${page}, limit: ${limit}`));
+        return this.schoolService.getAllSchools(page, limit);
+    }
+    async getAllClasses(page = 1, limit = 10) {
+        this.logger.log(colors.cyan(`Received request to fetch classes - page: ${page}, limit: ${limit}`));
+        return this.schoolService.getAllClasses(page, limit);
+    }
     async updateAllStudentCounts() {
         this.logger.log(colors.cyan('Received request to update all school student counts'));
         return this.schoolService.updateAllSchoolsStudentCounts();
@@ -59,6 +67,30 @@ __decorate([
     __metadata("design:paramtypes", [dto_1.CreateSchoolDto]),
     __metadata("design:returntype", Promise)
 ], SchoolController.prototype, "createSchool", null);
+__decorate([
+    (0, common_1.Get)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Get all schools with pagination' }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: 'Page number (default: 1)', example: 1 }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: 'Number of items per page (default: 10)', example: 10 }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Schools retrieved successfully' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number]),
+    __metadata("design:returntype", Promise)
+], SchoolController.prototype, "getAllSchools", null);
+__decorate([
+    (0, common_1.Get)('classes'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get all classes with pagination' }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: 'Page number (default: 1)', example: 1 }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: 'Number of items per page (default: 10)', example: 10 }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Classes retrieved successfully' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Number]),
+    __metadata("design:returntype", Promise)
+], SchoolController.prototype, "getAllClasses", null);
 __decorate([
     (0, common_1.Post)('update-student-counts'),
     (0, swagger_1.ApiOperation)({ summary: 'Update all schools student counts' }),

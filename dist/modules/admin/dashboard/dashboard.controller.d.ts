@@ -1,8 +1,9 @@
 import { DashboardService } from './dashboard.service';
+import { DashboardQueryDto } from './dto';
 export declare class DashboardController {
     private readonly dashboardService;
     constructor(dashboardService: DashboardService);
-    getAdminDashboard(session: string, term: string): Promise<{
+    getAdminDashboard(query: DashboardQueryDto): Promise<{
         success: boolean;
         message: string;
         data: any;

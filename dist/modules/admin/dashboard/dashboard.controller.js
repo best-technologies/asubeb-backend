@@ -16,13 +16,14 @@ exports.DashboardController = void 0;
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const dashboard_service_1 = require("./dashboard.service");
+const dto_1 = require("./dto");
 let DashboardController = class DashboardController {
     dashboardService;
     constructor(dashboardService) {
         this.dashboardService = dashboardService;
     }
-    async getAdminDashboard(session, term) {
-        return this.dashboardService.getAdminDashboard(session, term);
+    async getAdminDashboard(query) {
+        return this.dashboardService.getAdminDashboard(query);
     }
     async fetchDashboardPerformanceTable(session, term, page = 1, limit = 10, search, schoolId, classId, gender) {
         return this.dashboardService.fetchDashboardPerformanceTable(session, term, page, limit, search, schoolId, classId, gender);
@@ -31,15 +32,16 @@ let DashboardController = class DashboardController {
 exports.DashboardController = DashboardController;
 __decorate([
     (0, common_1.Get)(),
-    (0, swagger_1.ApiOperation)({ summary: 'Get admin dashboard data' }),
-    (0, swagger_1.ApiQuery)({ name: 'session', required: true, description: 'Academic session (e.g., 2023-2024)' }),
-    (0, swagger_1.ApiQuery)({ name: 'term', required: true, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Get admin dashboard data with pagination, search, and filters',
+        description: 'Returns dashboard data for the current session and term by default. Users can specify session and term to switch between different academic periods.'
+    }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Dashboard data retrieved successfully' }),
-    (0, swagger_1.ApiResponse)({ status: 400, description: 'Invalid session or term' }),
-    __param(0, (0, common_1.Query)('session')),
-    __param(1, (0, common_1.Query)('term')),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'Invalid parameters' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Session or term not found' }),
+    __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [dto_1.DashboardQueryDto]),
     __metadata("design:returntype", Promise)
 ], DashboardController.prototype, "getAdminDashboard", null);
 __decorate([

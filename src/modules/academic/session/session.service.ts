@@ -8,15 +8,11 @@ export class SessionService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getAllSessions(page: number, limit: number, schoolId?: string, isActive?: boolean) {
-    this.logger.log(`Fetching sessions - page: ${page}, limit: ${limit}, schoolId: ${schoolId}, isActive: ${isActive}`);
+  async getAllSessions(page: number, limit: number, isActive?: boolean) {
+    this.logger.log(`Fetching sessions - page: ${page}, limit: ${limit}, isActive: ${isActive}`);
 
     try {
       const whereConditions: any = {};
-      
-      if (schoolId) {
-        whereConditions.schoolId = schoolId;
-      }
       
       if (isActive !== undefined) {
         whereConditions.isActive = isActive;
@@ -26,13 +22,6 @@ export class SessionService {
         this.prisma.session.findMany({
           where: whereConditions,
           include: {
-            school: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
-              },
-            },
             _count: {
               select: {
                 terms: true,
@@ -70,13 +59,6 @@ export class SessionService {
       const currentSession = await this.prisma.session.findFirst({
         where: { isCurrent: true },
         include: {
-          school: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
           terms: {
             where: { isCurrent: true },
             take: 1,
@@ -104,13 +86,6 @@ export class SessionService {
       const session = await this.prisma.session.findUnique({
         where: { id },
         include: {
-          school: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
           terms: {
             orderBy: { name: 'asc' },
           },
@@ -134,23 +109,22 @@ export class SessionService {
     this.logger.log(`Creating new session: ${createSessionDto.name}`);
 
     try {
-      // Check if session name already exists for the school
+      // Check if session name already exists
       const existingSession = await this.prisma.session.findFirst({
         where: {
           name: createSessionDto.name,
-          schoolId: createSessionDto.schoolId,
         },
       });
 
       if (existingSession) {
-        this.logger.warn(`Session with name ${createSessionDto.name} already exists for this school`);
-        throw new BadRequestException(`Session with name ${createSessionDto.name} already exists for this school`);
+        this.logger.warn(`Session with name ${createSessionDto.name} already exists`);
+        throw new BadRequestException(`Session with name ${createSessionDto.name} already exists`);
       }
 
       // If this session is being set as current, deactivate other sessions
       if (createSessionDto.isCurrent) {
         await this.prisma.session.updateMany({
-          where: { schoolId: createSessionDto.schoolId, isCurrent: true },
+          where: { isCurrent: true },
           data: { isCurrent: false },
         });
       }
@@ -158,20 +132,10 @@ export class SessionService {
       const newSession = await this.prisma.session.create({
         data: {
           name: createSessionDto.name,
-          schoolId: createSessionDto.schoolId,
           startDate: new Date(createSessionDto.startDate),
           endDate: new Date(createSessionDto.endDate),
           isActive: createSessionDto.isActive ?? true,
           isCurrent: createSessionDto.isCurrent ?? false,
-        },
-        include: {
-          school: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
         },
       });
 
@@ -201,21 +165,20 @@ export class SessionService {
         const duplicateSession = await this.prisma.session.findFirst({
           where: {
             name: updateSessionDto.name,
-            schoolId: existingSession.schoolId,
             id: { not: id },
           },
         });
 
         if (duplicateSession) {
-          this.logger.warn(`Session with name ${updateSessionDto.name} already exists for this school`);
-          throw new BadRequestException(`Session with name ${updateSessionDto.name} already exists for this school`);
+          this.logger.warn(`Session with name ${updateSessionDto.name} already exists`);
+          throw new BadRequestException(`Session with name ${updateSessionDto.name} already exists`);
         }
       }
 
       // If setting as current, deactivate other sessions
       if (updateSessionDto.isCurrent) {
         await this.prisma.session.updateMany({
-          where: { schoolId: existingSession.schoolId, isCurrent: true, id: { not: id } },
+          where: { isCurrent: true, id: { not: id } },
           data: { isCurrent: false },
         });
       }
@@ -228,15 +191,6 @@ export class SessionService {
           endDate: updateSessionDto.endDate ? new Date(updateSessionDto.endDate) : undefined,
           isActive: updateSessionDto.isActive,
           isCurrent: updateSessionDto.isCurrent,
-        },
-        include: {
-          school: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
         },
       });
 
@@ -294,24 +248,15 @@ export class SessionService {
         throw new NotFoundException(`Session with ID ${id} not found`);
       }
 
-      // Deactivate other sessions for the same school
+      // Deactivate other sessions
       await this.prisma.session.updateMany({
-        where: { schoolId: session.schoolId, isCurrent: true },
+        where: { isCurrent: true },
         data: { isCurrent: false },
       });
 
       const activatedSession = await this.prisma.session.update({
         where: { id },
         data: { isCurrent: true, isActive: true },
-        include: {
-          school: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
-        },
       });
 
       this.logger.log(`Successfully activated session: ${activatedSession.name}`);
@@ -338,15 +283,6 @@ export class SessionService {
       const deactivatedSession = await this.prisma.session.update({
         where: { id },
         data: { isCurrent: false, isActive: false },
-        include: {
-          school: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
-        },
       });
 
       this.logger.log(`Successfully deactivated session: ${deactivatedSession.name}`);

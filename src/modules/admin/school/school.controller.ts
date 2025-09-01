@@ -1,5 +1,5 @@
-import { Controller, Post, Body, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Post, Get, Body, Logger, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { SchoolService } from './school.service';
 import { CreateSchoolDto } from './dto';
 import * as colors from 'colors';
@@ -32,6 +32,32 @@ export class SchoolController {
   async createSchool(@Body() createSchoolDto: CreateSchoolDto) {
     this.logger.log(colors.cyan('Received school creation request'));
     return this.schoolService.createSchool(createSchoolDto);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all schools with pagination' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of items per page (default: 10)', example: 10 })
+  @ApiResponse({ status: 200, description: 'Schools retrieved successfully' })
+  async getAllSchools(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    this.logger.log(colors.cyan(`Received request to fetch schools - page: ${page}, limit: ${limit}`));
+    return this.schoolService.getAllSchools(page, limit);
+  }
+
+  @Get('classes')
+  @ApiOperation({ summary: 'Get all classes with pagination' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of items per page (default: 10)', example: 10 })
+  @ApiResponse({ status: 200, description: 'Classes retrieved successfully' })
+  async getAllClasses(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    this.logger.log(colors.cyan(`Received request to fetch classes - page: ${page}, limit: ${limit}`));
+    return this.schoolService.getAllClasses(page, limit);
   }
 
   @Post('update-student-counts')

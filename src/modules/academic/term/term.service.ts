@@ -29,13 +29,6 @@ export class TermService {
               select: {
                 id: true,
                 name: true,
-                school: {
-                  select: {
-                    id: true,
-                    name: true,
-                    code: true,
-                  },
-                },
               },
             },
             _count: {
@@ -79,13 +72,6 @@ export class TermService {
             select: {
               id: true,
               name: true,
-              school: {
-                select: {
-                  id: true,
-                  name: true,
-                  code: true,
-                },
-              },
             },
           },
         },
@@ -115,13 +101,6 @@ export class TermService {
             select: {
               id: true,
               name: true,
-              school: {
-                select: {
-                  id: true,
-                  name: true,
-                  code: true,
-                },
-              },
             },
           },
           assessments: {
@@ -193,13 +172,6 @@ export class TermService {
             select: {
               id: true,
               name: true,
-              school: {
-                select: {
-                  id: true,
-                  name: true,
-                  code: true,
-                },
-              },
             },
           },
         },
@@ -264,13 +236,6 @@ export class TermService {
             select: {
               id: true,
               name: true,
-              school: {
-                select: {
-                  id: true,
-                  name: true,
-                  code: true,
-                },
-              },
             },
           },
         },
@@ -347,13 +312,6 @@ export class TermService {
             select: {
               id: true,
               name: true,
-              school: {
-                select: {
-                  id: true,
-                  name: true,
-                  code: true,
-                },
-              },
             },
           },
         },
@@ -388,13 +346,6 @@ export class TermService {
             select: {
               id: true,
               name: true,
-              school: {
-                select: {
-                  id: true,
-                  name: true,
-                  code: true,
-                },
-              },
             },
           },
         },

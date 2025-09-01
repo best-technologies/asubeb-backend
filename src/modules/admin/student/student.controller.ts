@@ -1,14 +1,92 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { StudentService } from './student.service';
+import { TermType } from '@prisma/client';
 
 @ApiTags('admin-student')
 @Controller('admin/students')
 export class StudentController {
   constructor(private readonly studentService: StudentService) {}
 
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Get student dashboard data with advanced filtering' })
+  @ApiQuery({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025)' })
+  @ApiQuery({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)' })
+  @ApiQuery({ name: 'schoolId', required: false, description: 'Filter by school ID' })
+  @ApiQuery({ name: 'classId', required: false, description: 'Filter by class ID' })
+  @ApiQuery({ name: 'subject', required: false, description: 'Filter by subject name' })
+  @ApiQuery({ name: 'gender', required: false, description: 'Gender (MALE, FEMALE, OTHER)' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by student name or ID' })
+  @ApiResponse({ status: 200, description: 'Student dashboard data retrieved successfully' })
+  async getStudentDashboard(
+    @Query('session') session?: string,
+    @Query('term') term?: string,
+    @Query('schoolId') schoolId?: string,
+    @Query('classId') classId?: string,
+    @Query('subject') subject?: string,
+    @Query('gender') gender?: string,
+    @Query('search') search?: string,
+  ) {
+    const filters = {
+      session,
+      term: term as TermType,
+      schoolId,
+      classId,
+      subject,
+      gender,
+      search,
+    };
+
+    return this.studentService.getStudentDashboard(filters);
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search, filter, and paginate students with comprehensive options' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (default: 10)', example: 10 })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by student name, ID, or email' })
+  @ApiQuery({ name: 'lgaId', required: false, description: 'Filter by Local Government Area ID' })
+  @ApiQuery({ name: 'schoolId', required: false, description: 'Filter by school ID' })
+  @ApiQuery({ name: 'classId', required: false, description: 'Filter by class ID' })
+  @ApiQuery({ name: 'gender', required: false, description: 'Filter by gender (MALE, FEMALE, OTHER)' })
+  @ApiQuery({ name: 'subject', required: false, description: 'Filter by subject name' })
+  @ApiQuery({ name: 'session', required: false, description: 'Academic session (e.g., 2023-2024)' })
+  @ApiQuery({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Sort by field (firstName, lastName, studentId, email, gender, enrollmentDate)', example: 'firstName' })
+  @ApiQuery({ name: 'sortOrder', required: false, description: 'Sort order (asc, desc)', example: 'asc' })
+  @ApiResponse({ status: 200, description: 'Students retrieved successfully' })
+  async searchFilterPaginationStudents(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search?: string,
+    @Query('lgaId') lgaId?: string,
+    @Query('schoolId') schoolId?: string,
+    @Query('classId') classId?: string,
+    @Query('gender') gender?: string,
+    @Query('subject') subject?: string,
+    @Query('session') session?: string,
+    @Query('term') term?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+  ) {
+    return this.studentService.searchFilterPaginationStudents({
+      page,
+      limit,
+      search,
+      lgaId,
+      schoolId,
+      classId,
+      gender,
+      subject,
+      session,
+      term: term as TermType,
+      sortBy,
+      sortOrder,
+    });
+  }
+
   @Get()
-  @ApiOperation({ summary: 'Get all students' })
+  @ApiOperation({ summary: 'Get all students (legacy endpoint)' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page' })
   @ApiQuery({ name: 'schoolId', required: false, description: 'Filter by school ID' })

@@ -104,7 +104,6 @@ model School {
   classes  Class[]
   teachers Teacher[]
   students Student[]
-  sessions Session[]
 
   @@map("schools")
 }
@@ -274,7 +273,6 @@ model TeacherSubject {
 model Session {
   id        String   @id @default(cuid())
   name      String   @unique // e.g., "2023-2024"
-  schoolId  String
   startDate DateTime
   endDate   DateTime
   isActive  Boolean  @default(false)
@@ -283,8 +281,7 @@ model Session {
   updatedAt DateTime @updatedAt
 
   // Relations
-  school School @relation(fields: [schoolId], references: [id])
-  terms  Term[]
+  terms Term[]
 
   @@map("sessions")
 }

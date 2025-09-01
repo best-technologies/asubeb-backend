@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
+import { DashboardQueryDto } from './dto';
 import { TermType } from '@prisma/client';
 
 @ApiTags('admin-dashboard')
@@ -9,16 +10,15 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get admin dashboard data' })
-  @ApiQuery({ name: 'session', required: true, description: 'Academic session (e.g., 2023-2024)' })
-  @ApiQuery({ name: 'term', required: true, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)' })
+  @ApiOperation({ 
+    summary: 'Get admin dashboard data with pagination, search, and filters',
+    description: 'Returns dashboard data for the current session and term by default. Users can specify session and term to switch between different academic periods.'
+  })
   @ApiResponse({ status: 200, description: 'Dashboard data retrieved successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid session or term' })
-  async getAdminDashboard(
-    @Query('session') session: string,
-    @Query('term') term: string,
-  ) {
-    return this.dashboardService.getAdminDashboard(session, term as TermType);
+  @ApiResponse({ status: 400, description: 'Invalid parameters' })
+  @ApiResponse({ status: 404, description: 'Session or term not found' })
+  async getAdminDashboard(@Query() query: DashboardQueryDto) {
+    return this.dashboardService.getAdminDashboard(query);
   }
 
   @Get('performance-table')

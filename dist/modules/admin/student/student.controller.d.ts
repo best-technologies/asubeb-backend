@@ -2,6 +2,22 @@ import { StudentService } from './student.service';
 export declare class StudentController {
     private readonly studentService;
     constructor(studentService: StudentService);
+    getStudentDashboard(session?: string, term?: string, schoolId?: string, classId?: string, subject?: string, gender?: string, search?: string): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
+    searchFilterPaginationStudents(page?: number, limit?: number, search?: string, lgaId?: string, schoolId?: string, classId?: string, gender?: string, subject?: string, session?: string, term?: string, sortBy?: string, sortOrder?: 'asc' | 'desc'): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
     getAllStudents(page?: number, limit?: number, schoolId?: string): Promise<{
         success: boolean;
         message: string;

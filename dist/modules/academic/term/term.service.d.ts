@@ -6,11 +6,6 @@ export declare class TermService {
     getAllTerms(page: number, limit: number, sessionId?: string, isActive?: boolean): Promise<{
         data: ({
             session: {
-                school: {
-                    name: string;
-                    id: string;
-                    code: string;
-                };
                 name: string;
                 id: string;
             };
@@ -20,13 +15,13 @@ export declare class TermService {
         } & {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
-            isActive: boolean;
             createdAt: Date;
             updatedAt: Date;
-            sessionId: string;
             startDate: Date;
             endDate: Date;
+            isActive: boolean;
             isCurrent: boolean;
+            sessionId: string;
         })[];
         pagination: {
             page: number;
@@ -37,32 +32,22 @@ export declare class TermService {
     }>;
     getCurrentTerm(): Promise<{
         session: {
-            school: {
-                name: string;
-                id: string;
-                code: string;
-            };
             name: string;
             id: string;
         };
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
-        sessionId: string;
         startDate: Date;
         endDate: Date;
+        isActive: boolean;
         isCurrent: boolean;
+        sessionId: string;
     }>;
     getTermById(id: string): Promise<{
         session: {
-            school: {
-                name: string;
-                id: string;
-                code: string;
-            };
             name: string;
             id: string;
         };
@@ -73,8 +58,8 @@ export declare class TermService {
             title: string;
             classId: string;
             createdAt: Date;
-            updatedAt: Date;
             studentId: string;
+            updatedAt: Date;
             teacherId: string | null;
             subjectId: string;
             termId: string;
@@ -90,55 +75,45 @@ export declare class TermService {
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
-        sessionId: string;
         startDate: Date;
         endDate: Date;
+        isActive: boolean;
         isCurrent: boolean;
+        sessionId: string;
     }>;
     createTerm(createTermDto: any): Promise<{
         session: {
-            school: {
-                name: string;
-                id: string;
-                code: string;
-            };
             name: string;
             id: string;
         };
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
-        sessionId: string;
         startDate: Date;
         endDate: Date;
+        isActive: boolean;
         isCurrent: boolean;
+        sessionId: string;
     }>;
     updateTerm(id: string, updateTermDto: any): Promise<{
         session: {
-            school: {
-                name: string;
-                id: string;
-                code: string;
-            };
             name: string;
             id: string;
         };
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
-        sessionId: string;
         startDate: Date;
         endDate: Date;
+        isActive: boolean;
         isCurrent: boolean;
+        sessionId: string;
     }>;
     deleteTerm(id: string): Promise<{
         message: string;
@@ -150,8 +125,8 @@ export declare class TermService {
                 title: string;
                 classId: string;
                 createdAt: Date;
-                updatedAt: Date;
                 studentId: string;
+                updatedAt: Date;
                 teacherId: string | null;
                 subjectId: string;
                 termId: string;
@@ -167,63 +142,53 @@ export declare class TermService {
         } & {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
-            isActive: boolean;
             createdAt: Date;
             updatedAt: Date;
-            sessionId: string;
             startDate: Date;
             endDate: Date;
+            isActive: boolean;
             isCurrent: boolean;
+            sessionId: string;
         };
     }>;
     activateTerm(id: string): Promise<{
         session: {
-            school: {
-                name: string;
-                id: string;
-                code: string;
-            };
             name: string;
             id: string;
         };
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
-        sessionId: string;
         startDate: Date;
         endDate: Date;
+        isActive: boolean;
         isCurrent: boolean;
+        sessionId: string;
     }>;
     deactivateTerm(id: string): Promise<{
         session: {
-            school: {
-                name: string;
-                id: string;
-                code: string;
-            };
             name: string;
             id: string;
         };
     } & {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
-        isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
-        sessionId: string;
         startDate: Date;
         endDate: Date;
+        isActive: boolean;
         isCurrent: boolean;
+        sessionId: string;
     }>;
     getTermAssessments(id: string): Promise<({
         student: {
             id: string;
-            studentId: string;
             firstName: string;
             lastName: string;
+            studentId: string;
         };
         subject: {
             name: string;
@@ -237,8 +202,8 @@ export declare class TermService {
         title: string;
         classId: string;
         createdAt: Date;
-        updatedAt: Date;
         studentId: string;
+        updatedAt: Date;
         teacherId: string | null;
         subjectId: string;
         termId: string;

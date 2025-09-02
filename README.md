@@ -314,3 +314,5 @@ For support and questions:
 ---
 
 **Built with ❤️ using NestJS and PostgreSQL**
+
+# Create a backup of your clean local database

@@ -14,6 +14,7 @@ const student_module_1 = require("./student/student.module");
 const class_module_1 = require("./class/class.module");
 const lga_module_1 = require("./lga/lga.module");
 const excel_upload_module_1 = require("./excel-upload/excel-upload.module");
+const bigquery_import_module_1 = require("./bigquery-import/bigquery-import.module");
 let AdminModule = class AdminModule {
 };
 exports.AdminModule = AdminModule;
@@ -26,6 +27,7 @@ exports.AdminModule = AdminModule = __decorate([
             class_module_1.ClassModule,
             lga_module_1.LgaModule,
             excel_upload_module_1.ExcelUploadModule,
+            bigquery_import_module_1.BigQueryImportModule,
         ],
         exports: [
             dashboard_module_1.DashboardModule,
@@ -34,6 +36,7 @@ exports.AdminModule = AdminModule = __decorate([
             class_module_1.ClassModule,
             lga_module_1.LgaModule,
             excel_upload_module_1.ExcelUploadModule,
+            bigquery_import_module_1.BigQueryImportModule,
         ],
     })
 ], AdminModule);

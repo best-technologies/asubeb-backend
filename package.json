@@ -52,6 +52,7 @@
     "docker:lint": "docker-compose -f docker-compose.dev.yml exec backend npm run lint"
   },
   "dependencies": {
+    "@google-cloud/bigquery": "^8.1.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",

@@ -1,0 +1,75 @@
+import { PrismaService } from '../../../prisma/prisma.service';
+import { BigQueryService } from './bigquery.service';
+interface BigQueryRow {
+    'School Name'?: string;
+    school_name?: string;
+    LGA?: string;
+    lga?: string;
+    'Student Name'?: string;
+    student_name?: string;
+    Class?: string;
+    class?: string;
+    Gender?: string;
+    gender?: string;
+    'English Language'?: number;
+    english_language?: number;
+    Mathematics?: number;
+    mathematics?: number;
+    'Number work'?: number;
+    number_work?: number;
+    'General norms'?: number;
+    general_norms?: number;
+    'Letter work'?: number;
+    letter_work?: number;
+    Rhyme?: number;
+    rhyme?: number;
+    'National values'?: number;
+    national_values?: number;
+    Prevocational?: number;
+    prevocational?: number;
+    CRS?: number;
+    crs?: number;
+    History?: number;
+    history?: number;
+    'Igbo Language'?: number;
+    igbo_language?: number;
+    CCA?: number;
+    cca?: number;
+    'Basic science and technology'?: number;
+    basic_science_technology?: number;
+    'Total Score'?: number;
+    total_score?: number;
+}
+export declare class BigQueryImportService {
+    private readonly prisma;
+    private readonly bigQueryService;
+    private readonly logger;
+    constructor(prisma: PrismaService, bigQueryService: BigQueryService);
+    importFromBigQueryTable(datasetId: string, tableId: string, limit?: number): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
+    private normalizeColumnNames;
+    importFromBigQuery(bigQueryData: BigQueryRow[]): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
+    private processRow;
+    private generateUniqueLgaCode;
+    private generateUniqueSchoolCode;
+    private mapGender;
+    private getCurrentSessionId;
+    private getCurrentTermId;
+    private generateUniqueStudentId;
+    private getSubjectId;
+    testConnection(): Promise<boolean>;
+}
+export {};

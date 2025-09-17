@@ -1,4 +1,4 @@
-# Asubeb Backend API
+# ASUBEB Backend API
 
 A comprehensive NestJS backend application for managing educational data, student performance, and administrative functions for the Abia State Universal Basic Education Board (ASUBEB).
 

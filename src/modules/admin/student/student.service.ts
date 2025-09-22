@@ -331,8 +331,11 @@ export class StudentService {
     });
 
     if (!student) {
+      this.logger.error(`Student with ID ${id} not found`);
       throw new NotFoundException(`Student with ID ${id} not found`);
     }
+
+    this.logger.log(`Student with ID ${id} retrieved successfully`);
 
     return ResponseHelper.success('Student retrieved successfully', student);
   }

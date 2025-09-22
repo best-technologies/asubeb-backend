@@ -288,8 +288,10 @@ let StudentService = StudentService_1 = class StudentService {
             },
         });
         if (!student) {
+            this.logger.error(`Student with ID ${id} not found`);
             throw new common_1.NotFoundException(`Student with ID ${id} not found`);
         }
+        this.logger.log(`Student with ID ${id} retrieved successfully`);
         return response_helper_1.ResponseHelper.success('Student retrieved successfully', student);
     }
     async createStudent(createStudentDto) {

@@ -21,6 +21,12 @@ let StudentController = class StudentController {
     constructor(studentService) {
         this.studentService = studentService;
     }
+    async getStudentExplorer(sessionId, termId, lgaId, schoolId, classId, studentId, search, page = 1, limit = 10) {
+        return this.studentService.getStudentExplorer({ sessionId, termId, lgaId, schoolId, classId, studentId, search, page, limit });
+    }
+    async getStudentExploreAlias(sessionId, termId, lgaId, schoolId, classId, studentId, search, page = 1, limit = 10) {
+        return this.studentService.getStudentExplorer({ sessionId, termId, lgaId, schoolId, classId, studentId, search, page, limit });
+    }
     async getStudentDashboard(session, term, schoolId, classId, subject, gender, search) {
         const filters = {
             session,
@@ -72,6 +78,90 @@ let StudentController = class StudentController {
     }
 };
 exports.StudentController = StudentController;
+__decorate([
+    (0, common_1.Get)('explorer'),
+    (0, swagger_1.ApiOperation)({ summary: 'Cascading explorer for sessions/terms → LGAs → schools → classes → students' }),
+    (0, swagger_1.ApiQuery)({ name: 'sessionId', required: false, description: 'Selected session ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'termId', required: false, description: 'Selected term ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'lgaId', required: false, description: 'Selected LGA ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false, description: 'Selected school ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'classId', required: false, description: 'Selected class ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'studentId', required: false, description: 'Selected student ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'search', required: false, description: 'Search by student name, school, or LGA' }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: 'Students page number (default: 1)', example: 1 }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: 'Students per page (default: 10)', example: 10 }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Explorer data retrieved successfully' }),
+    (0, swagger_1.ApiOkResponse)({
+        description: 'Explorer data with selections, filters, optional students, pagination, and totals',
+        schema: {
+            example: {
+                success: true,
+                message: 'Explorer data retrieved successfully',
+                data: {
+                    selections: {
+                        session: { id: 'sess_1', name: '2024/2025' },
+                        term: { id: 'term_2', name: 'SECOND_TERM' },
+                        lga: { id: 'lga_1', name: 'Umuahia North' },
+                        school: { id: 'sch_1', name: 'Central Primary School' },
+                        class: { id: 'cls_5', name: 'Primary 5' },
+                        student: { id: 'stu_1', name: 'John Doe' },
+                    },
+                    sessions: [
+                        { id: 'sess_1', name: '2024/2025', isCurrent: true, terms: [{ id: 'term_1', name: 'FIRST_TERM', isCurrent: false }] },
+                    ],
+                    lgas: [{ id: 'lga_1', name: 'Umuahia North', code: 'UMN', state: 'Abia' }],
+                    schools: [{ id: 'sch_1', name: 'Central Primary School', code: 'CPS', level: 'PRIMARY' }],
+                    classes: [{ id: 'cls_5', name: 'Primary 5', grade: 5, section: 'A' }],
+                    students: [{ id: 'stu_1', firstName: 'John', lastName: 'Doe', studentId: 'STU123', gender: 'MALE', email: 'john@example.com' }],
+                    pagination: { page: 1, limit: 10, total: 57, totalPages: 6 },
+                    totals: { schools: 1000, classes: 9, students: 57 },
+                    lastUpdated: '2025-09-22T12:00:00.000Z',
+                },
+            },
+        },
+    }),
+    __param(0, (0, common_1.Query)('sessionId')),
+    __param(1, (0, common_1.Query)('termId')),
+    __param(2, (0, common_1.Query)('lgaId')),
+    __param(3, (0, common_1.Query)('schoolId')),
+    __param(4, (0, common_1.Query)('classId')),
+    __param(5, (0, common_1.Query)('studentId')),
+    __param(6, (0, common_1.Query)('search')),
+    __param(7, (0, common_1.Query)('page')),
+    __param(8, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String, String, String, String, Number, Number]),
+    __metadata("design:returntype", Promise)
+], StudentController.prototype, "getStudentExplorer", null);
+__decorate([
+    (0, common_1.Get)('explore'),
+    (0, swagger_1.ApiOperation)({ summary: 'Alias of explorer endpoint' }),
+    (0, swagger_1.ApiQuery)({ name: 'sessionId', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'termId', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'lgaId', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'classId', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'studentId', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'search', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, example: 1 }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, example: 10 }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Explorer data retrieved successfully' }),
+    (0, swagger_1.ApiOkResponse)({
+        description: 'Explorer data (alias)',
+    }),
+    __param(0, (0, common_1.Query)('sessionId')),
+    __param(1, (0, common_1.Query)('termId')),
+    __param(2, (0, common_1.Query)('lgaId')),
+    __param(3, (0, common_1.Query)('schoolId')),
+    __param(4, (0, common_1.Query)('classId')),
+    __param(5, (0, common_1.Query)('studentId')),
+    __param(6, (0, common_1.Query)('search')),
+    __param(7, (0, common_1.Query)('page')),
+    __param(8, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String, String, String, String, Number, Number]),
+    __metadata("design:returntype", Promise)
+], StudentController.prototype, "getStudentExploreAlias", null);
 __decorate([
     (0, common_1.Get)('dashboard'),
     (0, swagger_1.ApiOperation)({ summary: 'Get student dashboard data with advanced filtering' }),

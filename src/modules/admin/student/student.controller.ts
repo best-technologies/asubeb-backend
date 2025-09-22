@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiOkResponse } from '@nestjs/swagger';
 import { StudentService } from './student.service';
 import { TermType } from '@prisma/client';
 
@@ -7,6 +7,91 @@ import { TermType } from '@prisma/client';
 @Controller('admin/students')
 export class StudentController {
   constructor(private readonly studentService: StudentService) {}
+
+  @Get('explorer')
+  @ApiOperation({ summary: 'Cascading explorer for sessions/terms → LGAs → schools → classes → students' })
+  @ApiQuery({ name: 'sessionId', required: false, description: 'Selected session ID' })
+  @ApiQuery({ name: 'termId', required: false, description: 'Selected term ID' })
+  @ApiQuery({ name: 'lgaId', required: false, description: 'Selected LGA ID' })
+  @ApiQuery({ name: 'schoolId', required: false, description: 'Selected school ID' })
+  @ApiQuery({ name: 'classId', required: false, description: 'Selected class ID' })
+  @ApiQuery({ name: 'studentId', required: false, description: 'Selected student ID' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by student name, school, or LGA' })
+  @ApiQuery({ name: 'page', required: false, description: 'Students page number (default: 1)', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Students per page (default: 10)', example: 10 })
+  @ApiResponse({ status: 200, description: 'Explorer data retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Explorer data with selections, filters, optional students, pagination, and totals',
+    schema: {
+      example: {
+        success: true,
+        message: 'Explorer data retrieved successfully',
+        data: {
+          selections: {
+            session: { id: 'sess_1', name: '2024/2025' },
+            term: { id: 'term_2', name: 'SECOND_TERM' },
+            lga: { id: 'lga_1', name: 'Umuahia North' },
+            school: { id: 'sch_1', name: 'Central Primary School' },
+            class: { id: 'cls_5', name: 'Primary 5' },
+            student: { id: 'stu_1', name: 'John Doe' },
+          },
+          sessions: [
+            { id: 'sess_1', name: '2024/2025', isCurrent: true, terms: [ { id: 'term_1', name: 'FIRST_TERM', isCurrent: false } ] },
+          ],
+          lgas: [ { id: 'lga_1', name: 'Umuahia North', code: 'UMN', state: 'Abia' } ],
+          schools: [ { id: 'sch_1', name: 'Central Primary School', code: 'CPS', level: 'PRIMARY' } ],
+          classes: [ { id: 'cls_5', name: 'Primary 5', grade: 5, section: 'A' } ],
+          students: [ { id: 'stu_1', firstName: 'John', lastName: 'Doe', studentId: 'STU123', gender: 'MALE', email: 'john@example.com' } ],
+          pagination: { page: 1, limit: 10, total: 57, totalPages: 6 },
+          totals: { schools: 1000, classes: 9, students: 57 },
+          lastUpdated: '2025-09-22T12:00:00.000Z',
+        },
+      },
+    },
+  })
+  async getStudentExplorer(
+    @Query('sessionId') sessionId?: string,
+    @Query('termId') termId?: string,
+    @Query('lgaId') lgaId?: string,
+    @Query('schoolId') schoolId?: string,
+    @Query('classId') classId?: string,
+    @Query('studentId') studentId?: string,
+    @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.studentService.getStudentExplorer({ sessionId, termId, lgaId, schoolId, classId, studentId, search, page, limit });
+  }
+
+  // Alias for convenience: /admin/students/explore (maps to explorer)
+  @Get('explore')
+  @ApiOperation({ summary: 'Alias of explorer endpoint' })
+  @ApiQuery({ name: 'sessionId', required: false })
+  @ApiQuery({ name: 'termId', required: false })
+  @ApiQuery({ name: 'lgaId', required: false })
+  @ApiQuery({ name: 'schoolId', required: false })
+  @ApiQuery({ name: 'classId', required: false })
+  @ApiQuery({ name: 'studentId', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  @ApiResponse({ status: 200, description: 'Explorer data retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Explorer data (alias)',
+  })
+  async getStudentExploreAlias(
+    @Query('sessionId') sessionId?: string,
+    @Query('termId') termId?: string,
+    @Query('lgaId') lgaId?: string,
+    @Query('schoolId') schoolId?: string,
+    @Query('classId') classId?: string,
+    @Query('studentId') studentId?: string,
+    @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.studentService.getStudentExplorer({ sessionId, termId, lgaId, schoolId, classId, studentId, search, page, limit });
+  }
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Get student dashboard data with advanced filtering' })

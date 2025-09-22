@@ -119,6 +119,56 @@ POST   /admin/students              # Create new student
 PUT    /admin/students/:id          # Update student
 DELETE /admin/students/:id          # Delete student
 GET    /admin/students/:id/assessment-breakdown  # Get student assessments
+GET    /admin/students/explorer     # Cascading explorer (sessions/terms → LGAs → schools → classes → students)
+GET    /admin/students/explore      # Alias of explorer
+```
+
+#### Students Explorer
+Endpoint to progressively fetch filters and results for the Students tab.
+
+Query parameters (all optional):
+- `sessionId`: selected session id
+- `termId`: selected term id
+- `lgaId`: selected LGA id
+- `schoolId`: selected school id
+- `classId`: selected class id
+- `studentId`: selected student id (returns that student for current active session/term)
+- `search`: search string (student name, school name, or LGA name)
+- `page`: students page number (default 1)
+- `limit`: students per page (default 10)
+
+Behavior:
+- No params: returns all active sessions (with terms) and all LGAs
+- With `lgaId`: also returns schools under that LGA
+- With `schoolId`: returns all active classes (classes are global, not per-school)
+- With `classId` (optionally with `schoolId`): returns students in that class, filtered by school if provided, for the active session/term; includes pagination
+- With `studentId`: returns that student’s record and assessments for the active session/term
+- `search` works globally or scoped (by `lgaId`/`schoolId`/`classId`) and is applied to student first/last name, school name, or LGA name
+
+Response shape (key fields):
+```json
+{
+  "success": true,
+  "message": "Explorer data retrieved successfully",
+  "data": {
+    "selections": {
+      "session": { "id": "...", "name": "2024/2025" },
+      "term": { "id": "...", "name": "SECOND_TERM" },
+      "lga": { "id": "...", "name": "Umuahia North" },
+      "school": { "id": "...", "name": "Central Primary School" },
+      "class": { "id": "...", "name": "Primary 5" },
+      "student": { "id": "...", "name": "John Doe" }
+    },
+    "sessions": [ { "id": "...", "name": "2024/2025", "terms": [ { "id": "...", "name": "FIRST_TERM" } ] } ],
+    "lgas": [ { "id": "...", "name": "Umuahia North" } ],
+    "schools": [ { "id": "...", "name": "Central Primary School" } ],
+    "classes": [ { "id": "...", "name": "Primary 5" } ],
+    "students": [ { "id": "...", "firstName": "John", "lastName": "Doe", "studentId": "STU123" } ],
+    "pagination": { "page": 1, "limit": 10, "total": 57, "totalPages": 6 },
+    "totals": { "schools": 1000, "classes": 9, "students": 57 },
+    "lastUpdated": "2025-09-22T12:00:00.000Z"
+  }
+}
 ```
 
 ### School Management

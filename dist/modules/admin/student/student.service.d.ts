@@ -98,6 +98,24 @@ export declare class StudentService {
         meta: any;
         statusCode: number;
     }>;
+    getStudentExplorer(params: {
+        sessionId?: string;
+        termId?: string;
+        lgaId?: string;
+        schoolId?: string;
+        classId?: string;
+        studentId?: string;
+        search?: string;
+        page?: number;
+        limit?: number;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
     private getStudentOrderBy;
     private getStudentFilterOptions;
 }

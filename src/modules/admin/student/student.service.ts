@@ -797,6 +797,363 @@ export class StudentService {
     }
   }
 
+  async getStudentExplorer(params: {
+    sessionId?: string;
+    termId?: string;
+    lgaId?: string;
+    schoolId?: string;
+    classId?: string;
+    studentId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    this.logger.log(`Student explorer params: ${JSON.stringify(params)}`);
+
+    const { sessionId, termId, lgaId, schoolId, classId, studentId, search } = params;
+
+    // Always provide sessions (with terms) and LGAs for the explorer header filters
+    const [sessions, lgas] = await Promise.all([
+      this.prisma.session.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          isCurrent: true,
+          terms: {
+            where: { isActive: true },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true, name: true, isCurrent: true },
+          },
+        },
+      }),
+      this.prisma.localGovernmentArea.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, code: true, state: true },
+      }),
+    ]);
+
+    let schools: any[] | undefined;
+    let classes: any[] | undefined;
+    let students: any[] | undefined;
+    let student: any | undefined;
+    let studentsPagination: { page: number; limit: number; total: number; totalPages: number } | undefined;
+    let selectedSession: { id: string; name: string } | undefined;
+    let selectedTerm: { id: string; name: string } | undefined;
+    let selectedLga: { id: string; name: string } | undefined;
+    let selectedSchool: { id: string; name: string } | undefined;
+    let selectedClass: { id: string; name: string } | undefined;
+    let selectedStudent: { id: string; name: string } | undefined;
+
+    // If a specific student is requested, fetch that student's record for the current active session/term
+    if (studentId) {
+      // Resolve current active session and term
+      let activeSession = await this.prisma.session.findFirst({ where: { isCurrent: true, isActive: true } });
+      if (!activeSession) {
+        activeSession = await this.prisma.session.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
+      }
+
+      let activeTerm = await this.prisma.term.findFirst({
+        where: { isCurrent: true, isActive: true, ...(activeSession && { sessionId: activeSession.id }) },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!activeTerm && activeSession) {
+        activeTerm = await this.prisma.term.findFirst({ where: { sessionId: activeSession.id, isActive: true }, orderBy: { createdAt: 'desc' } });
+      }
+
+      student = await this.prisma.student.findUnique({
+        where: { id: studentId },
+        select: {
+          id: true,
+          studentId: true,
+          firstName: true,
+          lastName: true,
+          gender: true,
+          email: true,
+          school: { select: { id: true, name: true } },
+          class: { select: { id: true, name: true } },
+          assessments: {
+            where: activeTerm && activeSession ? {
+              term: {
+                id: activeTerm.id,
+                sessionId: activeSession.id,
+              },
+            } : undefined,
+            select: {
+              id: true,
+              score: true,
+              maxScore: true,
+              percentage: true,
+              type: true,
+              title: true,
+              subject: { select: { id: true, name: true, code: true } },
+              term: { select: { id: true, name: true, session: { select: { id: true, name: true } } } },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      });
+
+      if (student) {
+        selectedStudent = { id: student.id, name: `${student.firstName} ${student.lastName}` };
+      }
+    }
+
+    // Resolve selection display names where ids are provided
+    const [sessionEntity, termEntity, lgaEntity, schoolEntity, classEntity] = await Promise.all([
+      sessionId ? this.prisma.session.findUnique({ where: { id: sessionId }, select: { id: true, name: true } }) : Promise.resolve(null),
+      termId ? this.prisma.term.findUnique({ where: { id: termId }, select: { id: true, name: true } }) : Promise.resolve(null),
+      lgaId ? this.prisma.localGovernmentArea.findUnique({ where: { id: lgaId }, select: { id: true, name: true } }) : Promise.resolve(null),
+      schoolId ? this.prisma.school.findUnique({ where: { id: schoolId }, select: { id: true, name: true } }) : Promise.resolve(null),
+      classId ? this.prisma.class.findUnique({ where: { id: classId }, select: { id: true, name: true } }) : Promise.resolve(null),
+    ]);
+
+    if (sessionEntity) selectedSession = sessionEntity;
+    if (termEntity) selectedTerm = termEntity;
+    if (lgaEntity) selectedLga = lgaEntity;
+    if (schoolEntity) selectedSchool = schoolEntity;
+    if (classEntity) selectedClass = classEntity;
+
+    if (lgaId) {
+      schools = await this.prisma.school.findMany({
+        where: { isActive: true, lgaId },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, code: true, level: true },
+      });
+    }
+
+    if (schoolId) {
+      // Classes are global (not attached to a specific school). Return all active classes.
+      classes = await this.prisma.class.findMany({
+        where: { isActive: true },
+        orderBy: [{ grade: 'asc' }, { section: 'asc' }],
+        select: { id: true, name: true, grade: true, section: true },
+      });
+    }
+
+    if (classId) {
+      const page = params.page && params.page > 0 ? params.page : 1;
+      const limit = params.limit && params.limit > 0 ? params.limit : 10;
+      const skip = (page - 1) * limit;
+
+      // Filter students by class, and optionally by selected school
+      const where: any = {
+        isActive: true,
+        classId,
+        ...(schoolId ? { schoolId } : {}),
+        ...(search && {
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' } },
+            { lastName: { contains: search, mode: 'insensitive' } },
+          ],
+        }),
+      };
+
+      // Determine active session and term to include assessments context
+      let activeSession = await this.prisma.session.findFirst({ where: { isCurrent: true, isActive: true } });
+      if (!activeSession) {
+        activeSession = await this.prisma.session.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
+      }
+      let activeTerm = await this.prisma.term.findFirst({
+        where: { isCurrent: true, isActive: true, ...(activeSession && { sessionId: activeSession.id }) },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!activeTerm && activeSession) {
+        activeTerm = await this.prisma.term.findFirst({ where: { sessionId: activeSession.id, isActive: true }, orderBy: { createdAt: 'desc' } });
+      }
+
+      const [list, total] = await Promise.all([
+        this.prisma.student.findMany({
+          where,
+          orderBy: { firstName: 'asc' },
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            studentId: true,
+            gender: true,
+            email: true,
+            school: { select: { id: true, name: true } },
+            class: { select: { id: true, name: true } },
+            assessments: {
+              where: activeTerm && activeSession ? {
+                term: { id: activeTerm.id, sessionId: activeSession.id },
+              } : undefined,
+              select: {
+                id: true,
+                score: true,
+                maxScore: true,
+                percentage: true,
+                type: true,
+                title: true,
+                subject: { select: { id: true, name: true, code: true } },
+                term: { select: { id: true, name: true } },
+              },
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+        }),
+        this.prisma.student.count({ where }),
+      ]);
+
+      students = list;
+      studentsPagination = { page, limit, total, totalPages: Math.ceil(total / limit) };
+    } else if (schoolId) {
+      // Optional: allow pre-class student search by school
+      if (search) {
+        const page = params.page && params.page > 0 ? params.page : 1;
+        const limit = params.limit && params.limit > 0 ? params.limit : 10;
+        const skip = (page - 1) * limit;
+
+        const where: any = {
+          isActive: true,
+          schoolId,
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' } },
+            { lastName: { contains: search, mode: 'insensitive' } },
+          ],
+        };
+
+        const [list, total] = await Promise.all([
+          this.prisma.student.findMany({
+            where,
+            orderBy: { firstName: 'asc' },
+            skip,
+            take: limit,
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              studentId: true,
+              gender: true,
+              email: true,
+              school: { select: { id: true, name: true } },
+              class: { select: { id: true, name: true } },
+            },
+          }),
+          this.prisma.student.count({ where }),
+        ]);
+
+        students = list;
+        studentsPagination = { page, limit, total, totalPages: Math.ceil(total / limit) };
+      }
+    } else if (lgaId) {
+      // Optional: allow pre-school student search by LGA (through school relation)
+      if (search) {
+        const page = params.page && params.page > 0 ? params.page : 1;
+        const limit = params.limit && params.limit > 0 ? params.limit : 10;
+        const skip = (page - 1) * limit;
+
+        const where: any = {
+          isActive: true,
+          school: { lgaId },
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' } },
+            { lastName: { contains: search, mode: 'insensitive' } },
+          ],
+        };
+
+        const [list, total] = await Promise.all([
+          this.prisma.student.findMany({
+            where,
+            orderBy: { firstName: 'asc' },
+            skip,
+            take: limit,
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              studentId: true,
+              gender: true,
+              email: true,
+              school: { select: { id: true, name: true } },
+              class: { select: { id: true, name: true } },
+            },
+          }),
+          this.prisma.student.count({ where }),
+        ]);
+
+        students = list;
+        studentsPagination = { page, limit, total, totalPages: Math.ceil(total / limit) };
+      }
+    } else if (search) {
+      // Global student search by name, school name, or LGA name
+      const page = params.page && params.page > 0 ? params.page : 1;
+      const limit = params.limit && params.limit > 0 ? params.limit : 10;
+      const skip = (page - 1) * limit;
+
+      const where: any = {
+        isActive: true,
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { school: { name: { contains: search, mode: 'insensitive' } } },
+          { school: { lga: { name: { contains: search, mode: 'insensitive' } } } },
+        ],
+      };
+
+      const [list, total] = await Promise.all([
+        this.prisma.student.findMany({
+          where,
+          orderBy: { firstName: 'asc' },
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            studentId: true,
+            gender: true,
+            email: true,
+            school: { select: { id: true, name: true } },
+            class: { select: { id: true, name: true } },
+          },
+        }),
+        this.prisma.student.count({ where }),
+      ]);
+
+      students = list;
+      studentsPagination = { page, limit, total, totalPages: Math.ceil(total / limit) };
+    }
+
+    // Compute totals based on current selections
+    const [totalSchools, totalClasses, totalStudents] = await Promise.all([
+      this.prisma.school.count({ where: { isActive: true, ...(lgaId ? { lgaId } : {}) } }),
+      // Classes are global; when a school is selected, show total count of all active classes
+      schoolId ? this.prisma.class.count({ where: { isActive: true } }) : Promise.resolve(undefined),
+      classId ? this.prisma.student.count({ where: { isActive: true, classId, ...(schoolId ? { schoolId } : {}) } }) : Promise.resolve(undefined),
+    ]);
+
+    return ResponseHelper.success('Explorer data retrieved successfully', {
+      totals: {
+        schools: totalSchools,
+        ...(totalClasses !== undefined ? { classes: totalClasses } : {}),
+        ...(totalStudents !== undefined ? { students: totalStudents } : {}),
+      },
+      selections: {
+        session: selectedSession,
+        term: selectedTerm,
+        lga: selectedLga,
+        school: selectedSchool,
+        class: selectedClass,
+        student: selectedStudent,
+      },
+      
+      sessions,
+      lgas,
+      ...(schools && { schools }),
+      ...(classes && { classes }),
+      ...(students && { students }),
+      ...(student && { student }),
+      ...(studentsPagination && { pagination: studentsPagination }),
+      lastUpdated: new Date().toISOString(),
+    });
+  }
+
   private getStudentOrderBy(sortBy: string, sortOrder: 'asc' | 'desc') {
     const fieldMapping: { [key: string]: any } = {
       firstName: 'firstName',

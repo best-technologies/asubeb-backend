@@ -2,6 +2,22 @@ import { StudentService } from './student.service';
 export declare class StudentController {
     private readonly studentService;
     constructor(studentService: StudentService);
+    getStudentExplorer(sessionId?: string, termId?: string, lgaId?: string, schoolId?: string, classId?: string, studentId?: string, search?: string, page?: number, limit?: number): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
+    getStudentExploreAlias(sessionId?: string, termId?: string, lgaId?: string, schoolId?: string, classId?: string, studentId?: string, search?: string, page?: number, limit?: number): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
     getStudentDashboard(session?: string, term?: string, schoolId?: string, classId?: string, subject?: string, gender?: string, search?: string): Promise<{
         success: boolean;
         message: string;

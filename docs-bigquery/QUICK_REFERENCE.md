@@ -59,3 +59,4 @@ Content-Type: application/json
 - LGAs, Schools, Classes, Students
 - Session (2024/2025), Term (SECOND_TERM)
 - Subjects, Assessments for each score
+

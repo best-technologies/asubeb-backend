@@ -48,6 +48,10 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
                 const row = normalizedData[i];
                 if (i % 100 === 0) {
                     this.logger.log(colors.yellow(`Processing row ${i + 1}/${normalizedData.length}`));
+                    if (i % 1000 === 0 && global.gc) {
+                        global.gc();
+                        this.logger.log(colors.cyan('Garbage collection triggered'));
+                    }
                 }
                 try {
                     const assessmentCount = await this.processRow(row, i + 1);

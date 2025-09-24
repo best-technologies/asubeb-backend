@@ -89,9 +89,15 @@ export class BigQueryImportService {
       for (let i = 0; i < normalizedData.length; i++) {
         const row = normalizedData[i];
         
-        // Log progress every 10 rows
+        // Log progress every 100 rows and force garbage collection
         if (i % 100 === 0) {
           this.logger.log(colors.yellow(`Processing row ${i + 1}/${normalizedData.length}`));
+          
+          // Force garbage collection every 1000 rows to prevent memory buildup
+          if (i % 1000 === 0 && global.gc) {
+            global.gc();
+            this.logger.log(colors.cyan('Garbage collection triggered'));
+          }
         }
         
         try {

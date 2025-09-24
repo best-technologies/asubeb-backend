@@ -9,7 +9,9 @@ const filters_1 = require("./common/filters");
 const colors = require("colors");
 async function bootstrap() {
     (0, env_checker_1.checkEnvironmentVariables)();
-    const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    const app = await core_1.NestFactory.create(app_module_1.AppModule, {
+        logger: ['error', 'warn', 'log'],
+    });
     const configService = app.get(config_1.ConfigService);
     app.enableCors({
         origin: [
@@ -34,14 +36,16 @@ async function bootstrap() {
     });
     app.setGlobalPrefix('api/v1');
     app.useGlobalFilters(new filters_1.HttpExceptionFilter());
-    const config = new swagger_1.DocumentBuilder()
-        .setTitle('Asubeb Backend API')
-        .setDescription('The Asubeb Backend API documentation')
-        .setVersion('1.0')
-        .addTag('default')
-        .build();
-    const document = swagger_1.SwaggerModule.createDocument(app, config);
-    swagger_1.SwaggerModule.setup('api', app, document);
+    if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true') {
+        const config = new swagger_1.DocumentBuilder()
+            .setTitle('Asubeb Backend API')
+            .setDescription('The Asubeb Backend API documentation')
+            .setVersion('1.0')
+            .addTag('default')
+            .build();
+        const document = swagger_1.SwaggerModule.createDocument(app, config);
+        swagger_1.SwaggerModule.setup('api', app, document);
+    }
     const port = configService.get('app.port') || 4000;
     await app.listen(port);
     console.log(colors.green('🚀 Server successfully started!'));

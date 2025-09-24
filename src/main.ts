@@ -10,7 +10,10 @@ async function bootstrap() {
   // Check environment variables before starting the server
   checkEnvironmentVariables();
   
-  const app = await NestFactory.create(AppModule);
+  // Create app with memory optimizations
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log'],
+  });
   const configService = app.get(ConfigService);
   
   // Enable CORS
@@ -43,16 +46,18 @@ async function bootstrap() {
   // Apply global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
   
-  // Swagger configuration
-  const config = new DocumentBuilder()
-    .setTitle('Asubeb Backend API')
-    .setDescription('The Asubeb Backend API documentation')
-    .setVersion('1.0')
-    .addTag('default')
-    .build();
-  
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  // Swagger configuration (only in development or when explicitly enabled)
+  if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true') {
+    const config = new DocumentBuilder()
+      .setTitle('Asubeb Backend API')
+      .setDescription('The Asubeb Backend API documentation')
+      .setVersion('1.0')
+      .addTag('default')
+      .build();
+    
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api', app, document);
+  }
   
   const port = configService.get<number>('app.port') || 4000;
   await app.listen(port);

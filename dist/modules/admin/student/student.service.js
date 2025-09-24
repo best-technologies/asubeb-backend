@@ -14,6 +14,8 @@ exports.StudentService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../prisma/prisma.service");
 const response_helper_1 = require("../../../common/helpers/response.helper");
+const pdf_helper_1 = require("../../../common/helpers/pdf.helper");
+const pdf_class_helper_1 = require("../../../common/helpers/pdf-class.helper");
 let StudentService = StudentService_1 = class StudentService {
     prisma;
     logger = new common_1.Logger(StudentService_1.name);
@@ -232,6 +234,121 @@ let StudentService = StudentService_1 = class StudentService {
         catch (error) {
             throw new Error(`Error fetching student dashboard: ${error.message}`);
         }
+    }
+    async getStudentResultPdf(studentId, options) {
+        let session = options?.sessionId
+            ? await this.prisma.session.findUnique({ where: { id: options.sessionId } })
+            : await this.prisma.session.findFirst({ where: { isCurrent: true, isActive: true } });
+        if (!session) {
+            session = await this.prisma.session.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
+        }
+        let term = options?.termId
+            ? await this.prisma.term.findUnique({ where: { id: options.termId } })
+            : await this.prisma.term.findFirst({ where: { isCurrent: true, isActive: true, ...(session ? { sessionId: session.id } : {}) } });
+        if (!term && session) {
+            term = await this.prisma.term.findFirst({ where: { sessionId: session.id, isActive: true }, orderBy: { createdAt: 'desc' } });
+        }
+        const student = await this.prisma.student.findUnique({
+            where: { id: studentId },
+            select: {
+                id: true,
+                studentId: true,
+                firstName: true,
+                lastName: true,
+                gender: true,
+                school: { select: { name: true } },
+                class: { select: { name: true } },
+                assessments: {
+                    where: term && session ? { term: { id: term.id, sessionId: session.id } } : undefined,
+                    select: {
+                        score: true,
+                        maxScore: true,
+                        percentage: true,
+                        type: true,
+                        subject: { select: { name: true } },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                },
+            },
+        });
+        if (!student) {
+            throw new common_1.NotFoundException(`Student with ID ${studentId} not found`);
+        }
+        const studentDisplayName = `${student.firstName} ${student.lastName}`.trim() || student.studentId;
+        const pdf = await (0, pdf_helper_1.generateStudentResultPdf)({
+            studentName: `${student.firstName} ${student.lastName}`.trim(),
+            studentId: student.studentId,
+            gender: student.gender,
+            schoolName: student.school?.name ?? null,
+            className: student.class?.name ?? null,
+            sessionName: session?.name ?? 'N/A',
+            termName: term?.name ?? 'N/A',
+            assessments: (student.assessments || []).map(a => ({
+                subjectName: a.subject.name,
+                score: a.score,
+                maxScore: a.maxScore,
+                percentage: a.percentage,
+                type: a.type,
+            })),
+        });
+        return { pdf, filename: `asubeb - ${studentDisplayName}.pdf` };
+    }
+    async getClassResultsPdf(params) {
+        let session = params.sessionId
+            ? await this.prisma.session.findUnique({ where: { id: params.sessionId } })
+            : await this.prisma.session.findFirst({ where: { isCurrent: true, isActive: true } });
+        if (!session) {
+            session = await this.prisma.session.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
+        }
+        let term = params.termId
+            ? await this.prisma.term.findUnique({ where: { id: params.termId } })
+            : await this.prisma.term.findFirst({ where: { isCurrent: true, isActive: true, ...(session ? { sessionId: session.id } : {}) } });
+        if (!term && session) {
+            term = await this.prisma.term.findFirst({ where: { sessionId: session.id, isActive: true }, orderBy: { createdAt: 'desc' } });
+        }
+        const students = await this.prisma.student.findMany({
+            where: { isActive: true, classId: params.classId, schoolId: params.schoolId },
+            select: {
+                id: true,
+                studentId: true,
+                firstName: true,
+                lastName: true,
+                school: { select: { name: true } },
+                class: { select: { name: true } },
+                assessments: {
+                    where: term && session ? { term: { id: term.id, sessionId: session.id } } : undefined,
+                    select: {
+                        score: true,
+                        maxScore: true,
+                        subject: { select: { name: true } },
+                    },
+                },
+            },
+            orderBy: { firstName: 'asc' },
+        });
+        const subjectsSet = new Set();
+        students.forEach(s => s.assessments.forEach(a => subjectsSet.add(a.subject.name)));
+        const subjects = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
+        const rows = students.map(s => ({
+            studentName: `${s.firstName} ${s.lastName}`.trim(),
+            studentId: s.studentId,
+            subjects: subjects.reduce((acc, subj) => {
+                const hit = s.assessments.find(a => a.subject.name === subj);
+                acc[subj] = hit ? { score: hit.score, maxScore: hit.maxScore } : undefined;
+                return acc;
+            }, {}),
+        }));
+        const payload = {
+            schoolName: students[0]?.school?.name ?? null,
+            className: students[0]?.class?.name ?? null,
+            sessionName: session?.name ?? 'N/A',
+            termName: term?.name ?? 'N/A',
+            subjects,
+            rows,
+        };
+        const pdf = await (0, pdf_class_helper_1.generateClassResultsPdf)(payload);
+        const filename = `asubeb - ${payload.schoolName ?? 'school'} - ${payload.className ?? 'class'} - ${payload.termName}.pdf`;
+        return { pdf, filename };
     }
     async getAllStudents(page = 1, limit = 10, schoolId) {
         const skip = (page - 1) * limit;

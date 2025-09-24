@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiOkResponse } from '@nestjs/swagger';
+import { Response as ExpressResponse } from 'express';
 import { StudentService } from './student.service';
 import { TermType } from '@prisma/client';
 
@@ -184,6 +185,27 @@ export class StudentController {
     return this.studentService.getAllStudents(page, limit, schoolId);
   }
 
+  // Place static routes BEFORE dynamic ':id' to avoid conflicts
+  @Get('class-result.pdf')
+  @ApiOperation({ summary: 'Download class results PDF (landscape table): students x subjects' })
+  @ApiQuery({ name: 'schoolId', required: true, description: 'School ID' })
+  @ApiQuery({ name: 'classId', required: true, description: 'Class ID' })
+  @ApiQuery({ name: 'sessionId', required: false, description: 'Optional session ID' })
+  @ApiQuery({ name: 'termId', required: false, description: 'Optional term ID' })
+  @ApiOkResponse({ description: 'PDF binary stream' })
+  async downloadClassResultsPdf(
+    @Query('schoolId') schoolId: string,
+    @Query('classId') classId: string,
+    @Query('sessionId') sessionId: string | undefined,
+    @Query('termId') termId: string | undefined,
+    @Res() res: ExpressResponse,
+  ) {
+    const { pdf, filename } = await this.studentService.getClassResultsPdf({ schoolId, classId, sessionId, termId });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(pdf);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get student by ID' })
   @ApiParam({ name: 'id', description: 'Student ID' })
@@ -191,6 +213,25 @@ export class StudentController {
   @ApiResponse({ status: 404, description: 'Student not found' })
   async getStudentById(@Param('id') id: string) {
     return this.studentService.getStudentById(id);
+  }
+
+  
+  @Get(':id/result.pdf')
+  @ApiOperation({ summary: 'Download student result as PDF for current (or specified) session/term' })
+  @ApiParam({ name: 'id', description: 'Student ID' })
+  @ApiQuery({ name: 'sessionId', required: false, description: 'Optional session ID to filter assessments' })
+  @ApiQuery({ name: 'termId', required: false, description: 'Optional term ID to filter assessments' })
+  @ApiOkResponse({ description: 'PDF binary stream' })
+  async downloadStudentResultPdf(
+    @Param('id') id: string,
+    @Query('sessionId') sessionId: string | undefined,
+    @Query('termId') termId: string | undefined,
+    @Res() res: ExpressResponse,
+  ) {
+    const { pdf, filename } = await this.studentService.getStudentResultPdf(id, { sessionId, termId });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(pdf);
   }
 
   @Post()

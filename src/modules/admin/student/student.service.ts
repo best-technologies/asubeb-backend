@@ -2,6 +2,8 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ResponseHelper } from '../../../common/helpers/response.helper';
 import { TermType } from '@prisma/client';
+import { generateStudentResultPdf } from '../../../common/helpers/pdf.helper';
+import { generateClassResultsPdf } from '../../../common/helpers/pdf-class.helper';
 
 @Injectable()
 export class StudentService {
@@ -267,6 +269,135 @@ export class StudentService {
     }
   }
 
+  async getStudentResultPdf(studentId: string, options?: { sessionId?: string; termId?: string }) {
+    // Resolve session/term
+    let session = options?.sessionId
+      ? await this.prisma.session.findUnique({ where: { id: options.sessionId } })
+      : await this.prisma.session.findFirst({ where: { isCurrent: true, isActive: true } });
+    if (!session) {
+      session = await this.prisma.session.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
+    }
+
+    let term = options?.termId
+      ? await this.prisma.term.findUnique({ where: { id: options.termId } })
+      : await this.prisma.term.findFirst({ where: { isCurrent: true, isActive: true, ...(session ? { sessionId: session.id } : {}) } });
+    if (!term && session) {
+      term = await this.prisma.term.findFirst({ where: { sessionId: session.id, isActive: true }, orderBy: { createdAt: 'desc' } });
+    }
+
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      select: {
+        id: true,
+        studentId: true,
+        firstName: true,
+        lastName: true,
+        gender: true,
+        school: { select: { name: true } },
+        class: { select: { name: true } },
+        assessments: {
+          where: term && session ? { term: { id: term.id, sessionId: session.id } } : undefined,
+          select: {
+            score: true,
+            maxScore: true,
+            percentage: true,
+            type: true,
+            subject: { select: { name: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException(`Student with ID ${studentId} not found`);
+    }
+
+    const studentDisplayName = `${student.firstName} ${student.lastName}`.trim() || student.studentId;
+    const pdf = await generateStudentResultPdf({
+      studentName: `${student.firstName} ${student.lastName}`.trim(),
+      studentId: student.studentId,
+      gender: student.gender,
+      schoolName: student.school?.name ?? null,
+      className: student.class?.name ?? null,
+      sessionName: session?.name ?? 'N/A',
+      termName: term?.name ?? 'N/A',
+      assessments: (student.assessments || []).map(a => ({
+        subjectName: a.subject.name,
+        score: a.score,
+        maxScore: a.maxScore,
+        percentage: a.percentage,
+        type: a.type,
+      })),
+    });
+    return { pdf, filename: `asubeb - ${studentDisplayName}.pdf` };
+  }
+
+  async getClassResultsPdf(params: { schoolId: string; classId: string; sessionId?: string; termId?: string }) {
+    // Resolve session/term
+    let session = params.sessionId
+      ? await this.prisma.session.findUnique({ where: { id: params.sessionId } })
+      : await this.prisma.session.findFirst({ where: { isCurrent: true, isActive: true } });
+    if (!session) {
+      session = await this.prisma.session.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
+    }
+
+    let term = params.termId
+      ? await this.prisma.term.findUnique({ where: { id: params.termId } })
+      : await this.prisma.term.findFirst({ where: { isCurrent: true, isActive: true, ...(session ? { sessionId: session.id } : {}) } });
+    if (!term && session) {
+      term = await this.prisma.term.findFirst({ where: { sessionId: session.id, isActive: true }, orderBy: { createdAt: 'desc' } });
+    }
+
+    // Fetch students in class for this school
+    const students = await this.prisma.student.findMany({
+      where: { isActive: true, classId: params.classId, schoolId: params.schoolId },
+      select: {
+        id: true,
+        studentId: true,
+        firstName: true,
+        lastName: true,
+        school: { select: { name: true } },
+        class: { select: { name: true } },
+        assessments: {
+          where: term && session ? { term: { id: term.id, sessionId: session.id } } : undefined,
+          select: {
+            score: true,
+            maxScore: true,
+            subject: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { firstName: 'asc' },
+    });
+
+    const subjectsSet = new Set<string>();
+    students.forEach(s => s.assessments.forEach(a => subjectsSet.add(a.subject.name)));
+    const subjects = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
+
+    const rows = students.map(s => ({
+      studentName: `${s.firstName} ${s.lastName}`.trim(),
+      studentId: s.studentId,
+      subjects: subjects.reduce((acc, subj) => {
+        const hit = s.assessments.find(a => a.subject.name === subj);
+        acc[subj] = hit ? { score: hit.score, maxScore: hit.maxScore } : undefined;
+        return acc;
+      }, {} as Record<string, { score: number; maxScore: number } | undefined>),
+    }));
+
+    const payload = {
+      schoolName: students[0]?.school?.name ?? null,
+      className: students[0]?.class?.name ?? null,
+      sessionName: session?.name ?? 'N/A',
+      termName: term?.name ?? 'N/A',
+      subjects,
+      rows,
+    };
+
+    const pdf = await generateClassResultsPdf(payload);
+    const filename = `asubeb - ${payload.schoolName ?? 'school'} - ${payload.className ?? 'class'} - ${payload.termName}.pdf`;
+    return { pdf, filename };
+  }
   async getAllStudents(page: number = 1, limit: number = 10, schoolId?: string) {
     const skip = (page - 1) * limit;
     

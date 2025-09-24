@@ -58,8 +58,20 @@ let StudentController = class StudentController {
     async getAllStudents(page = 1, limit = 10, schoolId) {
         return this.studentService.getAllStudents(page, limit, schoolId);
     }
+    async downloadClassResultsPdf(schoolId, classId, sessionId, termId, res) {
+        const { pdf, filename } = await this.studentService.getClassResultsPdf({ schoolId, classId, sessionId, termId });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(pdf);
+    }
     async getStudentById(id) {
         return this.studentService.getStudentById(id);
+    }
+    async downloadStudentResultPdf(id, sessionId, termId, res) {
+        const { pdf, filename } = await this.studentService.getStudentResultPdf(id, { sessionId, termId });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(pdf);
     }
     async createStudent(createStudentDto) {
         return this.studentService.createStudent(createStudentDto);
@@ -231,6 +243,23 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], StudentController.prototype, "getAllStudents", null);
 __decorate([
+    (0, common_1.Get)('class-result.pdf'),
+    (0, swagger_1.ApiOperation)({ summary: 'Download class results PDF (landscape table): students x subjects' }),
+    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: true, description: 'School ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'classId', required: true, description: 'Class ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'sessionId', required: false, description: 'Optional session ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'termId', required: false, description: 'Optional term ID' }),
+    (0, swagger_1.ApiOkResponse)({ description: 'PDF binary stream' }),
+    __param(0, (0, common_1.Query)('schoolId')),
+    __param(1, (0, common_1.Query)('classId')),
+    __param(2, (0, common_1.Query)('sessionId')),
+    __param(3, (0, common_1.Query)('termId')),
+    __param(4, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object, Object, Object]),
+    __metadata("design:returntype", Promise)
+], StudentController.prototype, "downloadClassResultsPdf", null);
+__decorate([
     (0, common_1.Get)(':id'),
     (0, swagger_1.ApiOperation)({ summary: 'Get student by ID' }),
     (0, swagger_1.ApiParam)({ name: 'id', description: 'Student ID' }),
@@ -241,6 +270,21 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], StudentController.prototype, "getStudentById", null);
+__decorate([
+    (0, common_1.Get)(':id/result.pdf'),
+    (0, swagger_1.ApiOperation)({ summary: 'Download student result as PDF for current (or specified) session/term' }),
+    (0, swagger_1.ApiParam)({ name: 'id', description: 'Student ID' }),
+    (0, swagger_1.ApiQuery)({ name: 'sessionId', required: false, description: 'Optional session ID to filter assessments' }),
+    (0, swagger_1.ApiQuery)({ name: 'termId', required: false, description: 'Optional term ID to filter assessments' }),
+    (0, swagger_1.ApiOkResponse)({ description: 'PDF binary stream' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Query)('sessionId')),
+    __param(2, (0, common_1.Query)('termId')),
+    __param(3, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object, Object]),
+    __metadata("design:returntype", Promise)
+], StudentController.prototype, "downloadStudentResultPdf", null);
 __decorate([
     (0, common_1.Post)(),
     (0, swagger_1.ApiOperation)({ summary: 'Create new student' }),

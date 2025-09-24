@@ -20,6 +20,22 @@ export declare class StudentService {
         meta: any;
         statusCode: number;
     }>;
+    getStudentResultPdf(studentId: string, options?: {
+        sessionId?: string;
+        termId?: string;
+    }): Promise<{
+        pdf: Buffer<ArrayBufferLike>;
+        filename: string;
+    }>;
+    getClassResultsPdf(params: {
+        schoolId: string;
+        classId: string;
+        sessionId?: string;
+        termId?: string;
+    }): Promise<{
+        pdf: Buffer<ArrayBufferLike>;
+        filename: string;
+    }>;
     getAllStudents(page?: number, limit?: number, schoolId?: string): Promise<{
         success: boolean;
         message: string;

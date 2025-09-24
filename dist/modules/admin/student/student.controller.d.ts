@@ -1,5 +1,6 @@
 import { Response as ExpressResponse } from 'express';
 import { StudentService } from './student.service';
+import { CreateStudentDto, UpdateStudentDto } from './dto';
 export declare class StudentController {
     private readonly studentService;
     constructor(studentService: StudentService);
@@ -53,7 +54,7 @@ export declare class StudentController {
         statusCode: number;
     }>;
     downloadStudentResultPdf(id: string, sessionId: string | undefined, termId: string | undefined, res: ExpressResponse): Promise<ExpressResponse<any, Record<string, any>>>;
-    createStudent(createStudentDto: any): Promise<{
+    createStudent(createStudentDto: CreateStudentDto): Promise<{
         success: boolean;
         message: string;
         data: any;
@@ -61,7 +62,7 @@ export declare class StudentController {
         meta: any;
         statusCode: number;
     }>;
-    updateStudent(id: string, updateStudentDto: any): Promise<{
+    updateStudent(id: string, updateStudentDto: UpdateStudentDto): Promise<{
         success: boolean;
         message: string;
         data: any;

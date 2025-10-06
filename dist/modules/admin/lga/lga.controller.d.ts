@@ -12,4 +12,17 @@ export declare class LgaController {
         meta: any;
         statusCode: number;
     }>;
+    getAllLga(): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    } | {
+        success: false;
+        message: string;
+        error: any;
+        statusCode: number;
+    }>;
 }

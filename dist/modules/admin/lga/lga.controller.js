@@ -29,6 +29,10 @@ let LgaController = LgaController_1 = class LgaController {
         this.logger.log(colors.cyan('Received LGA creation request'));
         return this.lgaService.createLga(createLgaDto);
     }
+    async getAllLga() {
+        this.logger.log(colors.cyan('Received request to list LGAs'));
+        return this.lgaService.getAllLga();
+    }
 };
 exports.LgaController = LgaController;
 __decorate([
@@ -51,6 +55,14 @@ __decorate([
     __metadata("design:paramtypes", [dto_1.CreateLgaDto]),
     __metadata("design:returntype", Promise)
 ], LgaController.prototype, "createLga", null);
+__decorate([
+    (0, common_1.Get)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Get all Local Government Areas' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'List of LGAs retrieved successfully' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], LgaController.prototype, "getAllLga", null);
 exports.LgaController = LgaController = LgaController_1 = __decorate([
     (0, swagger_1.ApiTags)('admin-lga'),
     (0, common_1.Controller)('admin/lga'),

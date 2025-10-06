@@ -71,6 +71,26 @@ let LgaService = LgaService_1 = class LgaService {
         }
         return code;
     }
+    async getAllLga() {
+        this.logger.log(colors.cyan('Fetching all LGAs...'));
+        try {
+            const lgas = await this.prisma.localGovernmentArea.findMany({
+                where: { isActive: true },
+                orderBy: { name: 'asc' },
+                select: {
+                    id: true,
+                    name: true,
+                },
+            });
+            const formatted = lgas.map((l) => ({ id: l.id, name: l.name }));
+            this.logger.log(colors.green(`Fetched ${formatted.length} LGAs`));
+            return helpers_1.ResponseHelper.success('LGAs retrieved successfully', formatted);
+        }
+        catch (error) {
+            this.logger.error(colors.red('Failed to fetch LGAs'), error);
+            return helpers_1.ResponseHelper.error('Failed to fetch LGAs', error?.message || error, 500);
+        }
+    }
 };
 exports.LgaService = LgaService;
 exports.LgaService = LgaService = LgaService_1 = __decorate([

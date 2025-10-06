@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateLgaDto } from './dto';
 import { ResponseHelper } from '../../../common/helpers';
@@ -83,5 +83,29 @@ export class LgaService {
     }
 
     return code!;
+  }
+
+  async getAllLga() {
+    this.logger.log(colors.cyan('Fetching all LGAs...'));
+
+    try {
+      const lgas = await this.prisma.localGovernmentArea.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      const formatted = lgas.map((l) => ({ id: l.id, name: l.name }));
+
+      this.logger.log(colors.green(`Fetched ${formatted.length} LGAs`));
+      return ResponseHelper.success('LGAs retrieved successfully', formatted);
+    } catch (error) {
+      this.logger.error(colors.red('Failed to fetch LGAs'), error as any);
+      // Return a formatted error so controllers return consistent payloads
+      return ResponseHelper.error('Failed to fetch LGAs', (error as any)?.message || error, 500);
+    }
   }
 } 

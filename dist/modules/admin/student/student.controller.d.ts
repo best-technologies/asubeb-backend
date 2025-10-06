@@ -1,6 +1,6 @@
 import { Response as ExpressResponse } from 'express';
 import { StudentService } from './student.service';
-import { CreateStudentDto, UpdateStudentDto } from './dto';
+import { CreateStudentDto, UpdateStudentDto, StudentDashboardQueryDto } from './dto';
 export declare class StudentController {
     private readonly studentService;
     constructor(studentService: StudentService);
@@ -20,7 +20,7 @@ export declare class StudentController {
         meta: any;
         statusCode: number;
     }>;
-    getStudentDashboard(session?: string, term?: string, schoolId?: string, classId?: string, subject?: string, gender?: string, search?: string): Promise<{
+    getStudentDashboard(query: StudentDashboardQueryDto): Promise<{
         success: boolean;
         message: string;
         data: any;

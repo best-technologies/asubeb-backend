@@ -2,15 +2,16 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res, Validation
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiOkResponse, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { Response as ExpressResponse } from 'express';
 import { StudentService } from './student.service';
-import { TermType } from '@prisma/client';
 import { 
   CreateStudentDto, 
   UpdateStudentDto, 
   StudentResponseDto, 
   StudentExplorerResponseDto, 
   StudentDashboardResponseDto,
-  StudentListResponseDto
+  StudentListResponseDto,
+  StudentDashboardQueryDto
 } from './dto';
+import { TermType } from '@prisma/client';
 
 @ApiTags('admin-student')
 @Controller('admin/students')
@@ -75,37 +76,24 @@ export class StudentController {
   }
 
   @Get('dashboard')
-  @ApiOperation({ summary: 'Get student dashboard data with advanced filtering' })
+  @ApiOperation({ 
+    summary: 'Get student dashboard data with progressive loading',
+    description: 'Progressively loads dashboard data based on provided filters. Without any filters, returns current session and term. With LGA ID, returns schools in that LGA. With school ID, returns classes in that school. With class ID, returns paginated students in that class.'
+  })
   @ApiQuery({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025)', example: '2024/2025' })
   @ApiQuery({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)', example: 'FIRST_TERM' })
-  @ApiQuery({ name: 'schoolId', required: false, description: 'Filter by school ID', example: 'school-uuid-123' })
-  @ApiQuery({ name: 'classId', required: false, description: 'Filter by class ID', example: 'class-uuid-456' })
-  @ApiQuery({ name: 'subject', required: false, description: 'Filter by subject name', example: 'Mathematics' })
+  @ApiQuery({ name: 'lgaId', required: false, description: 'Filter by LGA ID to get schools', example: 'lga-uuid-123' })
+  @ApiQuery({ name: 'schoolId', required: false, description: 'Filter by school ID to get classes', example: 'school-uuid-123' })
+  @ApiQuery({ name: 'classId', required: false, description: 'Filter by class ID to get students', example: 'class-uuid-456' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number for student list', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page for student list', example: 10 })
   @ApiQuery({ name: 'gender', required: false, description: 'Gender (MALE, FEMALE, OTHER)', example: 'MALE' })
   @ApiQuery({ name: 'search', required: false, description: 'Search by student name or ID', example: 'John' })
   @ApiResponse({ status: 200, description: 'Student dashboard data retrieved successfully', type: StudentDashboardResponseDto })
   @ApiResponse({ status: 400, description: 'Bad request - invalid parameters' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getStudentDashboard(
-    @Query('session') session?: string,
-    @Query('term') term?: string,
-    @Query('schoolId') schoolId?: string,
-    @Query('classId') classId?: string,
-    @Query('subject') subject?: string,
-    @Query('gender') gender?: string,
-    @Query('search') search?: string,
-  ) {
-    const filters = {
-      session,
-      term: term as TermType,
-      schoolId,
-      classId,
-      subject,
-      gender,
-      search,
-    };
-
-    return this.studentService.getStudentDashboard(filters);
+  async getStudentDashboard(@Query() query: StudentDashboardQueryDto) {
+    return this.studentService.getStudentDashboard(query);
   }
 
   @Get('search')

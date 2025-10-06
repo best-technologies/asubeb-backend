@@ -19,8 +19,11 @@ export class StudentService {
     subject?: string;
     gender?: string;
     search?: string;
+    lgaId?: string;
+    page?: number;
+    limit?: number;
   }) {
-    this.logger.log(`Fetching student dashboard data with filters:`, filters);
+    this.logger.log(`Fetching student dashboard data with filters bulala:`, filters);
 
     try {
       // Get current active session and term if not specified
@@ -28,8 +31,6 @@ export class StudentService {
       let currentTerm = filters?.term;
 
       if (!currentSession || !currentTerm) {
-        this.logger.log('No session or term provided, fetching active session and term...');
-        
         const activeSession = await this.prisma.session.findFirst({
           where: { isActive: true },
           include: {
@@ -42,94 +43,87 @@ export class StudentService {
         });
 
         if (!activeSession) {
+          this.logger.log("Error loading session")
           throw new Error('No active session found');
         }
-
-        this.logger.log(`Found active session: ${activeSession.name}`);
-        this.logger.log(`Available terms: ${activeSession.terms.map(t => t.name).join(', ')}`);
 
         currentSession = currentSession || activeSession.name;
         currentTerm = currentTerm || activeSession.terms[0]?.name as TermType;
 
-        if (!currentTerm) {
-          // Try to get any term from the session
-          const anyTerm = await this.prisma.term.findFirst({
-            where: {
-              sessionId: activeSession.id,
+        // Return just session and term info if no LGA filter provided
+        if (!filters?.lgaId) {
+          const lgas = await this.prisma.localGovernmentArea.findMany({
+            where: { isActive: true },
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              state: true,
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { name: 'asc' },
           });
 
-          if (anyTerm) {
-            currentTerm = anyTerm.name as TermType;
-            this.logger.log(`Using fallback term: ${currentTerm}`);
-          } else {
-            throw new Error('No terms found for active session');
-          }
+          return ResponseHelper.success('Basic dashboard data retrieved successfully', {
+            session: currentSession,
+            term: currentTerm,
+            lgas,
+            totalLgas: lgas.length
+          });
         }
       }
 
-      this.logger.log(`Using session: ${currentSession}, term: ${currentTerm}`);
-
-      // Get all LGAs
-      const lgas = await this.prisma.localGovernmentArea.findMany({
-        where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          state: true,
-        },
-      });
-
-      // Get all schools
-      const schools = await this.prisma.school.findMany({
-        where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          level: true,
-        },
-      });
-
-      // Get all classes
-      const classes = await this.prisma.class.findMany({
-        where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          grade: true,
-          section: true,
-          school: {
-            select: {
-              name: true,
-            },
+      // If LGA ID is provided but no school ID, return schools in that LGA
+      if (filters?.lgaId && !filters?.schoolId) {
+        const schools = await this.prisma.school.findMany({
+          where: { 
+            isActive: true,
+            lgaId: filters.lgaId
           },
-        },
-      });
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            level: true,
+          },
+          orderBy: { name: 'asc' },
+        });
 
-      // Get all subjects
-      const subjects = await this.prisma.subject.findMany({
-        where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          level: true,
-        },
-      });
+        return ResponseHelper.success('Schools in LGA retrieved successfully', {
+          session: currentSession,
+          term: currentTerm,
+          schools,
+          totalSchools: schools.length
+        });
+      }
 
-      // Get gender distribution
-      const genders = await this.prisma.student.groupBy({
-        by: ['gender'],
-        where: { isActive: true },
-        _count: {
-          gender: true,
-        },
-      });
+      // If school ID is provided but no class ID, return classes in that school
+      if (filters?.schoolId && !filters?.classId) {
+        const classes = await this.prisma.class.findMany({
+          where: { 
+            isActive: true,
+            schoolId: filters.schoolId
+          },
+          select: {
+            id: true,
+            name: true,
+            grade: true,
+            section: true,
+          },
+          orderBy: [
+            { grade: 'asc' },
+            { section: 'asc' }
+          ],
+        });
 
-      // Build student where conditions
+        return ResponseHelper.success('Classes in school retrieved successfully', {
+          session: currentSession,
+          term: currentTerm,
+          classes,
+          totalClasses: classes.length
+        });
+      }
+
+      // Build student where conditions for pagination
       const studentWhereConditions: any = {
         isActive: true,
         assessments: {
@@ -144,20 +138,17 @@ export class StudentService {
         },
       };
 
-      // Apply filters
+      // Apply existing filters
       if (filters?.schoolId) {
         studentWhereConditions.schoolId = filters.schoolId;
-        this.logger.log(`Applied school filter: ${filters.schoolId}`);
       }
 
       if (filters?.classId) {
         studentWhereConditions.classId = filters.classId;
-        this.logger.log(`Applied class filter: ${filters.classId}`);
       }
 
       if (filters?.gender) {
         studentWhereConditions.gender = filters.gender;
-        this.logger.log(`Applied gender filter: ${filters.gender}`);
       }
 
       if (filters?.search) {
@@ -166,10 +157,19 @@ export class StudentService {
           { lastName: { contains: filters.search, mode: 'insensitive' } },
           { studentId: { contains: filters.search, mode: 'insensitive' } },
         ];
-        this.logger.log(`Applied search filter: ${filters.search}`);
       }
 
-      // Get student performance table with filters
+      // Setup pagination
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const skip = (page - 1) * limit;
+
+      // Get total count first
+      const totalStudents = await this.prisma.student.count({
+        where: studentWhereConditions
+      });
+
+      // Then get paginated students
       const students = await this.prisma.student.findMany({
         where: studentWhereConditions,
         select: {
@@ -178,63 +178,32 @@ export class StudentService {
           lastName: true,
           studentId: true,
           gender: true,
-          school: {
-            select: {
-              name: true,
-            },
-          },
-          class: {
-            select: {
-              name: true,
-            },
-          },
+          school: { select: { name: true } },
+          class: { select: { name: true } },
           assessments: {
             where: {
-              term: {
-                name: currentTerm,
-                session: {
-                  name: currentSession,
-                },
-              },
-              // Apply subject filter if specified
+              term: { name: currentTerm, session: { name: currentSession } },
               ...(filters?.subject && {
-                subject: {
-                  name: {
-                    contains: filters.subject,
-                    mode: 'insensitive',
-                  },
-                },
+                subject: { name: { contains: filters.subject, mode: 'insensitive' } },
               }),
             },
-            select: {
-              score: true,
-              maxScore: true,
-              subject: {
-                select: {
-                  name: true,
-                },
-              },
-            },
+            select: { score: true, maxScore: true, subject: { select: { name: true } } },
           },
         },
-        orderBy: {
-          firstName: 'asc',
-        },
+        orderBy: { firstName: 'asc' },
+        skip,
+        take: limit,
       });
 
-      this.logger.log(`Found ${students.length} students with filters`);
-      if (students.length > 0) {
-        this.logger.log(`Sample student: ${students[0].firstName} ${students[0].lastName} - Class: ${students[0].class?.name} - School: ${students[0].school?.name}`);
-      }
-
-      // Calculate performance metrics for each student
+      // Calculate performance metrics
       const performanceData = students.map(student => {
-        const totalScore = student.assessments.reduce((sum, assessment) => sum + assessment.score, 0);
-        const totalMaxScore = student.assessments.reduce((sum, assessment) => sum + assessment.maxScore, 0);
+        const totalScore = student.assessments.reduce((sum, a) => sum + a.score, 0);
+        const totalMaxScore = student.assessments.reduce((sum, a) => sum + a.maxScore, 0);
         const average = student.assessments.length > 0 ? totalScore / student.assessments.length : 0;
         const percentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
 
         return {
+          id: student.id,
           studentName: `${student.firstName} ${student.lastName}`,
           examNo: student.studentId,
           school: student.school?.name || 'N/A',
@@ -253,18 +222,26 @@ export class StudentService {
         ...student,
       }));
 
-      return ResponseHelper.success('Student dashboard data retrieved successfully', {
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalStudents / limit);
+      const hasMore = page < totalPages;
+
+      return ResponseHelper.success('Students retrieved successfully', {
         session: currentSession,
         term: currentTerm,
-        lgas,
-        schools,
-        classes,
-        subjects,
-        genders,
         performanceTable,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems: totalStudents,
+          itemsPerPage: limit,
+          hasMore
+        },
         lastUpdated: new Date().toISOString(),
       });
+
     } catch (error) {
+      this.logger.error('Error in getStudentDashboard:', error);
       throw new Error(`Error fetching student dashboard: ${error.message}`);
     }
   }

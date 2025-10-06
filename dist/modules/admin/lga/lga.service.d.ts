@@ -13,4 +13,17 @@ export declare class LgaService {
         statusCode: number;
     }>;
     private generateUniqueCode;
+    getAllLga(): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    } | {
+        success: false;
+        message: string;
+        error: any;
+        statusCode: number;
+    }>;
 }

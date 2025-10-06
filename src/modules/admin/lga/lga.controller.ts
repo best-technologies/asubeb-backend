@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { LgaService } from './lga.service';
 import { CreateLgaDto } from './dto';
@@ -28,5 +28,13 @@ export class LgaController {
   async createLga(@Body() createLgaDto: CreateLgaDto) {
     this.logger.log(colors.cyan('Received LGA creation request'));
     return this.lgaService.createLga(createLgaDto);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all Local Government Areas' })
+  @ApiResponse({ status: 200, description: 'List of LGAs retrieved successfully' })
+  async getAllLga() {
+    this.logger.log(colors.cyan('Received request to list LGAs'));
+    return this.lgaService.getAllLga();
   }
 } 

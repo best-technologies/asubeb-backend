@@ -28,17 +28,8 @@ let StudentController = class StudentController {
     async getStudentExploreAlias(sessionId, termId, lgaId, schoolId, classId, studentId, search, page = 1, limit = 10) {
         return this.studentService.getStudentExplorer({ sessionId, termId, lgaId, schoolId, classId, studentId, search, page, limit });
     }
-    async getStudentDashboard(session, term, schoolId, classId, subject, gender, search) {
-        const filters = {
-            session,
-            term: term,
-            schoolId,
-            classId,
-            subject,
-            gender,
-            search,
-        };
-        return this.studentService.getStudentDashboard(filters);
+    async getStudentDashboard(query) {
+        return this.studentService.getStudentDashboard(query);
     }
     async searchFilterPaginationStudents(page = 1, limit = 10, search, lgaId, schoolId, classId, gender, subject, session, term, sortBy, sortOrder) {
         return this.studentService.searchFilterPaginationStudents({
@@ -149,26 +140,25 @@ __decorate([
 ], StudentController.prototype, "getStudentExploreAlias", null);
 __decorate([
     (0, common_1.Get)('dashboard'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get student dashboard data with advanced filtering' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Get student dashboard data with progressive loading',
+        description: 'Progressively loads dashboard data based on provided filters. Without any filters, returns current session and term. With LGA ID, returns schools in that LGA. With school ID, returns classes in that school. With class ID, returns paginated students in that class.'
+    }),
     (0, swagger_1.ApiQuery)({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025)', example: '2024/2025' }),
     (0, swagger_1.ApiQuery)({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)', example: 'FIRST_TERM' }),
-    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false, description: 'Filter by school ID', example: 'school-uuid-123' }),
-    (0, swagger_1.ApiQuery)({ name: 'classId', required: false, description: 'Filter by class ID', example: 'class-uuid-456' }),
-    (0, swagger_1.ApiQuery)({ name: 'subject', required: false, description: 'Filter by subject name', example: 'Mathematics' }),
+    (0, swagger_1.ApiQuery)({ name: 'lgaId', required: false, description: 'Filter by LGA ID to get schools', example: 'lga-uuid-123' }),
+    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false, description: 'Filter by school ID to get classes', example: 'school-uuid-123' }),
+    (0, swagger_1.ApiQuery)({ name: 'classId', required: false, description: 'Filter by class ID to get students', example: 'class-uuid-456' }),
+    (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: 'Page number for student list', example: 1 }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: 'Items per page for student list', example: 10 }),
     (0, swagger_1.ApiQuery)({ name: 'gender', required: false, description: 'Gender (MALE, FEMALE, OTHER)', example: 'MALE' }),
     (0, swagger_1.ApiQuery)({ name: 'search', required: false, description: 'Search by student name or ID', example: 'John' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'Student dashboard data retrieved successfully', type: dto_1.StudentDashboardResponseDto }),
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Bad request - invalid parameters' }),
     (0, swagger_1.ApiResponse)({ status: 500, description: 'Internal server error' }),
-    __param(0, (0, common_1.Query)('session')),
-    __param(1, (0, common_1.Query)('term')),
-    __param(2, (0, common_1.Query)('schoolId')),
-    __param(3, (0, common_1.Query)('classId')),
-    __param(4, (0, common_1.Query)('subject')),
-    __param(5, (0, common_1.Query)('gender')),
-    __param(6, (0, common_1.Query)('search')),
+    __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, String, String, String, String]),
+    __metadata("design:paramtypes", [dto_1.StudentDashboardQueryDto]),
     __metadata("design:returntype", Promise)
 ], StudentController.prototype, "getStudentDashboard", null);
 __decorate([

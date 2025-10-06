@@ -12,6 +12,9 @@ export declare class StudentService {
         subject?: string;
         gender?: string;
         search?: string;
+        lgaId?: string;
+        page?: number;
+        limit?: number;
     }): Promise<{
         success: boolean;
         message: string;

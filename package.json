@@ -55,6 +55,11 @@
     "memory:check": "node --expose-gc scripts/memory-check.js"
   },
   "dependencies": {
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.0",
+    "passport": "^0.6.0",
+    "passport-jwt": "^4.0.1",
+    "bcryptjs": "^2.4.3",
     "@google-cloud/bigquery": "^8.1.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
@@ -77,6 +82,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/passport-jwt": "^3.0.8",
+    "@types/bcryptjs": "^2.4.2",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",

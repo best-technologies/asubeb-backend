@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { GradingModule } from './modules/grading/grading.module';
 import { AcademicModule } from './modules/academic/academic.module';
 import { databaseConfig, appConfig } from './config';
@@ -21,6 +22,7 @@ import { validate } from './config/validation';
     PrismaModule,
     HealthModule,
     AdminModule,
+  AuthModule,
     GradingModule,
     AcademicModule,
   ],

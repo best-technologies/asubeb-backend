@@ -39,6 +39,8 @@ enum AssessmentType {
   QUIZ
 }
 
+// (State model defined later) - removed duplicate to avoid conflicts
+
 // User model for authentication
 model User {
   id        String   @id @default(cuid())
@@ -53,11 +55,39 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  teacher Teacher?
-  student Student?
-  parent  Parent?
+  teacher  Teacher?
+  student  Student?
+  parent   Parent?
+  // Optional relation to State (user's home state or admin state)
+  stateId  String?
+  stateRef State?   @relation(fields: [stateId], references: [id])
 
   @@map("users")
+}
+
+// State model: added as nullable relations to avoid breaking existing data.
+model State {
+  id           String   @id @default(cuid())
+  externalId   String?  @unique
+  stateId      String   @unique
+  contactEmail String?  @unique
+  stateName    String   @unique
+  code         String?  @unique
+  // Denormalized counters for quick lookups. Kept as non-null with default 0.
+  totalLgas    Int      @default(0)
+  totalSchools Int      @default(0)
+  totalUsers   Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  localGovernmentAreas LocalGovernmentArea[]
+  schools              School[]
+  users                User[]
+  students             Student[]
+
+  @@map("states")
 }
 
 // Local Government Area
@@ -72,7 +102,10 @@ model LocalGovernmentArea {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  schools School[]
+  schools  School[]
+  // Optional relation to State (added post-deployment). Keep the existing `state` string for backward compatibility.
+  stateId  String?
+  stateRef State?   @relation(fields: [stateId], references: [id])
 
   @@map("local_government_areas")
 }
@@ -95,12 +128,15 @@ model School {
   totalTeachers   Int         @default(0)
   capacity        Int?
   lgaId           String
+  // Optional relation to State added after initial deployment to avoid breaking existing rows.
+  stateId         String?
   isActive        Boolean     @default(true)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   // Relations
   lga      LocalGovernmentArea @relation(fields: [lgaId], references: [id])
+  stateRef State?              @relation(fields: [stateId], references: [id])
   classes  Class[]
   teachers Teacher[]
   students Student[]
@@ -182,6 +218,9 @@ model Student {
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  // Optional relation to State (user's home state or admin state)
+  stateId        String?
+  stateRef       State?   @relation(fields: [stateId], references: [id])
 
   // Relations
   user        User?        @relation(fields: [userId], references: [id])
@@ -329,10 +368,10 @@ model Assessment {
   updatedAt     DateTime       @updatedAt
 
   // Relations
-  student Student @relation(fields: [studentId], references: [id])
-  subject Subject @relation(fields: [subjectId], references: [id])
-  class   Class   @relation(fields: [classId], references: [id])
-  term    Term    @relation(fields: [termId], references: [id])
+  student Student  @relation(fields: [studentId], references: [id])
+  subject Subject  @relation(fields: [subjectId], references: [id])
+  class   Class    @relation(fields: [classId], references: [id])
+  term    Term     @relation(fields: [termId], references: [id])
   teacher Teacher? @relation(fields: [teacherId], references: [id])
 
   @@unique([studentId, subjectId, classId, termId, type, title])

@@ -14,6 +14,7 @@ const app_service_1 = require("./app.service");
 const prisma_module_1 = require("./prisma/prisma.module");
 const health_module_1 = require("./health/health.module");
 const admin_module_1 = require("./modules/admin/admin.module");
+const auth_module_1 = require("./modules/auth/auth.module");
 const grading_module_1 = require("./modules/grading/grading.module");
 const academic_module_1 = require("./modules/academic/academic.module");
 const config_2 = require("./config");
@@ -33,6 +34,7 @@ exports.AppModule = AppModule = __decorate([
             prisma_module_1.PrismaModule,
             health_module_1.HealthModule,
             admin_module_1.AdminModule,
+            auth_module_1.AuthModule,
             grading_module_1.GradingModule,
             academic_module_1.AcademicModule,
         ],

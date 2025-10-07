@@ -9,7 +9,8 @@ import {
   StudentExplorerResponseDto, 
   StudentDashboardResponseDto,
   StudentListResponseDto,
-  StudentDashboardQueryDto
+  StudentDashboardQueryDto,
+  StudentDetailsResponseDto
 } from './dto';
 import { TermType } from '@prisma/client';
 
@@ -78,12 +79,12 @@ export class StudentController {
   @Get('dashboard')
   @ApiOperation({ 
     summary: 'Get student dashboard data with progressive loading',
-    description: 'Progressively loads dashboard data based on provided filters. Without any filters, returns current session and term. With LGA ID, returns schools in that LGA. With school ID, returns classes in that school. With class ID, returns paginated students in that class.'
+    description: 'Progressively loads dashboard data based on provided filters. Without any filters, returns current session and term. With LGA ID, returns schools in that LGA. With school ID, returns classes for that specific school with school statistics (name, code, total students, gender breakdown). With class ID, returns paginated students in that class with school context.'
   })
   @ApiQuery({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025)', example: '2024/2025' })
   @ApiQuery({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)', example: 'FIRST_TERM' })
   @ApiQuery({ name: 'lgaId', required: false, description: 'Filter by LGA ID to get schools', example: 'lga-uuid-123' })
-  @ApiQuery({ name: 'schoolId', required: false, description: 'Filter by school ID to get classes', example: 'school-uuid-123' })
+  @ApiQuery({ name: 'schoolId', required: false, description: 'Filter by school ID to get classes for that school', example: 'school-uuid-123' })
   @ApiQuery({ name: 'classId', required: false, description: 'Filter by class ID to get students', example: 'class-uuid-456' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number for student list', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page for student list', example: 10 })
@@ -94,6 +95,25 @@ export class StudentController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getStudentDashboard(@Query() query: StudentDashboardQueryDto) {
     return this.studentService.getStudentDashboard(query);
+  }
+
+  @Get(':id/details')
+  @ApiOperation({ 
+    summary: 'Get comprehensive student details with performance summary',
+    description: 'Retrieves detailed information about a specific student including personal details, school information, class details, parent information, and comprehensive performance summary for the current or specified term/session. Includes subject-wise breakdown, assessment type analysis, and grade classification.'
+  })
+  @ApiParam({ name: 'id', description: 'Student ID', example: 'student-uuid-123' })
+  @ApiQuery({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025). If not provided, uses current active session.', example: '2024/2025' })
+  @ApiQuery({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM). If not provided, uses current active term.', example: 'SECOND_TERM' })
+  @ApiResponse({ status: 200, description: 'Student details retrieved successfully', type: StudentDetailsResponseDto })
+  @ApiResponse({ status: 404, description: 'Student not found' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getStudentDetails(
+    @Param('id') studentId: string,
+    @Query('session') session?: string,
+    @Query('term') term?: TermType,
+  ) {
+    return this.studentService.getStudentDetails(studentId, { session, term });
   }
 
   @Get('search')
@@ -161,11 +181,16 @@ export class StudentController {
 
   // Place static routes BEFORE dynamic ':id' to avoid conflicts
   @Get('class-result.pdf')
-  @ApiOperation({ summary: 'Download class results PDF (landscape table): students x subjects' })
+  @ApiOperation({ 
+    summary: 'Download comprehensive class results PDF',
+    description: 'Generates a comprehensive PDF report for all students in a specific class showing their performance across all subjects for the current or specified term/session. The PDF displays a landscape table format with students as rows and subjects as columns, including individual scores and totals.'
+  })
   @ApiQuery({ name: 'schoolId', required: true, description: 'School ID', example: 'school-uuid-123' })
   @ApiQuery({ name: 'classId', required: true, description: 'Class ID', example: 'class-uuid-456' })
   @ApiQuery({ name: 'sessionId', required: false, description: 'Optional session ID', example: 'session-uuid-789' })
   @ApiQuery({ name: 'termId', required: false, description: 'Optional term ID', example: 'term-uuid-101' })
+  @ApiQuery({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025). If not provided, uses current active session.', example: '2024/2025' })
+  @ApiQuery({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM). If not provided, uses current active term.', example: 'SECOND_TERM' })
   @ApiOkResponse({ description: 'PDF binary stream', content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } } })
   @ApiResponse({ status: 400, description: 'Bad request - missing required parameters' })
   @ApiResponse({ status: 404, description: 'School or class not found' })
@@ -175,9 +200,18 @@ export class StudentController {
     @Query('classId') classId: string,
     @Query('sessionId') sessionId: string | undefined,
     @Query('termId') termId: string | undefined,
+    @Query('session') session: string | undefined,
+    @Query('term') term: TermType | undefined,
     @Res() res: ExpressResponse,
   ) {
-    const { pdf, filename } = await this.studentService.getClassResultsPdf({ schoolId, classId, sessionId, termId });
+    const { pdf, filename } = await this.studentService.getClassResultsPdf({ 
+      schoolId, 
+      classId, 
+      sessionId, 
+      termId, 
+      session, 
+      term 
+    });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.send(pdf);
@@ -196,10 +230,15 @@ export class StudentController {
 
   
   @Get(':id/result.pdf')
-  @ApiOperation({ summary: 'Download student result as PDF for current (or specified) session/term' })
+  @ApiOperation({ 
+    summary: 'Download comprehensive student result as PDF',
+    description: 'Generates a comprehensive PDF report for a specific student including personal details, school information, class details, parent information, and detailed performance summary for the current or specified term/session. The PDF includes subject-wise breakdown, assessment type analysis, and grade classification.'
+  })
   @ApiParam({ name: 'id', description: 'Student ID', example: 'student-uuid-123' })
   @ApiQuery({ name: 'sessionId', required: false, description: 'Optional session ID to filter assessments', example: 'session-uuid-456' })
   @ApiQuery({ name: 'termId', required: false, description: 'Optional term ID to filter assessments', example: 'term-uuid-789' })
+  @ApiQuery({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025). If not provided, uses current active session.', example: '2024/2025' })
+  @ApiQuery({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM). If not provided, uses current active term.', example: 'SECOND_TERM' })
   @ApiOkResponse({ description: 'PDF binary stream', content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } } })
   @ApiResponse({ status: 404, description: 'Student not found' })
   @ApiResponse({ status: 400, description: 'Bad request - invalid parameters' })
@@ -208,9 +247,11 @@ export class StudentController {
     @Param('id') id: string,
     @Query('sessionId') sessionId: string | undefined,
     @Query('termId') termId: string | undefined,
+    @Query('session') session: string | undefined,
+    @Query('term') term: TermType | undefined,
     @Res() res: ExpressResponse,
   ) {
-    const { pdf, filename } = await this.studentService.getStudentResultPdf(id, { sessionId, termId });
+    const { pdf, filename } = await this.studentService.getStudentResultPdf(id, { sessionId, termId, session, term });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.send(pdf);

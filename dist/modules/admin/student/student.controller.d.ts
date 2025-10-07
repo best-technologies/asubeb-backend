@@ -1,6 +1,7 @@
 import { Response as ExpressResponse } from 'express';
 import { StudentService } from './student.service';
 import { CreateStudentDto, UpdateStudentDto, StudentDashboardQueryDto } from './dto';
+import { TermType } from '@prisma/client';
 export declare class StudentController {
     private readonly studentService;
     constructor(studentService: StudentService);
@@ -28,6 +29,14 @@ export declare class StudentController {
         meta: any;
         statusCode: number;
     }>;
+    getStudentDetails(studentId: string, session?: string, term?: TermType): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
     searchFilterPaginationStudents(page?: number, limit?: number, search?: string, lgaId?: string, schoolId?: string, classId?: string, gender?: string, subject?: string, session?: string, term?: string, sortBy?: string, sortOrder?: 'asc' | 'desc'): Promise<{
         success: boolean;
         message: string;
@@ -44,7 +53,7 @@ export declare class StudentController {
         meta: any;
         statusCode: number;
     }>;
-    downloadClassResultsPdf(schoolId: string, classId: string, sessionId: string | undefined, termId: string | undefined, res: ExpressResponse): Promise<ExpressResponse<any, Record<string, any>>>;
+    downloadClassResultsPdf(schoolId: string, classId: string, sessionId: string | undefined, termId: string | undefined, session: string | undefined, term: TermType | undefined, res: ExpressResponse): Promise<ExpressResponse<any, Record<string, any>>>;
     getStudentById(id: string): Promise<{
         success: boolean;
         message: string;
@@ -53,7 +62,7 @@ export declare class StudentController {
         meta: any;
         statusCode: number;
     }>;
-    downloadStudentResultPdf(id: string, sessionId: string | undefined, termId: string | undefined, res: ExpressResponse): Promise<ExpressResponse<any, Record<string, any>>>;
+    downloadStudentResultPdf(id: string, sessionId: string | undefined, termId: string | undefined, session: string | undefined, term: TermType | undefined, res: ExpressResponse): Promise<ExpressResponse<any, Record<string, any>>>;
     createStudent(createStudentDto: CreateStudentDto): Promise<{
         success: boolean;
         message: string;

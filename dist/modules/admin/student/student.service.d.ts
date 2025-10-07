@@ -26,6 +26,8 @@ export declare class StudentService {
     getStudentResultPdf(studentId: string, options?: {
         sessionId?: string;
         termId?: string;
+        session?: string;
+        term?: TermType;
     }): Promise<{
         pdf: Buffer<ArrayBufferLike>;
         filename: string;
@@ -35,6 +37,8 @@ export declare class StudentService {
         classId: string;
         sessionId?: string;
         termId?: string;
+        session?: string;
+        term?: TermType;
     }): Promise<{
         pdf: Buffer<ArrayBufferLike>;
         filename: string;
@@ -137,4 +141,15 @@ export declare class StudentService {
     }>;
     private getStudentOrderBy;
     private getStudentFilterOptions;
+    getStudentDetails(studentId: string, filters?: {
+        session?: string;
+        term?: TermType;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
 }

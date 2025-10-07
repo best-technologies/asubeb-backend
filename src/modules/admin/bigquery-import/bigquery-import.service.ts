@@ -251,12 +251,12 @@ export class BigQueryImportService {
     const normalizedClassName = className.toLowerCase().trim();
     const academicYear = '2024-2025';
     
-    // First, try to find existing class
+    // First, try to find existing class FOR THIS SPECIFIC SCHOOL
     let classRecord = await this.prisma.class.findFirst({
       where: {
-        // schoolId: school.id,
+        schoolId: school.id,  // ✅ MUST check schoolId
         name: normalizedClassName,
-        // academicYear: academicYear
+        academicYear: academicYear
       }
     });
     
@@ -278,7 +278,7 @@ export class BigQueryImportService {
         // If creation fails (likely due to race condition), try to find it again
         classRecord = await this.prisma.class.findFirst({
           where: {
-            schoolId: school.id,
+            schoolId: school.id,  // ✅ MUST check schoolId
             name: normalizedClassName,
             academicYear: academicYear
           }

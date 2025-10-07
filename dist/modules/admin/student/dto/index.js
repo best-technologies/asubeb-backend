@@ -20,4 +20,5 @@ __exportStar(require("./student-response.dto"), exports);
 __exportStar(require("./student-explorer.dto"), exports);
 __exportStar(require("./student-dashboard.dto"), exports);
 __exportStar(require("./student-dashboard-query.dto"), exports);
+__exportStar(require("./student-details-response.dto"), exports);
 //# sourceMappingURL=index.js.map

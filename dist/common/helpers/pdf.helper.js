@@ -7,6 +7,9 @@ async function generateStudentResultPdf(payload) {
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
     const buffers = [];
     doc.on('data', (chunk) => buffers.push(chunk));
+    const student = payload.studentData?.student;
+    const performanceSummary = payload.studentData?.performanceSummary;
+    const useComprehensiveData = !!(student && performanceSummary);
     const startY = doc.y;
     doc.save();
     doc.rect(50, startY, 495, 60).fill('#0ea5e9');
@@ -14,7 +17,7 @@ async function generateStudentResultPdf(payload) {
     doc.restore();
     doc.moveDown(2.5);
     const infoTop = doc.y;
-    const cardHeight = 110;
+    const cardHeight = useComprehensiveData ? 140 : 110;
     doc.save();
     doc.roundedRect(50, infoTop, 495, cardHeight, 10).fill('#f8fafc').stroke('#e5e7eb');
     doc.restore();
@@ -30,16 +33,50 @@ async function generateStudentResultPdf(payload) {
     drawField('School', payload.schoolName ?? 'N/A', leftX, y);
     y += 32;
     drawField('Session', payload.sessionName, leftX, y);
+    if (useComprehensiveData) {
+        y += 32;
+        drawField('LGA', student.school?.lga?.name ?? 'N/A', leftX, y);
+    }
     y = infoTop + 12;
     drawField('Gender', payload.gender ?? 'N/A', rightX, y);
     y += 32;
     drawField('Class', payload.className ?? 'N/A', rightX, y);
     y += 32;
     drawField('Term', payload.termName, rightX, y);
+    if (useComprehensiveData) {
+        y += 32;
+        drawField('Grade', performanceSummary.grade ?? 'N/A', rightX, y);
+    }
     doc.moveDown(7);
-    const totalSubjects = payload.assessments.length;
-    doc.fontSize(11).fill('#111827').text(`Total subjects: ${totalSubjects}`, 50, doc.y + 6);
-    doc.moveDown(0.6);
+    if (useComprehensiveData) {
+        const summaryTop = doc.y;
+        doc.roundedRect(50, summaryTop, 495, 60, 8).fill('#f0f9ff').stroke('#0ea5e9');
+        doc.fill('#0c4a6e').fontSize(14).text('PERFORMANCE SUMMARY', 60, summaryTop + 15, { align: 'center' });
+        const summaryY = summaryTop + 35;
+        doc.fill('#111827').fontSize(11);
+        doc.text(`Total Assessments: ${performanceSummary.totalAssessments}`, 70, summaryY);
+        doc.text(`Total Score: ${performanceSummary.totalScore}/${performanceSummary.totalMaxScore}`, 250, summaryY);
+        doc.text(`Average Score: ${performanceSummary.averageScore}`, 70, summaryY + 15);
+        doc.text(`Overall Percentage: ${performanceSummary.overallPercentage}%`, 250, summaryY + 15);
+        doc.text(`Grade: ${performanceSummary.grade}`, 70, summaryY + 30);
+        doc.moveDown(4);
+    }
+    if (useComprehensiveData && performanceSummary.subjectBreakdown?.length > 0) {
+        doc.fill('#111827').fontSize(14).text('SUBJECT-WISE PERFORMANCE', 50, doc.y);
+        doc.moveDown(1);
+        performanceSummary.subjectBreakdown.forEach((subject, index) => {
+            const subjectY = doc.y;
+            doc.roundedRect(50, subjectY, 495, 40, 6).fill('#f9fafb').stroke('#e5e7eb');
+            doc.fill('#111827').fontSize(12).text(subject.subject.name, 60, subjectY + 8);
+            doc.fill('#6b7280').fontSize(10).text(`Score: ${subject.totalScore}/${subject.totalMaxScore}`, 60, subjectY + 22);
+            doc.fill('#6b7280').fontSize(10).text(`Average: ${subject.averageScore}`, 200, subjectY + 22);
+            doc.fill('#6b7280').fontSize(10).text(`Percentage: ${subject.percentage}%`, 350, subjectY + 22);
+            doc.moveDown(2.2);
+        });
+        doc.moveDown(1);
+    }
+    doc.fill('#111827').fontSize(14).text('DETAILED ASSESSMENTS', 50, doc.y);
+    doc.moveDown(1);
     const headerY = doc.y;
     doc.rect(50, headerY, 495, 24).fill('#f3f4f6');
     doc.fill('#111827').fontSize(11);

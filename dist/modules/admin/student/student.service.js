@@ -45,6 +45,7 @@ let StudentService = StudentService_1 = class StudentService {
                 currentSession = currentSession || activeSession.name;
                 currentTerm = currentTerm || activeSession.terms[0]?.name;
                 if (!filters?.lgaId) {
+                    this.logger.log("No Lga Id provided, returning a list of all lgas");
                     const lgas = await this.prisma.localGovernmentArea.findMany({
                         where: { isActive: true },
                         select: {
@@ -55,6 +56,7 @@ let StudentService = StudentService_1 = class StudentService {
                         },
                         orderBy: { name: 'asc' },
                     });
+                    this.logger.log("All Lga lists retrieved successfully");
                     return response_helper_1.ResponseHelper.success('Basic dashboard data retrieved successfully', {
                         session: currentSession,
                         term: currentTerm,
@@ -64,6 +66,7 @@ let StudentService = StudentService_1 = class StudentService {
                 }
             }
             if (filters?.lgaId && !filters?.schoolId) {
+                this.logger.log("retirveing list of all schools");
                 const schools = await this.prisma.school.findMany({
                     where: {
                         isActive: true,
@@ -77,6 +80,7 @@ let StudentService = StudentService_1 = class StudentService {
                     },
                     orderBy: { name: 'asc' },
                 });
+                this.logger.log("All school lists retrieved successfully");
                 return response_helper_1.ResponseHelper.success('Schools in LGA retrieved successfully', {
                     session: currentSession,
                     term: currentTerm,
@@ -85,6 +89,43 @@ let StudentService = StudentService_1 = class StudentService {
                 });
             }
             if (filters?.schoolId && !filters?.classId) {
+                const school = await this.prisma.school.findUnique({
+                    where: { id: filters.schoolId },
+                    select: {
+                        id: true,
+                        name: true,
+                        code: true,
+                        level: true,
+                        address: true,
+                        totalStudents: true,
+                        totalTeachers: true,
+                        capacity: true,
+                        lga: {
+                            select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                            }
+                        }
+                    }
+                });
+                if (!school) {
+                    throw new Error('School not found');
+                }
+                const studentStats = await this.prisma.student.groupBy({
+                    by: ['gender'],
+                    where: {
+                        schoolId: filters.schoolId,
+                        isActive: true,
+                    },
+                    _count: {
+                        gender: true,
+                    },
+                });
+                const totalStudents = studentStats.reduce((sum, stat) => sum + stat._count.gender, 0);
+                const maleCount = studentStats.find(stat => stat.gender === 'MALE')?._count.gender || 0;
+                const femaleCount = studentStats.find(stat => stat.gender === 'FEMALE')?._count.gender || 0;
+                const otherCount = studentStats.find(stat => stat.gender === 'OTHER')?._count.gender || 0;
                 const classes = await this.prisma.class.findMany({
                     where: {
                         isActive: true,
@@ -95,15 +136,40 @@ let StudentService = StudentService_1 = class StudentService {
                         name: true,
                         grade: true,
                         section: true,
+                        school: {
+                            select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                            }
+                        }
                     },
                     orderBy: [
                         { grade: 'asc' },
                         { section: 'asc' }
                     ],
                 });
-                return response_helper_1.ResponseHelper.success('Classes in school retrieved successfully', {
+                this.logger.log("Classes and school stats retrieved successfully");
+                return response_helper_1.ResponseHelper.success('Classes and school stats retrieved successfully', {
                     session: currentSession,
                     term: currentTerm,
+                    school: {
+                        id: school.id,
+                        name: school.name,
+                        code: school.code,
+                        level: school.level,
+                        address: school.address,
+                        lga: school.lga,
+                        totalStudents: school.totalStudents,
+                        totalTeachers: school.totalTeachers,
+                        capacity: school.capacity,
+                        studentStats: {
+                            total: totalStudents,
+                            male: maleCount,
+                            female: femaleCount,
+                            other: otherCount,
+                        }
+                    },
                     classes,
                     totalClasses: classes.length
                 });
@@ -121,7 +187,7 @@ let StudentService = StudentService_1 = class StudentService {
                     },
                 },
             };
-            if (filters?.schoolId) {
+            if (filters?.schoolId && !filters?.classId) {
                 studentWhereConditions.schoolId = filters.schoolId;
             }
             if (filters?.classId) {
@@ -191,10 +257,73 @@ let StudentService = StudentService_1 = class StudentService {
             }));
             const totalPages = Math.ceil(totalStudents / limit);
             const hasMore = page < totalPages;
-            return response_helper_1.ResponseHelper.success('Students retrieved successfully', {
+            let schoolInfo = null;
+            if (filters?.classId) {
+                const classWithSchool = await this.prisma.class.findUnique({
+                    where: { id: filters.classId },
+                    select: {
+                        id: true,
+                        name: true,
+                        grade: true,
+                        section: true,
+                        school: {
+                            select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                                level: true,
+                                address: true,
+                                totalStudents: true,
+                                totalTeachers: true,
+                                capacity: true,
+                                lga: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        code: true,
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                if (classWithSchool?.school) {
+                    const studentStats = await this.prisma.student.groupBy({
+                        by: ['gender'],
+                        where: {
+                            schoolId: classWithSchool.school.id,
+                            isActive: true,
+                        },
+                        _count: {
+                            gender: true,
+                        },
+                    });
+                    const totalSchoolStudents = studentStats.reduce((sum, stat) => sum + stat._count.gender, 0);
+                    const maleCount = studentStats.find(stat => stat.gender === 'MALE')?._count.gender || 0;
+                    const femaleCount = studentStats.find(stat => stat.gender === 'FEMALE')?._count.gender || 0;
+                    const otherCount = studentStats.find(stat => stat.gender === 'OTHER')?._count.gender || 0;
+                    schoolInfo = {
+                        id: classWithSchool.school.id,
+                        name: classWithSchool.school.name,
+                        code: classWithSchool.school.code,
+                        level: classWithSchool.school.level,
+                        address: classWithSchool.school.address,
+                        lga: classWithSchool.school.lga,
+                        totalStudents: classWithSchool.school.totalStudents,
+                        totalTeachers: classWithSchool.school.totalTeachers,
+                        capacity: classWithSchool.school.capacity,
+                        studentStats: {
+                            total: totalSchoolStudents,
+                            male: maleCount,
+                            female: femaleCount,
+                            other: otherCount,
+                        }
+                    };
+                }
+            }
+            const responseData = {
                 session: currentSession,
                 term: currentTerm,
-                performanceTable,
                 pagination: {
                     currentPage: page,
                     totalPages,
@@ -203,7 +332,12 @@ let StudentService = StudentService_1 = class StudentService {
                     hasMore
                 },
                 lastUpdated: new Date().toISOString(),
-            });
+            };
+            if (schoolInfo) {
+                responseData.school = schoolInfo;
+            }
+            responseData.performanceTable = performanceTable;
+            return response_helper_1.ResponseHelper.success('Students retrieved successfully', responseData);
         }
         catch (error) {
             this.logger.error('Error in getStudentDashboard:', error);
@@ -211,119 +345,355 @@ let StudentService = StudentService_1 = class StudentService {
         }
     }
     async getStudentResultPdf(studentId, options) {
-        let session = options?.sessionId
-            ? await this.prisma.session.findUnique({ where: { id: options.sessionId } })
-            : await this.prisma.session.findFirst({ where: { isCurrent: true, isActive: true } });
-        if (!session) {
-            session = await this.prisma.session.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
-        }
-        let term = options?.termId
-            ? await this.prisma.term.findUnique({ where: { id: options.termId } })
-            : await this.prisma.term.findFirst({ where: { isCurrent: true, isActive: true, ...(session ? { sessionId: session.id } : {}) } });
-        if (!term && session) {
-            term = await this.prisma.term.findFirst({ where: { sessionId: session.id, isActive: true }, orderBy: { createdAt: 'desc' } });
-        }
-        const student = await this.prisma.student.findUnique({
-            where: { id: studentId },
-            select: {
-                id: true,
-                studentId: true,
-                firstName: true,
-                lastName: true,
-                gender: true,
-                school: { select: { name: true } },
-                class: { select: { name: true } },
-                assessments: {
-                    where: term && session ? { term: { id: term.id, sessionId: session.id } } : undefined,
-                    select: {
-                        score: true,
-                        maxScore: true,
-                        percentage: true,
-                        type: true,
-                        subject: { select: { name: true } },
+        this.logger.log(`Generating PDF for student ID: ${studentId}`, options);
+        try {
+            let currentSession = options?.session;
+            let currentTerm = options?.term;
+            if (!currentSession || !currentTerm) {
+                const activeSession = await this.prisma.session.findFirst({
+                    where: { isActive: true },
+                    include: {
+                        terms: {
+                            where: { isActive: true },
+                            orderBy: { createdAt: 'desc' },
+                            take: 1,
+                        },
                     },
-                    orderBy: { createdAt: 'desc' },
+                });
+                if (!activeSession) {
+                    throw new Error('No active session found');
+                }
+                currentSession = currentSession || activeSession.name;
+                currentTerm = currentTerm || activeSession.terms[0]?.name;
+            }
+            const student = await this.prisma.student.findUnique({
+                where: { id: studentId },
+                select: {
+                    id: true,
+                    studentId: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true,
+                    dateOfBirth: true,
+                    gender: true,
+                    address: true,
+                    enrollmentDate: true,
+                    isActive: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    school: {
+                        select: {
+                            id: true,
+                            name: true,
+                            code: true,
+                            level: true,
+                            address: true,
+                            phone: true,
+                            email: true,
+                            website: true,
+                            principalName: true,
+                            principalPhone: true,
+                            principalEmail: true,
+                            establishedYear: true,
+                            totalStudents: true,
+                            totalTeachers: true,
+                            capacity: true,
+                            lga: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    code: true,
+                                    state: true,
+                                }
+                            }
+                        }
+                    },
+                    class: {
+                        select: {
+                            id: true,
+                            name: true,
+                            grade: true,
+                            section: true,
+                            capacity: true,
+                            currentEnrollment: true,
+                            academicYear: true,
+                            teacher: {
+                                select: {
+                                    id: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    email: true,
+                                    phone: true,
+                                }
+                            }
+                        }
+                    },
+                    parent: {
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                            phone: true,
+                            address: true,
+                            occupation: true,
+                        }
+                    }
+                }
+            });
+            if (!student) {
+                throw new common_1.NotFoundException(`Student with ID ${studentId} not found`);
+            }
+            const assessments = await this.prisma.assessment.findMany({
+                where: {
+                    studentId: studentId,
+                    term: {
+                        name: currentTerm,
+                        session: {
+                            name: currentSession,
+                        },
+                    },
                 },
-            },
-        });
-        if (!student) {
-            throw new common_1.NotFoundException(`Student with ID ${studentId} not found`);
+                select: {
+                    id: true,
+                    type: true,
+                    title: true,
+                    description: true,
+                    maxScore: true,
+                    score: true,
+                    percentage: true,
+                    remarks: true,
+                    dateGiven: true,
+                    dateSubmitted: true,
+                    isSubmitted: true,
+                    isGraded: true,
+                    createdAt: true,
+                    subject: {
+                        select: {
+                            id: true,
+                            name: true,
+                            code: true,
+                            level: true,
+                        }
+                    },
+                    teacher: {
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                        }
+                    }
+                },
+                orderBy: [
+                    { subject: { name: 'asc' } },
+                    { type: 'asc' },
+                    { dateGiven: 'desc' }
+                ]
+            });
+            const totalAssessments = assessments.length;
+            const totalScore = assessments.reduce((sum, assessment) => sum + assessment.score, 0);
+            const totalMaxScore = assessments.reduce((sum, assessment) => sum + assessment.maxScore, 0);
+            const averageScore = totalAssessments > 0 ? totalScore / totalAssessments : 0;
+            const overallPercentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
+            const subjectBreakdown = assessments.reduce((acc, assessment) => {
+                const subjectName = assessment.subject.name;
+                if (!acc[subjectName]) {
+                    acc[subjectName] = {
+                        subject: assessment.subject,
+                        assessments: [],
+                        totalScore: 0,
+                        totalMaxScore: 0,
+                        averageScore: 0,
+                        percentage: 0,
+                        assessmentCount: 0
+                    };
+                }
+                acc[subjectName].assessments.push(assessment);
+                acc[subjectName].totalScore += assessment.score;
+                acc[subjectName].totalMaxScore += assessment.maxScore;
+                acc[subjectName].assessmentCount += 1;
+                return acc;
+            }, {});
+            Object.values(subjectBreakdown).forEach((subject) => {
+                subject.averageScore = subject.assessmentCount > 0 ? subject.totalScore / subject.assessmentCount : 0;
+                subject.percentage = subject.totalMaxScore > 0 ? (subject.totalScore / subject.totalMaxScore) * 100 : 0;
+            });
+            const assessmentTypeBreakdown = assessments.reduce((acc, assessment) => {
+                const type = assessment.type;
+                if (!acc[type]) {
+                    acc[type] = {
+                        type,
+                        count: 0,
+                        totalScore: 0,
+                        totalMaxScore: 0,
+                        averageScore: 0,
+                        percentage: 0
+                    };
+                }
+                acc[type].count += 1;
+                acc[type].totalScore += assessment.score;
+                acc[type].totalMaxScore += assessment.maxScore;
+                return acc;
+            }, {});
+            Object.values(assessmentTypeBreakdown).forEach((type) => {
+                type.averageScore = type.count > 0 ? type.totalScore / type.count : 0;
+                type.percentage = type.totalMaxScore > 0 ? (type.totalScore / type.totalMaxScore) * 100 : 0;
+            });
+            const getGradeClassification = (percentage) => {
+                if (percentage >= 90)
+                    return 'A+ (Excellent)';
+                if (percentage >= 80)
+                    return 'A (Very Good)';
+                if (percentage >= 70)
+                    return 'B+ (Good)';
+                if (percentage >= 60)
+                    return 'B (Fair)';
+                if (percentage >= 50)
+                    return 'C (Pass)';
+                if (percentage >= 40)
+                    return 'D (Poor)';
+                return 'F (Fail)';
+            };
+            const performanceSummary = {
+                session: currentSession,
+                term: currentTerm,
+                totalAssessments,
+                totalScore: Math.round(totalScore * 100) / 100,
+                totalMaxScore: Math.round(totalMaxScore * 100) / 100,
+                averageScore: Math.round(averageScore * 100) / 100,
+                overallPercentage: Math.round(overallPercentage * 100) / 100,
+                grade: getGradeClassification(overallPercentage),
+                subjectBreakdown: Object.values(subjectBreakdown).map((subject) => ({
+                    ...subject,
+                    totalScore: Math.round(subject.totalScore * 100) / 100,
+                    totalMaxScore: Math.round(subject.totalMaxScore * 100) / 100,
+                    averageScore: Math.round(subject.averageScore * 100) / 100,
+                    percentage: Math.round(subject.percentage * 100) / 100,
+                })),
+                assessmentTypeBreakdown: Object.values(assessmentTypeBreakdown).map((type) => ({
+                    ...type,
+                    totalScore: Math.round(type.totalScore * 100) / 100,
+                    totalMaxScore: Math.round(type.totalMaxScore * 100) / 100,
+                    averageScore: Math.round(type.averageScore * 100) / 100,
+                    percentage: Math.round(type.percentage * 100) / 100,
+                }))
+            };
+            const studentDisplayName = `${student.firstName} ${student.lastName}`.trim() || student.studentId;
+            const pdf = await (0, pdf_helper_1.generateStudentResultPdf)({
+                studentName: `${student.firstName} ${student.lastName}`.trim(),
+                studentId: student.studentId,
+                gender: student.gender,
+                schoolName: student.school?.name ?? null,
+                className: student.class?.name ?? null,
+                sessionName: currentSession,
+                termName: currentTerm,
+                assessments: (assessments || []).map(a => ({
+                    subjectName: a.subject.name,
+                    score: a.score,
+                    maxScore: a.maxScore,
+                    percentage: a.percentage,
+                    type: a.type,
+                })),
+                studentData: {
+                    student,
+                    performanceSummary,
+                    lastUpdated: new Date().toISOString(),
+                }
+            });
+            this.logger.log(`PDF generated successfully for ${student.firstName} ${student.lastName}`);
+            return { pdf, filename: `asubeb - ${studentDisplayName} - ${currentTerm}.pdf` };
         }
-        const studentDisplayName = `${student.firstName} ${student.lastName}`.trim() || student.studentId;
-        const pdf = await (0, pdf_helper_1.generateStudentResultPdf)({
-            studentName: `${student.firstName} ${student.lastName}`.trim(),
-            studentId: student.studentId,
-            gender: student.gender,
-            schoolName: student.school?.name ?? null,
-            className: student.class?.name ?? null,
-            sessionName: session?.name ?? 'N/A',
-            termName: term?.name ?? 'N/A',
-            assessments: (student.assessments || []).map(a => ({
-                subjectName: a.subject.name,
-                score: a.score,
-                maxScore: a.maxScore,
-                percentage: a.percentage,
-                type: a.type,
-            })),
-        });
-        return { pdf, filename: `asubeb - ${studentDisplayName}.pdf` };
+        catch (error) {
+            this.logger.error('Error in getStudentResultPdf:', error);
+            if (error instanceof common_1.NotFoundException) {
+                throw error;
+            }
+            throw new Error(`Error generating student result PDF: ${error.message}`);
+        }
     }
     async getClassResultsPdf(params) {
-        let session = params.sessionId
-            ? await this.prisma.session.findUnique({ where: { id: params.sessionId } })
-            : await this.prisma.session.findFirst({ where: { isCurrent: true, isActive: true } });
-        if (!session) {
-            session = await this.prisma.session.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'desc' } });
-        }
-        let term = params.termId
-            ? await this.prisma.term.findUnique({ where: { id: params.termId } })
-            : await this.prisma.term.findFirst({ where: { isCurrent: true, isActive: true, ...(session ? { sessionId: session.id } : {}) } });
-        if (!term && session) {
-            term = await this.prisma.term.findFirst({ where: { sessionId: session.id, isActive: true }, orderBy: { createdAt: 'desc' } });
-        }
-        const students = await this.prisma.student.findMany({
-            where: { isActive: true, classId: params.classId, schoolId: params.schoolId },
-            select: {
-                id: true,
-                studentId: true,
-                firstName: true,
-                lastName: true,
-                school: { select: { name: true } },
-                class: { select: { name: true } },
-                assessments: {
-                    where: term && session ? { term: { id: term.id, sessionId: session.id } } : undefined,
-                    select: {
-                        score: true,
-                        maxScore: true,
-                        subject: { select: { name: true } },
+        this.logger.log(`Generating class results PDF for school: ${params.schoolId}, class: ${params.classId}`, params);
+        try {
+            let currentSession = params.session;
+            let currentTerm = params.term;
+            if (!currentSession || !currentTerm) {
+                const activeSession = await this.prisma.session.findFirst({
+                    where: { isActive: true },
+                    include: {
+                        terms: {
+                            where: { isActive: true },
+                            orderBy: { createdAt: 'desc' },
+                            take: 1,
+                        },
+                    },
+                });
+                if (!activeSession) {
+                    throw new Error('No active session found');
+                }
+                currentSession = currentSession || activeSession.name;
+                currentTerm = currentTerm || activeSession.terms[0]?.name;
+            }
+            const students = await this.prisma.student.findMany({
+                where: { isActive: true, classId: params.classId, schoolId: params.schoolId },
+                select: {
+                    id: true,
+                    studentId: true,
+                    firstName: true,
+                    lastName: true,
+                    school: { select: { name: true } },
+                    class: { select: { name: true } },
+                    assessments: {
+                        where: {
+                            term: {
+                                name: currentTerm,
+                                session: {
+                                    name: currentSession,
+                                },
+                            },
+                        },
+                        select: {
+                            score: true,
+                            maxScore: true,
+                            subject: { select: { name: true } },
+                        },
                     },
                 },
-            },
-            orderBy: { firstName: 'asc' },
-        });
-        const subjectsSet = new Set();
-        students.forEach(s => s.assessments.forEach(a => subjectsSet.add(a.subject.name)));
-        const subjects = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
-        const rows = students.map(s => ({
-            studentName: `${s.firstName} ${s.lastName}`.trim(),
-            studentId: s.studentId,
-            subjects: subjects.reduce((acc, subj) => {
-                const hit = s.assessments.find(a => a.subject.name === subj);
-                acc[subj] = hit ? { score: hit.score, maxScore: hit.maxScore } : undefined;
-                return acc;
-            }, {}),
-        }));
-        const payload = {
-            schoolName: students[0]?.school?.name ?? null,
-            className: students[0]?.class?.name ?? null,
-            sessionName: session?.name ?? 'N/A',
-            termName: term?.name ?? 'N/A',
-            subjects,
-            rows,
-        };
-        const pdf = await (0, pdf_class_helper_1.generateClassResultsPdf)(payload);
-        const filename = `asubeb - ${payload.schoolName ?? 'school'} - ${payload.className ?? 'class'} - ${payload.termName}.pdf`;
-        return { pdf, filename };
+                orderBy: { firstName: 'asc' },
+            });
+            if (students.length === 0) {
+                throw new Error('No students found in the specified class');
+            }
+            const subjectsSet = new Set();
+            students.forEach(s => s.assessments.forEach(a => subjectsSet.add(a.subject.name)));
+            const subjects = Array.from(subjectsSet).sort((a, b) => a.localeCompare(b));
+            const rows = students.map(s => ({
+                studentName: `${s.firstName} ${s.lastName}`.trim(),
+                studentId: s.studentId,
+                subjects: subjects.reduce((acc, subj) => {
+                    const hit = s.assessments.find(a => a.subject.name === subj);
+                    acc[subj] = hit ? { score: hit.score, maxScore: hit.maxScore } : undefined;
+                    return acc;
+                }, {}),
+            }));
+            const payload = {
+                schoolName: students[0]?.school?.name ?? null,
+                className: students[0]?.class?.name ?? null,
+                sessionName: currentSession,
+                termName: currentTerm,
+                subjects,
+                rows,
+            };
+            const pdf = await (0, pdf_class_helper_1.generateClassResultsPdf)(payload);
+            const filename = `asubeb - ${payload.schoolName ?? 'school'} - ${payload.className ?? 'class'} - ${payload.termName}.pdf`;
+            this.logger.log(`Class results PDF generated successfully for ${students.length} students`);
+            return { pdf, filename };
+        }
+        catch (error) {
+            this.logger.error('Error in getClassResultsPdf:', error);
+            throw new Error(`Error generating class results PDF: ${error.message}`);
+        }
     }
     async getAllStudents(page = 1, limit = 10, schoolId) {
         const skip = (page - 1) * limit;
@@ -1128,6 +1498,257 @@ let StudentService = StudentService_1 = class StudentService {
             subjects,
             genders: genders.map(g => ({ gender: g.gender, count: g._count.gender })),
         };
+    }
+    async getStudentDetails(studentId, filters) {
+        this.logger.log(`Fetching student details for ID: ${studentId}`, filters);
+        try {
+            let currentSession = filters?.session;
+            let currentTerm = filters?.term;
+            if (!currentSession || !currentTerm) {
+                const activeSession = await this.prisma.session.findFirst({
+                    where: { isActive: true },
+                    include: {
+                        terms: {
+                            where: { isActive: true },
+                            orderBy: { createdAt: 'desc' },
+                            take: 1,
+                        },
+                    },
+                });
+                if (!activeSession) {
+                    throw new Error('No active session found');
+                }
+                currentSession = currentSession || activeSession.name;
+                currentTerm = currentTerm || activeSession.terms[0]?.name;
+            }
+            const student = await this.prisma.student.findUnique({
+                where: { id: studentId },
+                select: {
+                    id: true,
+                    studentId: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true,
+                    dateOfBirth: true,
+                    gender: true,
+                    address: true,
+                    enrollmentDate: true,
+                    isActive: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    school: {
+                        select: {
+                            id: true,
+                            name: true,
+                            code: true,
+                            level: true,
+                            address: true,
+                            phone: true,
+                            email: true,
+                            website: true,
+                            principalName: true,
+                            principalPhone: true,
+                            principalEmail: true,
+                            establishedYear: true,
+                            totalStudents: true,
+                            totalTeachers: true,
+                            capacity: true,
+                            lga: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    code: true,
+                                    state: true,
+                                }
+                            }
+                        }
+                    },
+                    class: {
+                        select: {
+                            id: true,
+                            name: true,
+                            grade: true,
+                            section: true,
+                            capacity: true,
+                            currentEnrollment: true,
+                            academicYear: true,
+                            teacher: {
+                                select: {
+                                    id: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    email: true,
+                                    phone: true,
+                                }
+                            }
+                        }
+                    },
+                    parent: {
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                            phone: true,
+                            address: true,
+                            occupation: true,
+                        }
+                    }
+                }
+            });
+            if (!student) {
+                throw new common_1.NotFoundException(`Student with ID ${studentId} not found`);
+            }
+            const assessments = await this.prisma.assessment.findMany({
+                where: {
+                    studentId: studentId,
+                    term: {
+                        name: currentTerm,
+                        session: {
+                            name: currentSession,
+                        },
+                    },
+                },
+                select: {
+                    id: true,
+                    type: true,
+                    title: true,
+                    description: true,
+                    maxScore: true,
+                    score: true,
+                    percentage: true,
+                    remarks: true,
+                    dateGiven: true,
+                    dateSubmitted: true,
+                    isSubmitted: true,
+                    isGraded: true,
+                    createdAt: true,
+                    subject: {
+                        select: {
+                            id: true,
+                            name: true,
+                            code: true,
+                            level: true,
+                        }
+                    },
+                    teacher: {
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                        }
+                    }
+                },
+                orderBy: [
+                    { subject: { name: 'asc' } },
+                    { type: 'asc' },
+                    { dateGiven: 'desc' }
+                ]
+            });
+            const totalAssessments = assessments.length;
+            const totalScore = assessments.reduce((sum, assessment) => sum + assessment.score, 0);
+            const totalMaxScore = assessments.reduce((sum, assessment) => sum + assessment.maxScore, 0);
+            const averageScore = totalAssessments > 0 ? totalScore / totalAssessments : 0;
+            const overallPercentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
+            const subjectBreakdown = assessments.reduce((acc, assessment) => {
+                const subjectName = assessment.subject.name;
+                if (!acc[subjectName]) {
+                    acc[subjectName] = {
+                        subject: assessment.subject,
+                        assessments: [],
+                        totalScore: 0,
+                        totalMaxScore: 0,
+                        averageScore: 0,
+                        percentage: 0,
+                        assessmentCount: 0
+                    };
+                }
+                acc[subjectName].assessments.push(assessment);
+                acc[subjectName].totalScore += assessment.score;
+                acc[subjectName].totalMaxScore += assessment.maxScore;
+                acc[subjectName].assessmentCount += 1;
+                return acc;
+            }, {});
+            Object.values(subjectBreakdown).forEach((subject) => {
+                subject.averageScore = subject.assessmentCount > 0 ? subject.totalScore / subject.assessmentCount : 0;
+                subject.percentage = subject.totalMaxScore > 0 ? (subject.totalScore / subject.totalMaxScore) * 100 : 0;
+            });
+            const assessmentTypeBreakdown = assessments.reduce((acc, assessment) => {
+                const type = assessment.type;
+                if (!acc[type]) {
+                    acc[type] = {
+                        type,
+                        count: 0,
+                        totalScore: 0,
+                        totalMaxScore: 0,
+                        averageScore: 0,
+                        percentage: 0
+                    };
+                }
+                acc[type].count += 1;
+                acc[type].totalScore += assessment.score;
+                acc[type].totalMaxScore += assessment.maxScore;
+                return acc;
+            }, {});
+            Object.values(assessmentTypeBreakdown).forEach((type) => {
+                type.averageScore = type.count > 0 ? type.totalScore / type.count : 0;
+                type.percentage = type.totalMaxScore > 0 ? (type.totalScore / type.totalMaxScore) * 100 : 0;
+            });
+            const getGradeClassification = (percentage) => {
+                if (percentage >= 90)
+                    return 'A+ (Excellent)';
+                if (percentage >= 80)
+                    return 'A (Very Good)';
+                if (percentage >= 70)
+                    return 'B+ (Good)';
+                if (percentage >= 60)
+                    return 'B (Fair)';
+                if (percentage >= 50)
+                    return 'C (Pass)';
+                if (percentage >= 40)
+                    return 'D (Poor)';
+                return 'F (Fail)';
+            };
+            const performanceSummary = {
+                session: currentSession,
+                term: currentTerm,
+                totalAssessments,
+                totalScore: Math.round(totalScore * 100) / 100,
+                totalMaxScore: Math.round(totalMaxScore * 100) / 100,
+                averageScore: Math.round(averageScore * 100) / 100,
+                overallPercentage: Math.round(overallPercentage * 100) / 100,
+                grade: getGradeClassification(overallPercentage),
+                subjectBreakdown: Object.values(subjectBreakdown).map((subject) => ({
+                    ...subject,
+                    totalScore: Math.round(subject.totalScore * 100) / 100,
+                    totalMaxScore: Math.round(subject.totalMaxScore * 100) / 100,
+                    averageScore: Math.round(subject.averageScore * 100) / 100,
+                    percentage: Math.round(subject.percentage * 100) / 100,
+                })),
+                assessmentTypeBreakdown: Object.values(assessmentTypeBreakdown).map((type) => ({
+                    ...type,
+                    totalScore: Math.round(type.totalScore * 100) / 100,
+                    totalMaxScore: Math.round(type.totalMaxScore * 100) / 100,
+                    averageScore: Math.round(type.averageScore * 100) / 100,
+                    percentage: Math.round(type.percentage * 100) / 100,
+                }))
+            };
+            this.logger.log(`Student details retrieved successfully for ${student.firstName} ${student.lastName}`);
+            return response_helper_1.ResponseHelper.success('Student details retrieved successfully', {
+                student,
+                performanceSummary,
+                lastUpdated: new Date().toISOString(),
+            });
+        }
+        catch (error) {
+            this.logger.error('Error in getStudentDetails:', error);
+            if (error instanceof common_1.NotFoundException) {
+                throw error;
+            }
+            throw new Error(`Error fetching student details: ${error.message}`);
+        }
     }
 };
 exports.StudentService = StudentService;

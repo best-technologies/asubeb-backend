@@ -14,5 +14,10 @@ export interface StudentResultPayload {
     sessionName: string;
     termName: string;
     assessments: StudentAssessmentItem[];
+    studentData?: {
+        student: any;
+        performanceSummary: any;
+        lastUpdated: string;
+    };
 }
 export declare function generateStudentResultPdf(payload: StudentResultPayload): Promise<Buffer>;

@@ -174,7 +174,9 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
         const academicYear = '2024-2025';
         let classRecord = await this.prisma.class.findFirst({
             where: {
+                schoolId: school.id,
                 name: normalizedClassName,
+                academicYear: academicYear
             }
         });
         if (!classRecord) {

@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const student_service_1 = require("./student.service");
 const dto_1 = require("./dto");
+const client_1 = require("@prisma/client");
 let StudentController = class StudentController {
     studentService;
     constructor(studentService) {
@@ -30,6 +31,9 @@ let StudentController = class StudentController {
     }
     async getStudentDashboard(query) {
         return this.studentService.getStudentDashboard(query);
+    }
+    async getStudentDetails(studentId, session, term) {
+        return this.studentService.getStudentDetails(studentId, { session, term });
     }
     async searchFilterPaginationStudents(page = 1, limit = 10, search, lgaId, schoolId, classId, gender, subject, session, term, sortBy, sortOrder) {
         return this.studentService.searchFilterPaginationStudents({
@@ -50,8 +54,15 @@ let StudentController = class StudentController {
     async getAllStudents(page = 1, limit = 10, schoolId) {
         return this.studentService.getAllStudents(page, limit, schoolId);
     }
-    async downloadClassResultsPdf(schoolId, classId, sessionId, termId, res) {
-        const { pdf, filename } = await this.studentService.getClassResultsPdf({ schoolId, classId, sessionId, termId });
+    async downloadClassResultsPdf(schoolId, classId, sessionId, termId, session, term, res) {
+        const { pdf, filename } = await this.studentService.getClassResultsPdf({
+            schoolId,
+            classId,
+            sessionId,
+            termId,
+            session,
+            term
+        });
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         return res.send(pdf);
@@ -59,8 +70,8 @@ let StudentController = class StudentController {
     async getStudentById(id) {
         return this.studentService.getStudentById(id);
     }
-    async downloadStudentResultPdf(id, sessionId, termId, res) {
-        const { pdf, filename } = await this.studentService.getStudentResultPdf(id, { sessionId, termId });
+    async downloadStudentResultPdf(id, sessionId, termId, session, term, res) {
+        const { pdf, filename } = await this.studentService.getStudentResultPdf(id, { sessionId, termId, session, term });
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         return res.send(pdf);
@@ -142,12 +153,12 @@ __decorate([
     (0, common_1.Get)('dashboard'),
     (0, swagger_1.ApiOperation)({
         summary: 'Get student dashboard data with progressive loading',
-        description: 'Progressively loads dashboard data based on provided filters. Without any filters, returns current session and term. With LGA ID, returns schools in that LGA. With school ID, returns classes in that school. With class ID, returns paginated students in that class.'
+        description: 'Progressively loads dashboard data based on provided filters. Without any filters, returns current session and term. With LGA ID, returns schools in that LGA. With school ID, returns classes for that specific school with school statistics (name, code, total students, gender breakdown). With class ID, returns paginated students in that class with school context.'
     }),
     (0, swagger_1.ApiQuery)({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025)', example: '2024/2025' }),
     (0, swagger_1.ApiQuery)({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)', example: 'FIRST_TERM' }),
     (0, swagger_1.ApiQuery)({ name: 'lgaId', required: false, description: 'Filter by LGA ID to get schools', example: 'lga-uuid-123' }),
-    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false, description: 'Filter by school ID to get classes', example: 'school-uuid-123' }),
+    (0, swagger_1.ApiQuery)({ name: 'schoolId', required: false, description: 'Filter by school ID to get classes for that school', example: 'school-uuid-123' }),
     (0, swagger_1.ApiQuery)({ name: 'classId', required: false, description: 'Filter by class ID to get students', example: 'class-uuid-456' }),
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: 'Page number for student list', example: 1 }),
     (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: 'Items per page for student list', example: 10 }),
@@ -161,6 +172,25 @@ __decorate([
     __metadata("design:paramtypes", [dto_1.StudentDashboardQueryDto]),
     __metadata("design:returntype", Promise)
 ], StudentController.prototype, "getStudentDashboard", null);
+__decorate([
+    (0, common_1.Get)(':id/details'),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Get comprehensive student details with performance summary',
+        description: 'Retrieves detailed information about a specific student including personal details, school information, class details, parent information, and comprehensive performance summary for the current or specified term/session. Includes subject-wise breakdown, assessment type analysis, and grade classification.'
+    }),
+    (0, swagger_1.ApiParam)({ name: 'id', description: 'Student ID', example: 'student-uuid-123' }),
+    (0, swagger_1.ApiQuery)({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025). If not provided, uses current active session.', example: '2024/2025' }),
+    (0, swagger_1.ApiQuery)({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM). If not provided, uses current active term.', example: 'SECOND_TERM' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Student details retrieved successfully', type: dto_1.StudentDetailsResponseDto }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'Student not found' }),
+    (0, swagger_1.ApiResponse)({ status: 500, description: 'Internal server error' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Query)('session')),
+    __param(2, (0, common_1.Query)('term')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", Promise)
+], StudentController.prototype, "getStudentDetails", null);
 __decorate([
     (0, common_1.Get)('search'),
     (0, swagger_1.ApiOperation)({ summary: 'Search, filter, and paginate students with comprehensive options' }),
@@ -213,11 +243,16 @@ __decorate([
 ], StudentController.prototype, "getAllStudents", null);
 __decorate([
     (0, common_1.Get)('class-result.pdf'),
-    (0, swagger_1.ApiOperation)({ summary: 'Download class results PDF (landscape table): students x subjects' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Download comprehensive class results PDF',
+        description: 'Generates a comprehensive PDF report for all students in a specific class showing their performance across all subjects for the current or specified term/session. The PDF displays a landscape table format with students as rows and subjects as columns, including individual scores and totals.'
+    }),
     (0, swagger_1.ApiQuery)({ name: 'schoolId', required: true, description: 'School ID', example: 'school-uuid-123' }),
     (0, swagger_1.ApiQuery)({ name: 'classId', required: true, description: 'Class ID', example: 'class-uuid-456' }),
     (0, swagger_1.ApiQuery)({ name: 'sessionId', required: false, description: 'Optional session ID', example: 'session-uuid-789' }),
     (0, swagger_1.ApiQuery)({ name: 'termId', required: false, description: 'Optional term ID', example: 'term-uuid-101' }),
+    (0, swagger_1.ApiQuery)({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025). If not provided, uses current active session.', example: '2024/2025' }),
+    (0, swagger_1.ApiQuery)({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM). If not provided, uses current active term.', example: 'SECOND_TERM' }),
     (0, swagger_1.ApiOkResponse)({ description: 'PDF binary stream', content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } } }),
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Bad request - missing required parameters' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'School or class not found' }),
@@ -226,9 +261,11 @@ __decorate([
     __param(1, (0, common_1.Query)('classId')),
     __param(2, (0, common_1.Query)('sessionId')),
     __param(3, (0, common_1.Query)('termId')),
-    __param(4, (0, common_1.Res)()),
+    __param(4, (0, common_1.Query)('session')),
+    __param(5, (0, common_1.Query)('term')),
+    __param(6, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Object, Object, Object]),
+    __metadata("design:paramtypes", [String, String, Object, Object, Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], StudentController.prototype, "downloadClassResultsPdf", null);
 __decorate([
@@ -246,10 +283,15 @@ __decorate([
 ], StudentController.prototype, "getStudentById", null);
 __decorate([
     (0, common_1.Get)(':id/result.pdf'),
-    (0, swagger_1.ApiOperation)({ summary: 'Download student result as PDF for current (or specified) session/term' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Download comprehensive student result as PDF',
+        description: 'Generates a comprehensive PDF report for a specific student including personal details, school information, class details, parent information, and detailed performance summary for the current or specified term/session. The PDF includes subject-wise breakdown, assessment type analysis, and grade classification.'
+    }),
     (0, swagger_1.ApiParam)({ name: 'id', description: 'Student ID', example: 'student-uuid-123' }),
     (0, swagger_1.ApiQuery)({ name: 'sessionId', required: false, description: 'Optional session ID to filter assessments', example: 'session-uuid-456' }),
     (0, swagger_1.ApiQuery)({ name: 'termId', required: false, description: 'Optional term ID to filter assessments', example: 'term-uuid-789' }),
+    (0, swagger_1.ApiQuery)({ name: 'session', required: false, description: 'Academic session (e.g., 2024/2025). If not provided, uses current active session.', example: '2024/2025' }),
+    (0, swagger_1.ApiQuery)({ name: 'term', required: false, description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM). If not provided, uses current active term.', example: 'SECOND_TERM' }),
     (0, swagger_1.ApiOkResponse)({ description: 'PDF binary stream', content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } } }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Student not found' }),
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Bad request - invalid parameters' }),
@@ -257,9 +299,11 @@ __decorate([
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Query)('sessionId')),
     __param(2, (0, common_1.Query)('termId')),
-    __param(3, (0, common_1.Res)()),
+    __param(3, (0, common_1.Query)('session')),
+    __param(4, (0, common_1.Query)('term')),
+    __param(5, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object, Object, Object]),
+    __metadata("design:paramtypes", [String, Object, Object, Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], StudentController.prototype, "downloadStudentResultPdf", null);
 __decorate([

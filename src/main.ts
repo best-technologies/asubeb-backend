@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { ValidationPipe } from '@nestjs/common';
 import { checkEnvironmentVariables } from './config/env-checker';
 import { HttpExceptionFilter } from './common/filters';
 import * as colors from 'colors';
@@ -15,6 +16,7 @@ async function bootstrap() {
     logger: ['error', 'warn', 'log'],
   });
   const configService = app.get(ConfigService);
+  
   
   // Enable CORS
   app.enableCors({
@@ -38,6 +40,18 @@ async function bootstrap() {
   
   // Set global prefix
   app.setGlobalPrefix('api/v1');
+  
+  // Apply global validation pipe with transformation enabled
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true, // Enable automatic type transformation
+      transformOptions: {
+        enableImplicitConversion: true, // Auto-convert primitives (string to number)
+      },
+      whitelist: true, // Strip properties that don't have decorators
+      forbidNonWhitelisted: false, // Don't throw error for extra properties
+    }),
+  );
   
   // Apply global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());

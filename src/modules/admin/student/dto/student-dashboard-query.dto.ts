@@ -29,30 +29,18 @@ export class StudentDashboardQueryDto {
   @IsString()
   classId?: string;
 
-  @ApiPropertyOptional({ description: 'Page number (default: 1)', minimum: 1 })
+  @ApiPropertyOptional({ description: 'Page number (default: 1)', minimum: 1, default: 1 })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @IsOptional()
-  get page(): number {
-    return this._page || 1;
-  }
-  set page(value: number) {
-    this._page = value;
-  }
-  private _page: number;
+  page?: number;
 
-  @ApiPropertyOptional({ description: 'Items per page (default: 10)', minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({ description: 'Items per page (default: 10)', minimum: 1, maximum: 100, default: 10 })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100)
   @IsOptional()
-  get limit(): number {
-    return this._limit || 10;
-  }
-  set limit(value: number) {
-    this._limit = value;
-  }
-  private _limit: number;
+  limit?: number;
 }

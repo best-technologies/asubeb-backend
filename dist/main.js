@@ -4,6 +4,7 @@ const core_1 = require("@nestjs/core");
 const app_module_1 = require("./app.module");
 const swagger_1 = require("@nestjs/swagger");
 const config_1 = require("@nestjs/config");
+const common_1 = require("@nestjs/common");
 const env_checker_1 = require("./config/env-checker");
 const filters_1 = require("./common/filters");
 const colors = require("colors");
@@ -32,6 +33,14 @@ async function bootstrap() {
         credentials: true,
     });
     app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(new common_1.ValidationPipe({
+        transform: true,
+        transformOptions: {
+            enableImplicitConversion: true,
+        },
+        whitelist: true,
+        forbidNonWhitelisted: false,
+    }));
     app.useGlobalFilters(new filters_1.HttpExceptionFilter());
     if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true') {
         const config = new swagger_1.DocumentBuilder()

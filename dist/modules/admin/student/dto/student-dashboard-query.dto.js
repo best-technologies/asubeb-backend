@@ -20,20 +20,8 @@ class StudentDashboardQueryDto {
     lgaId;
     schoolId;
     classId;
-    get page() {
-        return this._page || 1;
-    }
-    set page(value) {
-        this._page = value;
-    }
-    _page;
-    get limit() {
-        return this._limit || 10;
-    }
-    set limit(value) {
-        this._limit = value;
-    }
-    _limit;
+    page;
+    limit;
 }
 exports.StudentDashboardQueryDto = StudentDashboardQueryDto;
 __decorate([
@@ -67,22 +55,20 @@ __decorate([
     __metadata("design:type", String)
 ], StudentDashboardQueryDto.prototype, "classId", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: 'Page number (default: 1)', minimum: 1 }),
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Page number (default: 1)', minimum: 1, default: 1 }),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Number),
-    __metadata("design:paramtypes", [Number])
-], StudentDashboardQueryDto.prototype, "page", null);
+    __metadata("design:type", Number)
+], StudentDashboardQueryDto.prototype, "page", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: 'Items per page (default: 10)', minimum: 1, maximum: 100 }),
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Items per page (default: 10)', minimum: 1, maximum: 100, default: 10 }),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
     (0, class_validator_1.Max)(100),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Number),
-    __metadata("design:paramtypes", [Number])
-], StudentDashboardQueryDto.prototype, "limit", null);
+    __metadata("design:type", Number)
+], StudentDashboardQueryDto.prototype, "limit", void 0);
 //# sourceMappingURL=student-dashboard-query.dto.js.map

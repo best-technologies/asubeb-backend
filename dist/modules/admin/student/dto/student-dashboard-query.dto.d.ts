@@ -5,10 +5,6 @@ export declare class StudentDashboardQueryDto {
     lgaId?: string;
     schoolId?: string;
     classId?: string;
-    get page(): number;
-    set page(value: number);
-    private _page;
-    get limit(): number;
-    set limit(value: number);
-    private _limit;
+    page?: number;
+    limit?: number;
 }

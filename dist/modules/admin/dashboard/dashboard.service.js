@@ -303,33 +303,32 @@ let DashboardService = DashboardService_1 = class DashboardService {
                             name: true,
                         },
                     },
-                    ...(includePerformance && {
-                        assessments: {
-                            where: {
-                                term: {
-                                    name: termData.name,
-                                    session: {
-                                        name: sessionData.name,
-                                    },
-                                },
-                            },
-                            select: {
-                                score: true,
-                                maxScore: true,
-                                subject: {
-                                    select: {
-                                        name: true,
-                                    },
+                    assessments: {
+                        where: {
+                            term: {
+                                name: termData.name,
+                                session: {
+                                    name: sessionData.name,
                                 },
                             },
                         },
-                    }),
+                        select: {
+                            score: true,
+                            maxScore: true,
+                            subject: {
+                                select: {
+                                    name: true,
+                                },
+                            },
+                        },
+                    },
                 },
                 skip,
                 take: limit,
                 orderBy: this.getOrderByClause(sortBy, sortOrder),
             });
-            const studentsData = students.map(student => {
+            const studentsWithScores = students.map(student => {
+                const totalScore = student.assessments.reduce((sum, assessment) => sum + assessment.score, 0);
                 const baseData = {
                     id: student.id,
                     studentName: `${student.firstName} ${student.lastName}`,
@@ -338,15 +337,14 @@ let DashboardService = DashboardService_1 = class DashboardService {
                     schoolCode: student.school?.code || 'N/A',
                     class: student.class?.name || 'N/A',
                     gender: student.gender,
+                    totalScore,
                 };
                 if (includePerformance && student.assessments) {
-                    const totalScore = student.assessments.reduce((sum, assessment) => sum + assessment.score, 0);
                     const totalMaxScore = student.assessments.reduce((sum, assessment) => sum + assessment.maxScore, 0);
                     const average = student.assessments.length > 0 ? totalScore / student.assessments.length : 0;
                     const percentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
                     return {
                         ...baseData,
-                        totalScore,
                         average: Math.round(average * 100) / 100,
                         percentage: Math.round(percentage * 100) / 100,
                         assessmentCount: student.assessments.length,
@@ -354,6 +352,11 @@ let DashboardService = DashboardService_1 = class DashboardService {
                 }
                 return baseData;
             });
+            studentsWithScores.sort((a, b) => b.totalScore - a.totalScore);
+            const studentsData = studentsWithScores.map((student, index) => ({
+                ...student,
+                position: skip + index + 1,
+            }));
             let topStudentsWithPositions = [];
             if (includePerformance) {
                 const topStudents = await this.prisma.student.findMany({

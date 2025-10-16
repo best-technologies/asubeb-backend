@@ -26,161 +26,131 @@ export interface StudentResultPayload {
 }
 
 export async function generateStudentResultPdf(payload: StudentResultPayload): Promise<Buffer> {
-  const doc = new PDFDocument({ size: 'A4', margin: 50 });
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
   const buffers: Buffer[] = [];
   doc.on('data', (chunk: Buffer) => buffers.push(chunk));
 
-  // Use comprehensive data if available, otherwise fall back to basic data
-  const student = payload.studentData?.student;
-  const performanceSummary = payload.studentData?.performanceSummary;
-  const useComprehensiveData = !!(student && performanceSummary);
-
-  // Header banner
-  const startY = doc.y;
+  // Professional header with school branding and QR code
+  const headerY = doc.y;
   doc.save();
-  doc.rect(50, startY, 495, 60).fill('#0ea5e9');
-  doc.fill('#ffffff').fontSize(20).text('ASUBEB — Student Result', 60, startY + 15, { align: 'left' });
+  doc.rect(40, headerY, 515, 80).fill('#1e40af');
+  
+  // QR Code in header (right side)
+  const verifyUrl = `https://subeb.besttechnologiesltd.com/verify-result/${encodeURIComponent(payload.studentData?.student?.id || payload.studentId)}`;
+  const qrPng = await QRCode.toBuffer(verifyUrl, { width: 50, margin: 1 });
+  doc.image(qrPng, 480, headerY + 15, { width: 50, height: 50 });
+  
+  // Header text (left side, with proper padding)
+  doc.fill('#ffffff').fontSize(22).font('Helvetica-Bold').text('ASUBEB STUDENT RESULT', 60, headerY + 20);
+  doc.fontSize(11).font('Helvetica').text('Abia State Universal Basic Education Board', 60, headerY + 45);
+  
+  // Small verification text below QR code
+  doc.fontSize(8).text('Scan to Verify', 480, headerY + 68);
   doc.restore();
 
-  doc.moveDown(2.5);
+  doc.moveDown(3);
 
-  // Student meta card (enhanced design)
-  const infoTop = doc.y;
-  const cardHeight = useComprehensiveData ? 140 : 110;
+  // Student Information Card
+  const infoY = doc.y;
   doc.save();
-  doc.roundedRect(50, infoTop, 495, cardHeight, 10).fill('#f8fafc').stroke('#e5e7eb');
+  doc.roundedRect(40, infoY, 515, 100, 8).fill('#f8fafc').stroke('#e2e8f0');
   doc.restore();
 
-  const leftX = 66;
-  const rightX = 325;
+  const leftX = 60;
+  const rightX = 320;
+  const centerX = 190;
 
-  const drawField = (label: string, value: string | null | undefined, x: number, y: number) => {
-    doc.fill('#6b7280').fontSize(9).text(label.toUpperCase(), x, y);
-    doc.fill('#111827').fontSize(12).text(String(value ?? 'N/A'), x, y + 12);
+  const drawField = (label: string, value: string | null | undefined, x: number, y: number, isBold = false) => {
+    doc.fill('#64748b').fontSize(10).font('Helvetica').text(label.toUpperCase(), x, y);
+    doc.fill('#1e293b').fontSize(12).font(isBold ? 'Helvetica-Bold' : 'Helvetica').text(String(value ?? 'N/A'), x, y + 12);
   };
 
-  // Left column
-  let y = infoTop + 12;
-  drawField('Student', `${payload.studentName} (${payload.studentId})`, leftX, y);
-  y += 32;
+  // Student info layout
+  let y = infoY + 20;
+  drawField('Student Name', payload.studentName, leftX, y, true);
+  drawField('Student ID', payload.studentId, rightX, y, true);
+  y += 35;
   drawField('School', payload.schoolName ?? 'N/A', leftX, y);
-  y += 32;
-  drawField('Session', payload.sessionName, leftX, y);
-  if (useComprehensiveData) {
-    y += 32;
-    drawField('LGA', student.school?.lga?.name ?? 'N/A', leftX, y);
-  }
-
-  // Right column
-  y = infoTop + 12;
-  drawField('Gender', payload.gender ?? 'N/A', rightX, y);
-  y += 32;
   drawField('Class', payload.className ?? 'N/A', rightX, y);
-  y += 32;
+  y += 35;
+  drawField('Session', payload.sessionName, leftX, y);
   drawField('Term', payload.termName, rightX, y);
-  if (useComprehensiveData) {
-    y += 32;
-    drawField('Grade', performanceSummary.grade ?? 'N/A', rightX, y);
-  }
 
-  doc.moveDown(7);
+  doc.moveDown(3);
 
-  // Performance summary section (if comprehensive data available)
-  if (useComprehensiveData) {
-    const summaryTop = doc.y;
-    doc.roundedRect(50, summaryTop, 495, 60, 8).fill('#f0f9ff').stroke('#0ea5e9');
-    doc.fill('#0c4a6e').fontSize(14).text('PERFORMANCE SUMMARY', 60, summaryTop + 15, { align: 'center' });
-    
-    const summaryY = summaryTop + 35;
-    doc.fill('#111827').fontSize(11);
-    doc.text(`Total Assessments: ${performanceSummary.totalAssessments}`, 70, summaryY);
-    doc.text(`Total Score: ${performanceSummary.totalScore}/${performanceSummary.totalMaxScore}`, 250, summaryY);
-    doc.text(`Average Score: ${performanceSummary.averageScore}`, 70, summaryY + 15);
-    doc.text(`Overall Percentage: ${performanceSummary.overallPercentage}%`, 250, summaryY + 15);
-    doc.text(`Grade: ${performanceSummary.grade}`, 70, summaryY + 30);
-    
-    doc.moveDown(4);
-  }
+  // Performance Summary (compact)
+  const summaryY = doc.y;
+  doc.save();
+  doc.roundedRect(40, summaryY, 515, 50, 6).fill('#eff6ff').stroke('#3b82f6');
+  doc.fill('#1e40af').fontSize(16).font('Helvetica-Bold').text('PERFORMANCE SUMMARY', 40, summaryY + 15, { width: 515, align: 'center' });
+  doc.restore();
 
-  // Subject-wise breakdown (if comprehensive data available)
-  if (useComprehensiveData && performanceSummary.subjectBreakdown?.length > 0) {
-    doc.fill('#111827').fontSize(14).text('SUBJECT-WISE PERFORMANCE', 50, doc.y);
-    doc.moveDown(1);
+  // Calculate totals
+  let totalScore = 0;
+  let totalMax = 0;
+  payload.assessments.forEach(item => {
+    totalScore += item.score;
+    totalMax += item.maxScore;
+  });
 
-    performanceSummary.subjectBreakdown.forEach((subject: any, index: number) => {
-      const subjectY = doc.y;
-      doc.roundedRect(50, subjectY, 495, 40, 6).fill('#f9fafb').stroke('#e5e7eb');
-      
-      doc.fill('#111827').fontSize(12).text(subject.subject.name, 60, subjectY + 8);
-      doc.fill('#6b7280').fontSize(10).text(`Score: ${subject.totalScore}/${subject.totalMaxScore}`, 60, subjectY + 22);
-      doc.fill('#6b7280').fontSize(10).text(`Average: ${subject.averageScore}`, 200, subjectY + 22);
-      doc.fill('#6b7280').fontSize(10).text(`Percentage: ${subject.percentage}%`, 350, subjectY + 22);
-      
-      doc.moveDown(2.2);
-    });
+  const overallPercentage = totalMax > 0 ? (totalScore / totalMax) * 100 : 0;
+  const averageScore = payload.assessments.length > 0 ? totalScore / payload.assessments.length : 0;
 
-    doc.moveDown(1);
-  }
+  const summaryInfoY = summaryY + 35;
+  doc.fill('#1e293b').fontSize(12).font('Helvetica');
+  doc.text(`Total Score: ${totalScore}/${totalMax}`, 60, summaryInfoY);
+  doc.text(`Average: ${Math.round(averageScore * 100) / 100}`, 250, summaryInfoY);
+  doc.text(`Percentage: ${Math.round(overallPercentage * 100) / 100}%`, 400, summaryInfoY);
 
-  // Detailed assessments table
-  doc.fill('#111827').fontSize(14).text('DETAILED ASSESSMENTS', 50, doc.y);
+  doc.moveDown(2);
+
+  // Detailed Assessments Table (Compact)
+  doc.fill('#1e293b').fontSize(16).font('Helvetica-Bold').text('ASSESSMENT DETAILS', 40, doc.y);
   doc.moveDown(1);
 
   // Table header
-  const headerY = doc.y;
-  doc.rect(50, headerY, 495, 24).fill('#f3f4f6');
-  doc.fill('#111827').fontSize(11);
-  doc.text('SN', 60, headerY + 6);
-  doc.text('Subject', 95, headerY + 6);
-  doc.text('Type', 300, headerY + 6);
-  doc.text('Score', 380, headerY + 6);
-  doc.text('Max', 440, headerY + 6);
-  doc.moveDown(2);
+  const headerTableY = doc.y;
+  doc.rect(40, headerTableY, 515, 25).fill('#f1f5f9').stroke('#cbd5e1');
+  doc.fill('#1e293b').fontSize(11).font('Helvetica-Bold');
+  doc.text('S/N', 50, headerTableY + 7);
+  doc.text('Subject', 80, headerTableY + 7);
+  doc.text('Assessment Type', 280, headerTableY + 7);
+  doc.text('Score', 420, headerTableY + 7);
+  doc.text('Max Score', 480, headerTableY + 7);
 
-  // Rows
-  let totalScore = 0;
-  let totalMax = 0;
+  // Table rows (compact)
+  let rowY = headerTableY + 25;
   payload.assessments.forEach((item, index) => {
-    totalScore += item.score;
-    totalMax += item.maxScore;
-    const rowY = doc.y;
-    if (index % 2 === 0) {
-      doc.rect(50, rowY - 2, 495, 20).fill('#fafafa');
-      doc.fill('#111827');
+    const isEven = index % 2 === 0;
+    if (isEven) {
+      doc.rect(40, rowY, 515, 20).fill('#fafbfc');
     }
-    doc.fontSize(11)
-      .text(String(index + 1), 60, rowY)
-      .text(item.subjectName, 95, rowY)
-      .text(item.type, 300, rowY)
-      .text(String(item.score), 380, rowY)
-      .text(String(item.maxScore), 440, rowY);
-    doc.moveDown(1.1);
+    
+    doc.fill('#1e293b').fontSize(10).font('Helvetica');
+    doc.text(String(index + 1), 50, rowY + 5);
+    doc.text(item.subjectName, 80, rowY + 5);
+    doc.text(item.type, 280, rowY + 5);
+    doc.text(String(item.score), 420, rowY + 5);
+    doc.text(String(item.maxScore), 480, rowY + 5);
+    
+    rowY += 20;
   });
 
-  doc.moveDown(0.8);
-  doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#e5e7eb');
-  doc.moveDown(0.8);
+  // Add border to complete the table
+  doc.rect(40, headerTableY, 515, rowY - headerTableY).stroke('#cbd5e1');
 
-  const overallPct = totalMax > 0 ? (totalScore / totalMax) * 100 : 0;
-  const summaryTop = doc.y;
-  doc.roundedRect(325, summaryTop - 6, 220, 42, 6).fill('#f9fafb').stroke('#e5e7eb');
-  doc.fill('#111827').fontSize(11)
-    .text(`Total Score: ${totalScore}/${totalMax}`, 335, summaryTop)
-    .text(`Overall Percentage: ${Math.round(overallPct * 100) / 100}%`, 335, summaryTop + 16);
   doc.moveDown(2);
 
-  // QR code footer
-  const verifyUrl = `https://www.besttechnologiesltd.com/asubeb/verify-result/${encodeURIComponent(payload.studentId)}`;
-  const qrPng = await QRCode.toBuffer(verifyUrl, { width: 80, margin: 0 });
-  const pageHeight = (doc as any).page.height || 792;
-  let footerY = doc.y + 6;
-  if (footerY > pageHeight - 120) {
-    doc.addPage();
-    footerY = 60;
-  }
-  doc.image(qrPng, 50, footerY, { width: 80, height: 80 });
-  doc.fontSize(9).fillColor('#6b7280').text('Scan to verify result', 135, footerY + 8);
-  doc.fontSize(9).fillColor('#6b7280').text('Generated by ASUBEB', 400, footerY + 60, { align: 'left' });
+  // Footer with signature line and additional info
+  const footerY = Math.max(doc.y, 650); // Ensure minimum footer position
+  
+  // Additional info on the left
+  doc.fill('#64748b').fontSize(9).font('Helvetica').text(`Generated: ${new Date().toLocaleDateString()}`, 40, footerY + 20);
+  doc.fill('#64748b').fontSize(9).font('Helvetica').text(`Student ID: ${payload.studentId}`, 40, footerY + 35);
+  
+  // Official signature line on the right
+  doc.fill('#1e293b').fontSize(10).font('Helvetica-Bold').text('Authorized Signature', 450, footerY + 20);
+  doc.moveTo(450, footerY + 35).lineTo(550, footerY + 35).stroke('#1e293b');
 
   return new Promise<Buffer>((resolve) => {
     doc.on('end', () => {

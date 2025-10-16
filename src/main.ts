@@ -32,6 +32,7 @@ async function bootstrap() {
       'http://127.0.0.1:8080',
       'http://127.0.0.1:4200',
       "https://subeb-project-frontend.vercel.app",
+      "https://subeb.besttechnologiesltd.com"
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],

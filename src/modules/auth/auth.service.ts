@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { ResponseHelper } from '../../common/helpers/response.helper';
 
 export type SafeUser = { id: string; email: string; role: string; firstName?: string | null; lastName?: string | null };
 
@@ -59,9 +60,38 @@ export class AuthService {
   }
 
   /**
+   * Authenticate user with email and password, then return formatted response with JWT token and user data.
+   * Throws UnauthorizedException if credentials are invalid.
+   */
+  async authenticate(email: string, password: string) {
+
+    this.logger.log(`Authenticating user ${email} with password ${password}`);
+
+    try {
+      
+    } catch (error) {
+      
+    }
+
+    if (!email || !password) {
+      this.logger.warn('Missing email or password');
+      throw new BadRequestException('Email and password must be provided');
+    }
+
+    const user = await this.validateUser(email, password);
+    if (!user) {
+      this.logger.warn(`Invalid credentials for ${email}`);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const result = await this.login(user);
+    return ResponseHelper.success('Login successful', result);
+  }
+
+  /**
    * Sign a JWT for an authenticated user and return token + user payload.
    */
-  async login(user: SafeUser) {
+  private async login(user: SafeUser) {
     if (!user || !user.id) {
       this.logger.warn('login called with invalid user payload');
       throw new BadRequestException('Invalid user');
@@ -84,11 +114,12 @@ export class AuthService {
 
   /**
    * Register a new user. By default assigns role 'grade-entry-officer' unless overridden.
+   * Returns formatted response with user data.
    */
-  async register(data: { email: string; password: string; firstName?: string; lastName?: string }): Promise<SafeUser> {
-    if (!data?.email || !data?.password) {
-      this.logger.warn('register called with missing email or password');
-      throw new BadRequestException('Email and password are required');
+  async register(data: { email: string; password: string; firstName: string; lastName: string }) {
+    if (!data?.email || !data?.password || !data?.firstName || !data?.lastName) {
+      this.logger.warn('register called with missing required fields');
+      throw new BadRequestException('Email, password, firstName, and lastName are required');
     }
 
     try {
@@ -112,7 +143,7 @@ export class AuthService {
       });
 
       this.logger.log(`Created user ${user.email} (${user.id})`);
-      return user as SafeUser;
+      return ResponseHelper.created('User registered', user as SafeUser);
     } catch (error) {
       // If we already threw a known exception, rethrow it
       if (error instanceof ConflictException || error instanceof BadRequestException) throw error;
@@ -120,5 +151,12 @@ export class AuthService {
       this.logger.error(`Failed to create user ${data.email}: ${error?.message ?? error}`);
       throw new InternalServerErrorException('Failed to register user');
     }
+  }
+
+  /**
+   * Get user profile formatted response.
+   */
+  getProfile(user: any) {
+    return ResponseHelper.success('Profile fetched', user);
   }
 }

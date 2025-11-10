@@ -15,6 +15,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = require("bcryptjs");
+const response_helper_1 = require("../../common/helpers/response.helper");
 let AuthService = AuthService_1 = class AuthService {
     prisma;
     jwtService;
@@ -54,6 +55,24 @@ let AuthService = AuthService_1 = class AuthService {
             throw new common_1.InternalServerErrorException('Failed to validate user');
         }
     }
+    async authenticate(email, password) {
+        this.logger.log(`Authenticating user ${email} with password ${password}`);
+        try {
+        }
+        catch (error) {
+        }
+        if (!email || !password) {
+            this.logger.warn('Missing email or password');
+            throw new common_1.BadRequestException('Email and password must be provided');
+        }
+        const user = await this.validateUser(email, password);
+        if (!user) {
+            this.logger.warn(`Invalid credentials for ${email}`);
+            throw new common_1.UnauthorizedException('Invalid credentials');
+        }
+        const result = await this.login(user);
+        return response_helper_1.ResponseHelper.success('Login successful', result);
+    }
     async login(user) {
         if (!user || !user.id) {
             this.logger.warn('login called with invalid user payload');
@@ -74,9 +93,9 @@ let AuthService = AuthService_1 = class AuthService {
         }
     }
     async register(data) {
-        if (!data?.email || !data?.password) {
-            this.logger.warn('register called with missing email or password');
-            throw new common_1.BadRequestException('Email and password are required');
+        if (!data?.email || !data?.password || !data?.firstName || !data?.lastName) {
+            this.logger.warn('register called with missing required fields');
+            throw new common_1.BadRequestException('Email, password, firstName, and lastName are required');
         }
         try {
             const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
@@ -97,7 +116,7 @@ let AuthService = AuthService_1 = class AuthService {
                 select: { id: true, email: true, role: true, firstName: true, lastName: true },
             });
             this.logger.log(`Created user ${user.email} (${user.id})`);
-            return user;
+            return response_helper_1.ResponseHelper.created('User registered', user);
         }
         catch (error) {
             if (error instanceof common_1.ConflictException || error instanceof common_1.BadRequestException)
@@ -105,6 +124,9 @@ let AuthService = AuthService_1 = class AuthService {
             this.logger.error(`Failed to create user ${data.email}: ${error?.message ?? error}`);
             throw new common_1.InternalServerErrorException('Failed to register user');
         }
+    }
+    getProfile(user) {
+        return response_helper_1.ResponseHelper.success('Profile fetched', user);
     }
 };
 exports.AuthService = AuthService;

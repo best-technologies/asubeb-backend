@@ -1,10 +1,13 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { DashboardQueryDto } from './dto';
 import { TermType } from '@prisma/client';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 
 @ApiTags('admin-dashboard')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('admin/dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}

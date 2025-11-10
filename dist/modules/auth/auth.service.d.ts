@@ -13,19 +13,34 @@ export declare class AuthService {
     private readonly logger;
     constructor(prisma: PrismaService, jwtService: JwtService);
     validateUser(email: string, pass: string): Promise<SafeUser | null>;
-    login(user: SafeUser): Promise<{
-        access_token: string;
-        user: {
-            sub: string;
-            id: string | undefined;
-            email: string;
-            role: string;
-        };
+    authenticate(email: string, password: string): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
     }>;
+    private login;
     register(data: {
         email: string;
         password: string;
-        firstName?: string;
-        lastName?: string;
-    }): Promise<SafeUser>;
+        firstName: string;
+        lastName: string;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
+    getProfile(user: any): {
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    };
 }

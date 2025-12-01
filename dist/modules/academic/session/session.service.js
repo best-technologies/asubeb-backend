@@ -108,9 +108,17 @@ let SessionService = SessionService_1 = class SessionService {
     async createSession(createSessionDto) {
         this.logger.log(`Creating new session: ${createSessionDto.name}`);
         try {
+            const abiaState = await this.prisma.state.findFirst({
+                where: { stateId: 'ABIA' },
+            });
+            if (!abiaState) {
+                throw new common_1.BadRequestException('Abia State not found. Please run the migration first.');
+            }
+            const stateId = abiaState.id;
             const existingSession = await this.prisma.session.findFirst({
                 where: {
                     name: createSessionDto.name,
+                    stateId: stateId,
                 },
             });
             if (existingSession) {
@@ -119,7 +127,7 @@ let SessionService = SessionService_1 = class SessionService {
             }
             if (createSessionDto.isCurrent) {
                 await this.prisma.session.updateMany({
-                    where: { isCurrent: true },
+                    where: { isCurrent: true, stateId: stateId },
                     data: { isCurrent: false },
                 });
             }
@@ -130,6 +138,7 @@ let SessionService = SessionService_1 = class SessionService {
                     endDate: new Date(createSessionDto.endDate),
                     isActive: createSessionDto.isActive ?? true,
                     isCurrent: createSessionDto.isCurrent ?? false,
+                    stateId: stateId,
                 },
             });
             this.logger.log(`Successfully created session: ${newSession.name}`);

@@ -16,6 +16,7 @@ const prisma_service_1 = require("../../prisma/prisma.service");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = require("bcryptjs");
 const response_helper_1 = require("../../common/helpers/response.helper");
+const client_1 = require("@prisma/client");
 let AuthService = AuthService_1 = class AuthService {
     prisma;
     jwtService;
@@ -103,6 +104,12 @@ let AuthService = AuthService_1 = class AuthService {
                 this.logger.warn(`Attempt to register with existing email: ${data.email}`);
                 throw new common_1.ConflictException('User already exists');
             }
+            const abiaState = await this.prisma.state.findFirst({
+                where: { stateId: 'ABIA' },
+            });
+            if (!abiaState) {
+                throw new common_1.BadRequestException('Abia State not found. Please run the migration first.');
+            }
             const hashed = await bcrypt.hash(data.password, 10);
             const user = await this.prisma.user.create({
                 data: {
@@ -111,7 +118,8 @@ let AuthService = AuthService_1 = class AuthService {
                     password: hashed,
                     firstName: data.firstName,
                     lastName: data.lastName,
-                    role: 'grade-entry-officer',
+                    role: client_1.UserRole.ADMIN,
+                    stateId: abiaState.id,
                 },
                 select: { id: true, email: true, role: true, firstName: true, lastName: true },
             });

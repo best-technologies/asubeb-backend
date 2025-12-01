@@ -133,10 +133,15 @@ let TermService = TermService_1 = class TermService {
                 this.logger.warn(`Session with ID ${createTermDto.sessionId} not found`);
                 throw new common_1.BadRequestException(`Session with ID ${createTermDto.sessionId} not found`);
             }
+            const stateId = session.stateId;
+            if (!stateId) {
+                throw new common_1.BadRequestException('Session does not have a stateId. Please update the session first.');
+            }
             const existingTerm = await this.prisma.term.findFirst({
                 where: {
                     name: createTermDto.name,
                     sessionId: createTermDto.sessionId,
+                    stateId: stateId,
                 },
             });
             if (existingTerm) {
@@ -157,6 +162,7 @@ let TermService = TermService_1 = class TermService {
                     endDate: new Date(createTermDto.endDate),
                     isActive: createTermDto.isActive ?? true,
                     isCurrent: createTermDto.isCurrent ?? false,
+                    stateId: stateId,
                 },
                 include: {
                     session: {

@@ -109,10 +109,20 @@ export class SessionService {
     this.logger.log(`Creating new session: ${createSessionDto.name}`);
 
     try {
-      // Check if session name already exists
+      // Get Abia State ID
+      const abiaState = await this.prisma.state.findFirst({
+        where: { stateId: 'ABIA' },
+      });
+      if (!abiaState) {
+        throw new BadRequestException('Abia State not found. Please run the migration first.');
+      }
+      const stateId = abiaState.id;
+
+      // Check if session name already exists for this state
       const existingSession = await this.prisma.session.findFirst({
         where: {
           name: createSessionDto.name,
+          stateId: stateId,
         },
       });
 
@@ -121,10 +131,10 @@ export class SessionService {
         throw new BadRequestException(`Session with name ${createSessionDto.name} already exists`);
       }
 
-      // If this session is being set as current, deactivate other sessions
+      // If this session is being set as current, deactivate other sessions for this state
       if (createSessionDto.isCurrent) {
         await this.prisma.session.updateMany({
-          where: { isCurrent: true },
+          where: { isCurrent: true, stateId: stateId },
           data: { isCurrent: false },
         });
       }
@@ -136,6 +146,7 @@ export class SessionService {
           endDate: new Date(createSessionDto.endDate),
           isActive: createSessionDto.isActive ?? true,
           isCurrent: createSessionDto.isCurrent ?? false,
+          stateId: stateId,
         },
       });
 

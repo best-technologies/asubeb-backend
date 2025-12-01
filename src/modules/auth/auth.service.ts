@@ -11,6 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { ResponseHelper } from '../../common/helpers/response.helper';
+import { UserRole } from '@prisma/client';
 
 export type SafeUser = { id: string; email: string; role: string; firstName?: string | null; lastName?: string | null };
 
@@ -129,6 +130,14 @@ export class AuthService {
         throw new ConflictException('User already exists');
       }
 
+      // Get Abia State ID
+      const abiaState = await this.prisma.state.findFirst({
+        where: { stateId: 'ABIA' },
+      });
+      if (!abiaState) {
+        throw new BadRequestException('Abia State not found. Please run the migration first.');
+      }
+
       const hashed = await bcrypt.hash(data.password, 10);
       const user = await this.prisma.user.create({
         data: {
@@ -137,7 +146,8 @@ export class AuthService {
           password: hashed,
           firstName: data.firstName,
           lastName: data.lastName,
-          role: 'grade-entry-officer',
+          role: UserRole.ADMIN,
+          stateId: abiaState.id,
         },
         select: { id: true, email: true, role: true, firstName: true, lastName: true },
       });

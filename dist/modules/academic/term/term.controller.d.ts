@@ -20,6 +20,7 @@ export declare class TermController {
             endDate: Date;
             isActive: boolean;
             isCurrent: boolean;
+            stateId: string;
             sessionId: string;
         })[];
         pagination: {
@@ -43,6 +44,7 @@ export declare class TermController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
         sessionId: string;
     }>;
     getTermById(id: string): Promise<{
@@ -80,6 +82,7 @@ export declare class TermController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
         sessionId: string;
     }>;
     createTerm(createTermDto: any): Promise<{
@@ -96,6 +99,7 @@ export declare class TermController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
         sessionId: string;
     }>;
     updateTerm(id: string, updateTermDto: any): Promise<{
@@ -112,6 +116,7 @@ export declare class TermController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
         sessionId: string;
     }>;
     deleteTerm(id: string): Promise<{
@@ -147,6 +152,7 @@ export declare class TermController {
             endDate: Date;
             isActive: boolean;
             isCurrent: boolean;
+            stateId: string;
             sessionId: string;
         };
     }>;
@@ -164,6 +170,7 @@ export declare class TermController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
         sessionId: string;
     }>;
     deactivateTerm(id: string): Promise<{
@@ -180,6 +187,7 @@ export declare class TermController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
         sessionId: string;
     }>;
     getTermAssessments(id: string): Promise<({

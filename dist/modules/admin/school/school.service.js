@@ -37,6 +37,12 @@ let SchoolService = SchoolService_1 = class SchoolService {
         if (existingSchool) {
             throw new common_1.ConflictException('School with this name already exists');
         }
+        const abiaState = await this.prisma.state.findFirst({
+            where: { stateId: 'ABIA' },
+        });
+        if (!abiaState) {
+            throw new common_1.BadRequestException('Abia State not found. Please run the migration first.');
+        }
         const code = await this.generateUniqueCode(createSchoolDto.name);
         const school = await this.prisma.school.create({
             data: {
@@ -55,6 +61,7 @@ let SchoolService = SchoolService_1 = class SchoolService {
                 totalTeachers: createSchoolDto.totalTeachers || 0,
                 capacity: createSchoolDto.capacity,
                 lgaId: createSchoolDto.lgaId,
+                stateId: abiaState.id,
                 isActive: true,
             },
             include: {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateSchoolDto } from './dto';
 import { ResponseHelper } from '../../../common/helpers';
@@ -33,6 +33,14 @@ export class SchoolService {
       throw new ConflictException('School with this name already exists');
     }
 
+    // Get Abia State ID
+    const abiaState = await this.prisma.state.findFirst({
+      where: { stateId: 'ABIA' },
+    });
+    if (!abiaState) {
+      throw new BadRequestException('Abia State not found. Please run the migration first.');
+    }
+
     // Generate unique code for school
     const code = await this.generateUniqueCode(createSchoolDto.name);
 
@@ -54,6 +62,7 @@ export class SchoolService {
         totalTeachers: createSchoolDto.totalTeachers || 0,
         capacity: createSchoolDto.capacity,
         lgaId: createSchoolDto.lgaId,
+        stateId: abiaState.id,
         isActive: true, // Automatically set to true
       },
       include: {

@@ -137,11 +137,18 @@ export class TermService {
         throw new BadRequestException(`Session with ID ${createTermDto.sessionId} not found`);
       }
 
-      // Check if term name already exists for the session
+      // Get stateId from session
+      const stateId = session.stateId;
+      if (!stateId) {
+        throw new BadRequestException('Session does not have a stateId. Please update the session first.');
+      }
+
+      // Check if term name already exists for the session and state
       const existingTerm = await this.prisma.term.findFirst({
         where: {
           name: createTermDto.name,
           sessionId: createTermDto.sessionId,
+          stateId: stateId,
         },
       });
 
@@ -166,6 +173,7 @@ export class TermService {
           endDate: new Date(createTermDto.endDate),
           isActive: createTermDto.isActive ?? true,
           isCurrent: createTermDto.isCurrent ?? false,
+          stateId: stateId,
         },
         include: {
           session: {

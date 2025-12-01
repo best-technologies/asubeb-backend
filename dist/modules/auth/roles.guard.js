@@ -27,7 +27,15 @@ let RolesGuard = class RolesGuard {
             return true;
         }
         const { user } = context.switchToHttp().getRequest();
-        return requiredRoles.includes(user?.role);
+        if (!user?.role) {
+            throw new common_1.ForbiddenException('User role not found. Access denied.');
+        }
+        const userRole = user.role.toLowerCase();
+        const normalizedRequiredRoles = requiredRoles.map(role => role.toLowerCase());
+        if (!normalizedRequiredRoles.includes(userRole)) {
+            throw new common_1.ForbiddenException(`Access denied. Required roles: ${requiredRoles.join(', ')}. Your role: ${user.role}`);
+        }
+        return true;
     }
 };
 exports.RolesGuard = RolesGuard;

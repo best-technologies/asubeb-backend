@@ -17,6 +17,7 @@ export declare class SessionController {
             endDate: Date;
             isActive: boolean;
             isCurrent: boolean;
+            stateId: string;
         })[];
         pagination: {
             page: number;
@@ -35,6 +36,7 @@ export declare class SessionController {
             endDate: Date;
             isActive: boolean;
             isCurrent: boolean;
+            stateId: string;
             sessionId: string;
         }[];
     } & {
@@ -46,6 +48,7 @@ export declare class SessionController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
     }>;
     getSessionById(id: string): Promise<{
         terms: {
@@ -57,6 +60,7 @@ export declare class SessionController {
             endDate: Date;
             isActive: boolean;
             isCurrent: boolean;
+            stateId: string;
             sessionId: string;
         }[];
     } & {
@@ -68,6 +72,7 @@ export declare class SessionController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
     }>;
     createSession(createSessionDto: CreateSessionDto): Promise<{
         name: string;
@@ -78,6 +83,7 @@ export declare class SessionController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
     }>;
     updateSession(id: string, updateSessionDto: UpdateSessionDto): Promise<{
         name: string;
@@ -88,6 +94,7 @@ export declare class SessionController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
     }>;
     deleteSession(id: string): Promise<{
         message: string;
@@ -101,6 +108,7 @@ export declare class SessionController {
                 endDate: Date;
                 isActive: boolean;
                 isCurrent: boolean;
+                stateId: string;
                 sessionId: string;
             }[];
         } & {
@@ -112,6 +120,7 @@ export declare class SessionController {
             endDate: Date;
             isActive: boolean;
             isCurrent: boolean;
+            stateId: string;
         };
     }>;
     activateSession(id: string): Promise<{
@@ -123,6 +132,7 @@ export declare class SessionController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
     }>;
     deactivateSession(id: string): Promise<{
         name: string;
@@ -133,6 +143,7 @@ export declare class SessionController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
     }>;
     getSessionTerms(id: string): Promise<{
         name: import(".prisma/client").$Enums.TermType;
@@ -143,6 +154,7 @@ export declare class SessionController {
         endDate: Date;
         isActive: boolean;
         isCurrent: boolean;
+        stateId: string;
         sessionId: string;
     }[]>;
 }

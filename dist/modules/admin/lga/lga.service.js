@@ -35,11 +35,18 @@ let LgaService = LgaService_1 = class LgaService {
         if (existingLga) {
             throw new common_1.ConflictException('Local Government Area with this name already exists');
         }
+        const abiaState = await this.prisma.state.findFirst({
+            where: { stateId: 'ABIA' },
+        });
+        if (!abiaState) {
+            throw new common_1.BadRequestException('Abia State not found. Please run the migration first.');
+        }
         const lga = await this.prisma.localGovernmentArea.create({
             data: {
                 name: name,
                 code: code,
                 state: 'Abia State',
+                stateId: abiaState.id,
                 description: description,
                 isActive: true,
             },

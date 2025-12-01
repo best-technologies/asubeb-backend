@@ -138,6 +138,13 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
         if (!studentName || studentName === 'unknown_student') {
             throw new Error('Student name is required and cannot be empty');
         }
+        const abiaState = await this.prisma.state.findFirst({
+            where: { stateId: 'ABIA' },
+        });
+        if (!abiaState) {
+            throw new Error('Abia State not found. Please run the migration first.');
+        }
+        const stateId = abiaState.id;
         let lga = await this.prisma.localGovernmentArea.findFirst({
             where: { name: lgaName }
         });
@@ -148,6 +155,7 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
                     name: lgaName,
                     code: lgaCode,
                     state: 'abia',
+                    stateId: stateId,
                     isActive: true,
                 }
             });
@@ -165,6 +173,7 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
                     level: 'PRIMARY',
                     address: `${lgaName}, Abia State`,
                     lgaId: lga.id,
+                    stateId: stateId,
                     isActive: true,
                 }
             });
@@ -224,6 +233,7 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
                     schoolId: school.id,
                     classId: classRecord.id,
                     dateOfBirth: new Date(),
+                    stateId: stateId,
                     isActive: true,
                 }
             });
@@ -243,7 +253,7 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
             { name: 'CCA', score: row.cca },
             { name: 'Basic science and technology', score: row.basic_science_technology },
         ];
-        const termId = await this.getCurrentTermId(school.id);
+        const termId = await this.getCurrentTermId(school.id, stateId);
         for (const subject of subjects) {
             if (subject.score !== undefined && subject.score !== null && subject.score > 0) {
                 const subjectId = await this.getSubjectId(subject.name);
@@ -344,10 +354,11 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
         };
         return genderMap[gender] || 'OTHER';
     }
-    async getCurrentSessionId(schoolId) {
+    async getCurrentSessionId(schoolId, stateId) {
         let session = await this.prisma.session.findFirst({
             where: {
-                name: '2024/2025'
+                name: '2024/2025',
+                stateId: stateId
             }
         });
         if (!session) {
@@ -358,18 +369,20 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
                     endDate: new Date('2025-07-31'),
                     isActive: true,
                     isCurrent: true,
+                    stateId: stateId,
                 }
             });
             this.logger.log(colors.green('Created default session: 2024/2025'));
         }
         return session.id;
     }
-    async getCurrentTermId(schoolId) {
-        const sessionId = await this.getCurrentSessionId(schoolId);
+    async getCurrentTermId(schoolId, stateId) {
+        const sessionId = await this.getCurrentSessionId(schoolId, stateId);
         let term = await this.prisma.term.findFirst({
             where: {
                 sessionId: sessionId,
-                name: 'SECOND_TERM'
+                name: 'SECOND_TERM',
+                stateId: stateId
             }
         });
         if (!term) {
@@ -381,6 +394,7 @@ let BigQueryImportService = BigQueryImportService_1 = class BigQueryImportServic
                     endDate: new Date('2025-04-30'),
                     isActive: true,
                     isCurrent: true,
+                    stateId: stateId,
                 }
             });
             this.logger.log(colors.green('Created default term: SECOND_TERM'));

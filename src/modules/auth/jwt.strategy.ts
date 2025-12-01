@@ -22,6 +22,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     // return minimal user object for request
-    return { id: user.id, email: user.email, role: user.role };
+    return { id: user.id, email: user.email, role: user.role, stateId: user.stateId };
   }
 }

@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 // Gender Enum
@@ -39,6 +39,18 @@ enum AssessmentType {
   QUIZ
 }
 
+// User Role Enum
+enum UserRole {
+  SUPER_ADMIN
+  SUBEB_ADMIN
+  ADMIN
+  SUBEB_OFFICER
+  TEACHER
+  STUDENT
+  PARENT
+  USER
+}
+
 // (State model defined later) - removed duplicate to avoid conflicts
 
 // User model for authentication
@@ -49,43 +61,57 @@ model User {
   password  String
   firstName String?
   lastName  String?
-  role      String   @default("USER") // ADMIN, TEACHER, STUDENT, PARENT
+  role      UserRole @default(USER)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  teacher  Teacher?
-  student  Student?
-  parent   Parent?
-  // Optional relation to State (user's home state or admin state)
-  stateId  String?
-  stateRef State?   @relation(fields: [stateId], references: [id])
+  teacher          Teacher?
+  student          Student?
+  parent           Parent?
+  subebOfficer     SubebOfficer?  @relation("OfficerUser")
+  enrolledOfficers SubebOfficer[] @relation("EnrolledOfficers")
+  // Required relation to State
+  stateId          String
+  stateRef         State          @relation(fields: [stateId], references: [id])
 
   @@map("users")
 }
 
-// State model: added as nullable relations to avoid breaking existing data.
+// State model
 model State {
-  id           String   @id @default(cuid())
-  externalId   String?  @unique
-  stateId      String   @unique
-  contactEmail String?  @unique
-  stateName    String   @unique
-  code         String?  @unique
-  // Denormalized counters for quick lookups. Kept as non-null with default 0.
-  totalLgas    Int      @default(0)
-  totalSchools Int      @default(0)
-  totalUsers   Int      @default(0)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  externalId    String?  @unique
+  stateId       String   @unique // e.g., "ABIA", "LAGOS"
+  contactEmail  String?  @unique
+  stateName     String   @unique // e.g., "Abia State"
+  code          String?  @unique // e.g., "AB"
+  capital       String? // State capital
+  region        String? // e.g., "South East"
+  // Denormalized counters for quick lookups
+  totalLgas     Int      @default(0)
+  totalSchools  Int      @default(0)
+  totalUsers    Int      @default(0)
+  totalOfficers Int      @default(0)
+  totalTeachers Int      @default(0)
+  totalStudents Int      @default(0)
+  totalParents  Int      @default(0)
+  totalClasses  Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
   localGovernmentAreas LocalGovernmentArea[]
   schools              School[]
   users                User[]
   students             Student[]
+  teachers             Teacher[]
+  parents              Parent[]
+  subebOfficers        SubebOfficer[]
+  sessions             Session[]
+  terms                Term[]
 
   @@map("states")
 }
@@ -95,7 +121,7 @@ model LocalGovernmentArea {
   id          String   @id @default(cuid())
   name        String   @unique
   code        String   @unique
-  state       String
+  state       String // Keep for backward compatibility
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -103,9 +129,9 @@ model LocalGovernmentArea {
 
   // Relations
   schools  School[]
-  // Optional relation to State (added post-deployment). Keep the existing `state` string for backward compatibility.
-  stateId  String?
-  stateRef State?   @relation(fields: [stateId], references: [id])
+  // Required relation to State
+  stateId  String
+  stateRef State    @relation(fields: [stateId], references: [id])
 
   @@map("local_government_areas")
 }
@@ -128,15 +154,15 @@ model School {
   totalTeachers   Int         @default(0)
   capacity        Int?
   lgaId           String
-  // Optional relation to State added after initial deployment to avoid breaking existing rows.
-  stateId         String?
+  // Required relation to State
+  stateId         String
   isActive        Boolean     @default(true)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   // Relations
   lga      LocalGovernmentArea @relation(fields: [lgaId], references: [id])
-  stateRef State?              @relation(fields: [stateId], references: [id])
+  stateRef State               @relation(fields: [stateId], references: [id])
   classes  Class[]
   teachers Teacher[]
   students Student[]
@@ -189,6 +215,9 @@ model Teacher {
   isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  // Required relation to State
+  stateId        String
+  stateRef       State     @relation(fields: [stateId], references: [id])
 
   // Relations
   user        User             @relation(fields: [userId], references: [id])
@@ -218,9 +247,9 @@ model Student {
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  // Optional relation to State (user's home state or admin state)
-  stateId        String?
-  stateRef       State?   @relation(fields: [stateId], references: [id])
+  // Required relation to State
+  stateId        String
+  stateRef       State    @relation(fields: [stateId], references: [id])
 
   // Relations
   user        User?        @relation(fields: [userId], references: [id])
@@ -246,6 +275,9 @@ model Parent {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  // Required relation to State
+  stateId    String
+  stateRef   State    @relation(fields: [stateId], references: [id])
 
   // Relations
   user     User?     @relation(fields: [userId], references: [id])
@@ -311,17 +343,21 @@ model TeacherSubject {
 // Session model (Academic Year)
 model Session {
   id        String   @id @default(cuid())
-  name      String   @unique // e.g., "2023-2024"
+  name      String // e.g., "2023-2024"
   startDate DateTime
   endDate   DateTime
   isActive  Boolean  @default(false)
   isCurrent Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // Required relation to State
+  stateId   String
+  stateRef  State    @relation(fields: [stateId], references: [id])
 
   // Relations
   terms Term[]
 
+  @@unique([name, stateId]) // Unique per state
   @@map("sessions")
 }
 
@@ -336,12 +372,15 @@ model Term {
   isCurrent Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // Required relation to State
+  stateId   String
+  stateRef  State    @relation(fields: [stateId], references: [id])
 
   // Relations
   session     Session      @relation(fields: [sessionId], references: [id])
   assessments Assessment[]
 
-  @@unique([sessionId, name])
+  @@unique([sessionId, name, stateId]) // Unique per state
   @@map("terms")
 }
 
@@ -376,4 +415,31 @@ model Assessment {
 
   @@unique([studentId, subjectId, classId, termId, type, title])
   @@map("assessments")
+}
+
+// SUBEB Officer model
+model SubebOfficer {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  officerId      String   @unique // Custom officer ID
+  firstName      String
+  lastName       String
+  email          String   @unique
+  phone          String
+  address        String?
+  designation    String? // e.g., "Education Officer", "Supervisor"
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  // Required relation to State
+  stateId        String
+  stateRef       State    @relation(fields: [stateId], references: [id])
+  // Track who enrolled this officer
+  enrolledBy     String? // User ID of the person who enrolled this officer
+  enrolledByUser User?    @relation("EnrolledOfficers", fields: [enrolledBy], references: [id])
+
+  // Relations
+  user User @relation("OfficerUser", fields: [userId], references: [id])
+
+  @@map("subeb_officers")
 }

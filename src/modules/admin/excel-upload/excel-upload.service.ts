@@ -108,6 +108,15 @@ export class ExcelUploadService {
       throw new Error('Missing required fields (School Name, LGA, Student Name, Class, Gender)');
     }
 
+    // Get Abia State ID (once at the start)
+    const abiaState = await this.prisma.state.findFirst({
+      where: { stateId: 'ABIA' },
+    });
+    if (!abiaState) {
+      throw new Error('Abia State not found. Please run the migration first.');
+    }
+    const stateId = abiaState.id;
+
     // 1. Create or find LGA
     let lga = await this.prisma.localGovernmentArea.findFirst({
       where: { name: lgaName }
@@ -120,6 +129,7 @@ export class ExcelUploadService {
           name: lgaName,
           code: lgaCode,
           state: 'abia',
+          stateId: stateId,
           isActive: true,
         }
       });
@@ -140,6 +150,7 @@ export class ExcelUploadService {
           level: 'PRIMARY', // Default to PRIMARY, can be updated later
           address: `${lgaName}, Abia State`, // Default address
           lgaId: lga.id,
+          stateId: stateId,
           isActive: true,
         }
       });
@@ -187,6 +198,7 @@ export class ExcelUploadService {
           schoolId: school.id,
           classId: classRecord.id, // Add the class assignment
           dateOfBirth: new Date(),
+          stateId: stateId,
           isActive: true,
         }
       });
@@ -210,7 +222,7 @@ export class ExcelUploadService {
       { name: 'Basic science and technology', score: row['Basic science and technology'] },
     ];
 
-    const termId = await this.getCurrentTermId(school.id);
+    const termId = await this.getCurrentTermId(school.id, stateId);
     
     for (const subject of subjects) {
       if (subject.score !== undefined && subject.score !== null && subject.score > 0) {
@@ -312,10 +324,11 @@ export class ExcelUploadService {
     return genderMap[gender] || 'OTHER';
   }
 
-  private async getCurrentSessionId(schoolId: string): Promise<string> {
+  private async getCurrentSessionId(schoolId: string, stateId: string): Promise<string> {
     let session = await this.prisma.session.findFirst({
       where: { 
-        name: '2024/2025'
+        name: '2024/2025',
+        stateId: stateId
       }
     });
     
@@ -327,6 +340,7 @@ export class ExcelUploadService {
           endDate: new Date('2025-07-31'),
           isActive: true,
           isCurrent: true,
+          stateId: stateId,
         }
       });
       this.logger.log(colors.green('Created default session: 2024/2025'));
@@ -335,13 +349,14 @@ export class ExcelUploadService {
     return session.id;
   }
 
-  private async getCurrentTermId(schoolId: string): Promise<string> {
-    const sessionId = await this.getCurrentSessionId(schoolId);
+  private async getCurrentTermId(schoolId: string, stateId: string): Promise<string> {
+    const sessionId = await this.getCurrentSessionId(schoolId, stateId);
     
     let term = await this.prisma.term.findFirst({
       where: { 
         sessionId: sessionId,
-        name: 'SECOND_TERM'
+        name: 'SECOND_TERM',
+        stateId: stateId
       }
     });
     
@@ -354,6 +369,7 @@ export class ExcelUploadService {
           endDate: new Date('2025-04-30'),
           isActive: true,
           isCurrent: true,
+          stateId: stateId,
         }
       });
       this.logger.log(colors.green('Created default term: SECOND_TERM'));

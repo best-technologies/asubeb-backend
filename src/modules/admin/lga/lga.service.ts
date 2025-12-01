@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateLgaDto } from './dto';
 import { ResponseHelper } from '../../../common/helpers';
@@ -33,12 +33,21 @@ export class LgaService {
       );
     }
 
+    // Get Abia State ID
+    const abiaState = await this.prisma.state.findFirst({
+      where: { stateId: 'ABIA' },
+    });
+    if (!abiaState) {
+      throw new BadRequestException('Abia State not found. Please run the migration first.');
+    }
+
     // Create new LGA with auto-generated fields
     const lga = await this.prisma.localGovernmentArea.create({
       data: {
         name: name,
         code: code,
         state: 'Abia State', // Automatically set to Abia State
+        stateId: abiaState.id,
         description: description,
         isActive: true, // Automatically set to true
       },

@@ -7,23 +7,23 @@ export declare class AcademicContextService {
         currentSession: {
             name: string;
             id: string;
+            createdAt: Date;
+            updatedAt: Date;
             startDate: Date;
             endDate: Date;
             isActive: boolean;
             isCurrent: boolean;
-            createdAt: Date;
-            updatedAt: Date;
             stateId: string;
         } | null;
         currentTerm: {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
+            createdAt: Date;
+            updatedAt: Date;
             startDate: Date;
             endDate: Date;
             isActive: boolean;
             isCurrent: boolean;
-            createdAt: Date;
-            updatedAt: Date;
             stateId: string;
             sessionId: string;
         } | null;

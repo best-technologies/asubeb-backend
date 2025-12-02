@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsEmail, IsOptional, IsEnum, IsDateString, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+  IsUUID,
+  IsArray,
+  ValidateNested,
+  ArrayMinSize,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { Gender } from '@prisma/client';
 
 export class EnrollStudentDto {
@@ -50,14 +61,14 @@ export class EnrollStudentDto {
     description: 'School ID where student is to be enrolled',
     example: 'school-uuid-123',
   })
-  @IsUUID()
+  @IsString()
   schoolId: string;
 
   @ApiProperty({
     description: 'Class ID where student is to be enrolled',
     example: 'class-uuid-456',
   })
-  @IsUUID()
+  @IsString()
   classId: string;
 }
 
@@ -66,6 +77,10 @@ export class EnrollSingleOrBulkStudentsDto {
     description: 'List of students to enroll. Can be single or multiple.',
     type: [EnrollStudentDto],
   })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => EnrollStudentDto)
   students: EnrollStudentDto[];
 }
 

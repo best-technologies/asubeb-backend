@@ -390,6 +390,12 @@ export class EnrollmentService {
    * Uses shared academic context and auto-generates institutional emails.
    */
   async enrollSingleOrBulkStudents(payload: EnrollSingleOrBulkStudentsDto, user: any) {
+    this.logger.log(
+      colors.cyan(
+        `Incoming enrollSingleOrBulkStudents payload: ${JSON.stringify(payload, null, 2)}`,
+      ),
+    );
+
     if (!payload?.students || payload.students.length === 0) {
       this.logger.error('No students provided in the payload');
       return ResponseHelper.error('No students provided in the payload');

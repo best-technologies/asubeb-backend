@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.EnrollSingleOrBulkStudentsDto = exports.EnrollStudentDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
 class EnrollStudentDto {
     firstName;
@@ -80,7 +81,7 @@ __decorate([
         description: 'School ID where student is to be enrolled',
         example: 'school-uuid-123',
     }),
-    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], EnrollStudentDto.prototype, "schoolId", void 0);
 __decorate([
@@ -88,7 +89,7 @@ __decorate([
         description: 'Class ID where student is to be enrolled',
         example: 'class-uuid-456',
     }),
-    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], EnrollStudentDto.prototype, "classId", void 0);
 class EnrollSingleOrBulkStudentsDto {
@@ -100,6 +101,10 @@ __decorate([
         description: 'List of students to enroll. Can be single or multiple.',
         type: [EnrollStudentDto],
     }),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ArrayMinSize)(1),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => EnrollStudentDto),
     __metadata("design:type", Array)
 ], EnrollSingleOrBulkStudentsDto.prototype, "students", void 0);
 //# sourceMappingURL=enroll-student.dto.js.map

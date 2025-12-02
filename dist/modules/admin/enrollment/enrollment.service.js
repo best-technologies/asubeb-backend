@@ -251,6 +251,7 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
         }
     }
     async enrollSingleOrBulkStudents(payload, user) {
+        this.logger.log(colors.cyan(`Incoming enrollSingleOrBulkStudents payload: ${JSON.stringify(payload, null, 2)}`));
         if (!payload?.students || payload.students.length === 0) {
             this.logger.error('No students provided in the payload');
             return response_helper_1.ResponseHelper.error('No students provided in the payload');

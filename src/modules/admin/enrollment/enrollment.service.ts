@@ -223,19 +223,19 @@ export class EnrollmentService {
         };
       });
 
-      // 7. Send welcome email with temp password (fire-and-forget)
+      // 7. Send welcome email with temp password.
+      // If this fails, we treat the entire operation as failed because the officer
+      // needs the emailed credentials to access the platform.
       this.logger.log(colors.blue(`Result from enrollment: ${JSON.stringify(result, null, 2)}`));
-      if (result?.email && result?.firstName && result?.lastName) {
-        sendSubebOfficerWelcomeEmail(result.email, {
-          firstName: result.firstName ?? '',
-          lastName: result.lastName ?? '',
-          email: result.email,
-          password: tempPassword,
-        }).catch((error) => {
-          // Swallow email errors; main registration should still succeed, but og the error 
-          this.logger.error(`Error sending welcome email to ${result.email}: ${error?.message ?? error}`);
-        });
-      }
+      await sendSubebOfficerWelcomeEmail(result.email, {
+        firstName: result.firstName ?? '',
+        lastName: result.lastName ?? '',
+        email: result.email,
+        password: tempPassword,
+      });
+      this.logger.log(
+        colors.green(`Welcome email sent successfully to SUBEB officer ${result.email}`),
+      );
 
       this.logger.log(`Created SUBEB officer ${result.email} (${result.id}) via EnrollmentModule`);
       return ResponseHelper.created('SUBEB officer registered', result);
@@ -335,12 +335,42 @@ export class EnrollmentService {
       });
       const finalEmail =
         existingEmailOwner || !emailGenerated ? dto.email ?? null : emailGenerated;
+      if (!finalEmail) {
+        throw new BadRequestException(
+          'Unable to generate a unique email address for the student. Please provide a unique email.',
+        );
+      }
 
-      // Create student and increment school student count in a transaction
+      // Also ensure no User already exists with this email
+      const existingUserWithEmail = await this.prisma.user.findUnique({
+        where: { email: finalEmail },
+      });
+      if (existingUserWithEmail) {
+        throw new ConflictException('A user with this email already exists');
+      }
+
+      // Generate a temporary password for the student user account
+      const tempPassword = Math.random().toString(36).slice(-10);
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+      // Create user + student and increment school student count in a transaction
       const result = await this.prisma.$transaction(async (tx) => {
+        const userRecord = await tx.user.create({
+          data: {
+            email: finalEmail,
+            username: studentId,
+            password: hashedPassword,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            role: UserRole.STUDENT,
+            stateId,
+          },
+        });
+
         const student = await tx.student.create({
           data: {
             studentId: studentId!,
+            userId: userRecord.id,
             schoolId: dto.schoolId,
             classId: dto.classId,
             firstName: dto.firstName,
@@ -363,7 +393,16 @@ export class EnrollmentService {
           },
         });
 
-        return student;
+        return {
+          ...student,
+          user: {
+            id: userRecord.id,
+            email: userRecord.email,
+            role: userRecord.role,
+            username: userRecord.username,
+          },
+          tempPassword,
+        };
       });
 
       this.logger.log(

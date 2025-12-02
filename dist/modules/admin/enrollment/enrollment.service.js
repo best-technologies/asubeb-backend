@@ -139,14 +139,26 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
                     lastName: user.lastName,
                 };
             });
-            this.logger.log(colors.blue(`sending email to ${result.email}`));
-            await (0, send_mail_1.sendSubebOfficerWelcomeEmail)(result.email, {
-                firstName: result.firstName ?? '',
-                lastName: result.lastName ?? '',
-                email: result.email,
-                password: tempPassword,
-            });
-            this.logger.log(colors.green(`Welcome email sent successfully to SUBEB officer ${result.email}`));
+            this.logger.log(colors.blue(`Sending welcome email to ${result.email}`));
+            try {
+                await (0, send_mail_1.sendSubebOfficerWelcomeEmail)(result.email, {
+                    firstName: result.firstName ?? '',
+                    lastName: result.lastName ?? '',
+                    email: result.email,
+                    password: tempPassword,
+                });
+                this.logger.log(colors.green(`Welcome email sent successfully to SUBEB officer ${result.email}`));
+            }
+            catch (emailError) {
+                this.logger.error(colors.red(`Failed to send welcome email to ${result.email}: ${emailError?.message ?? emailError}`));
+                this.logger.error(`Email error details: ${JSON.stringify({
+                    code: emailError?.code,
+                    command: emailError?.command,
+                    response: emailError?.response,
+                    responseCode: emailError?.responseCode,
+                }, null, 2)}`);
+                throw emailError;
+            }
             this.logger.log(`Created SUBEB officer ${result.email} (${result.id}) via EnrollmentModule`);
             return response_helper_1.ResponseHelper.created('SUBEB officer registered', result);
         }

@@ -6,20 +6,39 @@ exports.sendSubebOfficerWelcomeEmail = sendSubebOfficerWelcomeEmail;
 const nodemailer = require("nodemailer");
 const student_result_template_1 = require("../helpers/email-templates/student-result.template");
 const subeb_officer_welcome_template_1 = require("../helpers/email-templates/subeb-officer-welcome.template");
-async function sendMail({ to, subject, html }) {
+let cachedTransporter = null;
+function getTransporter() {
+    if (cachedTransporter) {
+        return cachedTransporter;
+    }
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
         throw new Error('SMTP credentials missing in environment variables');
     }
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        host: process.env.GOOGLE_SMTP_HOST,
+    cachedTransporter = nodemailer.createTransport({
+        host: process.env.GOOGLE_SMTP_HOST || 'smtp.gmail.com',
         port: process.env.GOOGLE_SMTP_PORT ? parseInt(process.env.GOOGLE_SMTP_PORT) : 587,
-        secure: false,
+        secure: process.env.GOOGLE_SMTP_PORT === '465',
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASSWORD,
         },
+        connectionTimeout: 10000,
+        socketTimeout: 30000,
+        greetingTimeout: 10000,
+        pool: true,
+        maxConnections: 5,
+        maxMessages: 100,
+        retry: {
+            attempts: 3,
+            delay: 2000,
+        },
+        debug: process.env.NODE_ENV === 'development',
+        logger: process.env.NODE_ENV === 'development',
     });
+    return cachedTransporter;
+}
+async function sendMail({ to, subject, html }) {
+    const transporter = getTransporter();
     const mailOptions = {
         from: {
             name: 'ASUBEB',
@@ -29,7 +48,30 @@ async function sendMail({ to, subject, html }) {
         subject,
         html,
     };
-    await transporter.sendMail(mailOptions);
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        if (process.env.NODE_ENV === 'development') {
+            console.log('Email sent successfully:', {
+                messageId: info.messageId,
+                to,
+                subject,
+            });
+        }
+    }
+    catch (error) {
+        const errorDetails = {
+            message: error?.message,
+            code: error?.code,
+            command: error?.command,
+            response: error?.response,
+            responseCode: error?.responseCode,
+            to,
+            subject,
+        };
+        console.error('Email sending failed:', errorDetails);
+        throw new Error(`Failed to send email to ${to}: ${error?.message || 'Unknown error'}. ` +
+            `Error code: ${error?.code || 'N/A'}, Response: ${error?.response || 'N/A'}`);
+    }
 }
 async function sendStudentResultEmail(to, payload) {
     const html = (0, student_result_template_1.studentResultEmailTemplate)(payload);

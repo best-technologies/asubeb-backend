@@ -226,16 +226,38 @@ export class EnrollmentService {
       // 7. Send welcome email with temp password.
       // If this fails, we treat the entire operation as failed because the officer
       // needs the emailed credentials to access the platform.
-      this.logger.log(colors.blue(`sending email to ${result.email}`));
-      await sendSubebOfficerWelcomeEmail(result.email, {
-        firstName: result.firstName ?? '',
-        lastName: result.lastName ?? '',
-        email: result.email,
-        password: tempPassword,
-      });
-      this.logger.log(
-        colors.green(`Welcome email sent successfully to SUBEB officer ${result.email}`),
-      );
+      this.logger.log(colors.blue(`Sending welcome email to ${result.email}`));
+      try {
+        await sendSubebOfficerWelcomeEmail(result.email, {
+          firstName: result.firstName ?? '',
+          lastName: result.lastName ?? '',
+          email: result.email,
+          password: tempPassword,
+        });
+        this.logger.log(
+          colors.green(`Welcome email sent successfully to SUBEB officer ${result.email}`),
+        );
+      } catch (emailError: any) {
+        this.logger.error(
+          colors.red(
+            `Failed to send welcome email to ${result.email}: ${emailError?.message ?? emailError}`,
+          ),
+        );
+        this.logger.error(
+          `Email error details: ${JSON.stringify(
+            {
+              code: emailError?.code,
+              command: emailError?.command,
+              response: emailError?.response,
+              responseCode: emailError?.responseCode,
+            },
+            null,
+            2,
+          )}`,
+        );
+        // Re-throw to fail the entire enrollment
+        throw emailError;
+      }
 
       this.logger.log(`Created SUBEB officer ${result.email} (${result.id}) via EnrollmentModule`);
       return ResponseHelper.created('SUBEB officer registered', result);

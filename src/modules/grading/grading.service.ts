@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class GradingService {
+  constructor(private readonly prisma: PrismaService) {}
+
   private grades = [
     {
       id: '1',
@@ -57,6 +60,32 @@ export class GradingService {
     { grade: 'D', minScore: 50, maxScore: 59, points: 1.0 },
     { grade: 'F', minScore: 0, maxScore: 49, points: 0.0 },
   ];
+
+  /**
+   * Fetch academic metadata needed for grade entry for a given state.
+   * Returns the current session, current term and all LGAs in the state.
+   */
+  async getAcademicMetadataForGradeEntry(stateId: string) {
+    const [currentSession, currentTerm, lgas] = await this.prisma.$transaction([
+      this.prisma.session.findFirst({
+        where: { stateId, isCurrent: true },
+      }),
+      this.prisma.term.findFirst({
+        where: { stateId, isCurrent: true },
+      }),
+      this.prisma.localGovernmentArea.findMany({
+        where: { stateId, isActive: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+
+    return {
+      stateId,
+      currentSession,
+      currentTerm,
+      localGovernments: lgas,
+    };
+  }
 
   async getStudentGrades(studentId: string, subject?: string, semester?: string) {
     let filteredGrades = this.grades.filter(g => g.studentId === studentId);

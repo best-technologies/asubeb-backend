@@ -1,5 +1,6 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
+import { RegisterDto } from './dto/register.dto';
 export type SafeUser = {
     id: string;
     email: string;
@@ -22,12 +23,7 @@ export declare class AuthService {
         statusCode: number;
     }>;
     private login;
-    register(data: {
-        email: string;
-        password: string;
-        firstName: string;
-        lastName: string;
-    }): Promise<{
+    register(data: RegisterDto): Promise<{
         success: boolean;
         message: string;
         data: any;

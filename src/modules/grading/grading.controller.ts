@@ -1,11 +1,35 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Req, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { GradingService } from './grading.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('grading')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('grading')
 export class GradingController {
   constructor(private readonly gradingService: GradingService) {}
+
+  @Get('metadata/grade-entry')
+  @ApiOperation({ summary: 'Fetch academic metadata for grade entry (SUBEB_OFFICER only)' })
+  @ApiResponse({ status: 200, description: 'Academic metadata retrieved successfully' })
+  async fetchAcademicMetadataForGradeEntry(@Req() req: any) {
+    const user = req.user;
+
+    if (!user) {
+      throw new ForbiddenException('User not authenticated');
+    }
+
+    if (user.role !== 'SUBEB_OFFICER') {
+      throw new ForbiddenException('Only SUBEB_OFFICER can access this resource');
+    }
+
+    if (!user.stateId) {
+      throw new BadRequestException('User state not found');
+    }
+
+    return this.gradingService.getAcademicMetadataForGradeEntry(user.stateId);
+  }
 
   @Get('students/:studentId/grades')
   @ApiOperation({ summary: 'Get student grades' })

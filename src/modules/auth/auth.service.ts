@@ -12,6 +12,8 @@ import * as bcrypt from 'bcryptjs';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { ResponseHelper } from '../../common/helpers/response.helper';
 import { UserRole } from '@prisma/client';
+import { RegisterDto } from './dto/register.dto';
+import * as colors from 'colors';
 
 export type SafeUser = { id: string; email: string; role: string; firstName?: string | null; lastName?: string | null };
 
@@ -117,11 +119,8 @@ export class AuthService {
    * Register a new user. By default assigns role 'grade-entry-officer' unless overridden.
    * Returns formatted response with user data.
    */
-  async register(data: { email: string; password: string; firstName: string; lastName: string }) {
-    if (!data?.email || !data?.password || !data?.firstName || !data?.lastName) {
-      this.logger.warn('register called with missing required fields');
-      throw new BadRequestException('Email, password, firstName, and lastName are required');
-    }
+  async register(data: RegisterDto) {
+    this.logger.log(colors.yellow(`Registering user ${data.email} with role ${data.role}`));
 
     try {
       const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
@@ -146,7 +145,7 @@ export class AuthService {
           password: hashed,
           firstName: data.firstName,
           lastName: data.lastName,
-          role: UserRole.ADMIN,
+          role: data.role,
           stateId: abiaState.id,
         },
         select: { id: true, email: true, role: true, firstName: true, lastName: true },

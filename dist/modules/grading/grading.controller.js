@@ -16,10 +16,24 @@ exports.GradingController = void 0;
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const grading_service_1 = require("./grading.service");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 let GradingController = class GradingController {
     gradingService;
     constructor(gradingService) {
         this.gradingService = gradingService;
+    }
+    async fetchAcademicMetadataForGradeEntry(req) {
+        const user = req.user;
+        if (!user) {
+            throw new common_1.ForbiddenException('User not authenticated');
+        }
+        if (user.role !== 'SUBEB_OFFICER') {
+            throw new common_1.ForbiddenException('Only SUBEB_OFFICER can access this resource');
+        }
+        if (!user.stateId) {
+            throw new common_1.BadRequestException('User state not found');
+        }
+        return this.gradingService.getAcademicMetadataForGradeEntry(user.stateId);
     }
     async getStudentGrades(studentId, subject, semester) {
         return this.gradingService.getStudentGrades(studentId, subject, semester);
@@ -50,6 +64,15 @@ let GradingController = class GradingController {
     }
 };
 exports.GradingController = GradingController;
+__decorate([
+    (0, common_1.Get)('metadata/grade-entry'),
+    (0, swagger_1.ApiOperation)({ summary: 'Fetch academic metadata for grade entry (SUBEB_OFFICER only)' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Academic metadata retrieved successfully' }),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GradingController.prototype, "fetchAcademicMetadataForGradeEntry", null);
 __decorate([
     (0, common_1.Get)('students/:studentId/grades'),
     (0, swagger_1.ApiOperation)({ summary: 'Get student grades' }),
@@ -149,6 +172,8 @@ __decorate([
 ], GradingController.prototype, "getStudentGradeReport", null);
 exports.GradingController = GradingController = __decorate([
     (0, swagger_1.ApiTags)('grading'),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)('grading'),
     __metadata("design:paramtypes", [grading_service_1.GradingService])
 ], GradingController);

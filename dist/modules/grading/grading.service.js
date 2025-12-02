@@ -5,10 +5,18 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GradingService = void 0;
 const common_1 = require("@nestjs/common");
+const prisma_service_1 = require("../../prisma/prisma.service");
 let GradingService = class GradingService {
+    prisma;
+    constructor(prisma) {
+        this.prisma = prisma;
+    }
     grades = [
         {
             id: '1',
@@ -62,6 +70,26 @@ let GradingService = class GradingService {
         { grade: 'D', minScore: 50, maxScore: 59, points: 1.0 },
         { grade: 'F', minScore: 0, maxScore: 49, points: 0.0 },
     ];
+    async getAcademicMetadataForGradeEntry(stateId) {
+        const [currentSession, currentTerm, lgas] = await this.prisma.$transaction([
+            this.prisma.session.findFirst({
+                where: { stateId, isCurrent: true },
+            }),
+            this.prisma.term.findFirst({
+                where: { stateId, isCurrent: true },
+            }),
+            this.prisma.localGovernmentArea.findMany({
+                where: { stateId, isActive: true },
+                orderBy: { name: 'asc' },
+            }),
+        ]);
+        return {
+            stateId,
+            currentSession,
+            currentTerm,
+            localGovernments: lgas,
+        };
+    }
     async getStudentGrades(studentId, subject, semester) {
         let filteredGrades = this.grades.filter(g => g.studentId === studentId);
         if (subject) {
@@ -213,6 +241,7 @@ let GradingService = class GradingService {
 };
 exports.GradingService = GradingService;
 exports.GradingService = GradingService = __decorate([
-    (0, common_1.Injectable)()
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], GradingService);
 //# sourceMappingURL=grading.service.js.map

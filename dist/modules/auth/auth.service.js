@@ -16,7 +16,7 @@ const prisma_service_1 = require("../../prisma/prisma.service");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = require("bcryptjs");
 const response_helper_1 = require("../../common/helpers/response.helper");
-const client_1 = require("@prisma/client");
+const colors = require("colors");
 let AuthService = AuthService_1 = class AuthService {
     prisma;
     jwtService;
@@ -94,10 +94,7 @@ let AuthService = AuthService_1 = class AuthService {
         }
     }
     async register(data) {
-        if (!data?.email || !data?.password || !data?.firstName || !data?.lastName) {
-            this.logger.warn('register called with missing required fields');
-            throw new common_1.BadRequestException('Email, password, firstName, and lastName are required');
-        }
+        this.logger.log(colors.yellow(`Registering user ${data.email} with role ${data.role}`));
         try {
             const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
             if (existing) {
@@ -118,7 +115,7 @@ let AuthService = AuthService_1 = class AuthService {
                     password: hashed,
                     firstName: data.firstName,
                     lastName: data.lastName,
-                    role: client_1.UserRole.ADMIN,
+                    role: data.role,
                     stateId: abiaState.id,
                 },
                 select: { id: true, email: true, role: true, firstName: true, lastName: true },

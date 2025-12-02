@@ -15,20 +15,7 @@ async function bootstrap() {
     });
     const configService = app.get(config_1.ConfigService);
     app.enableCors({
-        origin: [
-            'http://localhost:3000',
-            'http://localhost:3001',
-            'http://localhost:5173',
-            'http://localhost:8080',
-            'http://localhost:4200',
-            'http://127.0.0.1:3000',
-            'http://127.0.0.1:3001',
-            'http://127.0.0.1:5173',
-            'http://127.0.0.1:8080',
-            'http://127.0.0.1:4200',
-            "https://subeb-project-frontend.vercel.app",
-            "https://subeb.besttechnologiesltd.com"
-        ],
+        origin: '*',
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
         credentials: true,

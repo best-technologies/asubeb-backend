@@ -2,6 +2,43 @@ import { GradingService } from './grading.service';
 export declare class GradingController {
     private readonly gradingService;
     constructor(gradingService: GradingService);
+    fetchAcademicMetadataForGradeEntry(req: any): Promise<{
+        stateId: string;
+        currentSession: {
+            name: string;
+            id: string;
+            startDate: Date;
+            endDate: Date;
+            isActive: boolean;
+            isCurrent: boolean;
+            createdAt: Date;
+            updatedAt: Date;
+            stateId: string;
+        } | null;
+        currentTerm: {
+            name: import(".prisma/client").$Enums.TermType;
+            id: string;
+            startDate: Date;
+            endDate: Date;
+            isActive: boolean;
+            isCurrent: boolean;
+            createdAt: Date;
+            updatedAt: Date;
+            stateId: string;
+            sessionId: string;
+        } | null;
+        localGovernments: {
+            name: string;
+            id: string;
+            isActive: boolean;
+            createdAt: Date;
+            updatedAt: Date;
+            stateId: string;
+            code: string;
+            state: string;
+            description: string | null;
+        }[];
+    }>;
     getStudentGrades(studentId: string, subject?: string, semester?: string): Promise<{
         studentId: string;
         grades: {

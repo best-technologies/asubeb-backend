@@ -14,16 +14,6 @@ const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 class EnvironmentVariables {
     DATABASE_URL;
-    DB_HOST;
-    DB_PORT;
-    DB_USERNAME;
-    DB_PASSWORD;
-    DB_NAME;
-    DB_SCHEMA;
-    DB_SSL;
-    DB_MAX_CONNECTIONS;
-    DB_IDLE_TIMEOUT;
-    DB_CONNECTION_TIMEOUT;
     PORT;
     NODE_ENV;
     API_PREFIX;
@@ -35,56 +25,6 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], EnvironmentVariables.prototype, "DATABASE_URL", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], EnvironmentVariables.prototype, "DB_HOST", void 0);
-__decorate([
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value, 10)),
-    (0, class_validator_1.IsNumber)(),
-    __metadata("design:type", Number)
-], EnvironmentVariables.prototype, "DB_PORT", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], EnvironmentVariables.prototype, "DB_USERNAME", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], EnvironmentVariables.prototype, "DB_PASSWORD", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], EnvironmentVariables.prototype, "DB_NAME", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], EnvironmentVariables.prototype, "DB_SCHEMA", void 0);
-__decorate([
-    (0, class_transformer_1.Transform)(({ value }) => value === 'true'),
-    (0, class_validator_1.IsBoolean)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Boolean)
-], EnvironmentVariables.prototype, "DB_SSL", void 0);
-__decorate([
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value, 10)),
-    (0, class_validator_1.IsNumber)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Number)
-], EnvironmentVariables.prototype, "DB_MAX_CONNECTIONS", void 0);
-__decorate([
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value, 10)),
-    (0, class_validator_1.IsNumber)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Number)
-], EnvironmentVariables.prototype, "DB_IDLE_TIMEOUT", void 0);
-__decorate([
-    (0, class_transformer_1.Transform)(({ value }) => parseInt(value, 10)),
-    (0, class_validator_1.IsNumber)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Number)
-], EnvironmentVariables.prototype, "DB_CONNECTION_TIMEOUT", void 0);
 __decorate([
     (0, class_transformer_1.Transform)(({ value }) => parseInt(value, 10)),
     (0, class_validator_1.IsNumber)(),

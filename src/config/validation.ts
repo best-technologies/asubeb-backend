@@ -5,46 +5,6 @@ class EnvironmentVariables {
   @IsString()
   DATABASE_URL: string;
 
-  @IsString()
-  DB_HOST: string;
-
-  @Transform(({ value }) => parseInt(value, 10))
-  @IsNumber()
-  DB_PORT: number;
-
-  @IsString()
-  DB_USERNAME: string;
-
-  @IsString()
-  DB_PASSWORD: string;
-
-  @IsString()
-  DB_NAME: string;
-
-  @IsString()
-  @IsOptional()
-  DB_SCHEMA?: string;
-
-  @Transform(({ value }) => value === 'true')
-  @IsBoolean()
-  @IsOptional()
-  DB_SSL?: boolean;
-
-  @Transform(({ value }) => parseInt(value, 10))
-  @IsNumber()
-  @IsOptional()
-  DB_MAX_CONNECTIONS?: number;
-
-  @Transform(({ value }) => parseInt(value, 10))
-  @IsNumber()
-  @IsOptional()
-  DB_IDLE_TIMEOUT?: number;
-
-  @Transform(({ value }) => parseInt(value, 10))
-  @IsNumber()
-  @IsOptional()
-  DB_CONNECTION_TIMEOUT?: number;
-
   @Transform(({ value }) => parseInt(value, 10))
   @IsNumber()
   @IsOptional()

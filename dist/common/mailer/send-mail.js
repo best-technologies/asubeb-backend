@@ -22,16 +22,6 @@ function getTransporter() {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASSWORD,
         },
-        connectionTimeout: 10000,
-        socketTimeout: 30000,
-        greetingTimeout: 10000,
-        pool: true,
-        maxConnections: 5,
-        maxMessages: 100,
-        retry: {
-            attempts: 3,
-            delay: 2000,
-        },
         debug: process.env.NODE_ENV === 'development',
         logger: process.env.NODE_ENV === 'development',
     });

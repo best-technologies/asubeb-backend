@@ -28,19 +28,19 @@ function getTransporter(): nodemailer.Transporter {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,
     },
-    // Connection timeout settings (in milliseconds)
-    connectionTimeout: 10000, // 10 seconds to establish connection
-    socketTimeout: 30000, // 30 seconds for socket operations
-    greetingTimeout: 10000, // 10 seconds for SMTP greeting
-    // Enable connection pooling
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100,
-    // Retry configuration
-    retry: {
-      attempts: 3,
-      delay: 2000, // 2 seconds between retries
-    },
+    // // Connection timeout settings (in milliseconds)
+    // connectionTimeout: 10000, // 10 seconds to establish connection
+    // socketTimeout: 30000, // 30 seconds for socket operations
+    // greetingTimeout: 10000, // 10 seconds for SMTP greeting
+    // // Enable connection pooling
+    // pool: true,
+    // maxConnections: 5,
+    // maxMessages: 100,
+    // // Retry configuration
+    // retry: {
+    //   attempts: 3,
+    //   delay: 2000, // 2 seconds between retries
+    // },
     // Debug mode (set to true for verbose logging in development)
     debug: process.env.NODE_ENV === 'development',
     logger: process.env.NODE_ENV === 'development',

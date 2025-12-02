@@ -14,31 +14,6 @@ const requiredEnvVars: RequiredEnvVars = {
     description: 'PostgreSQL database connection URL',
     example: 'postgresql://username:password@localhost:5432/database_name',
   },
-  DB_HOST: {
-    required: true,
-    description: 'Database host address',
-    example: 'localhost',
-  },
-  DB_PORT: {
-    required: true,
-    description: 'Database port number',
-    example: '5432',
-  },
-  DB_USERNAME: {
-    required: true,
-    description: 'Database username',
-    example: 'postgres',
-  },
-  DB_PASSWORD: {
-    required: true,
-    description: 'Database password',
-    example: 'your_password',
-  },
-  DB_NAME: {
-    required: true,
-    description: 'Database name',
-    example: 'asubeb_db',
-  },
   JWT_SECRET: {
     required: true,
     description: 'JWT secret key for authentication',

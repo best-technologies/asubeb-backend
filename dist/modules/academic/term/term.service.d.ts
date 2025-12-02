@@ -16,13 +16,13 @@ export declare class TermService {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
-            startDate: Date;
-            endDate: Date;
             isActive: boolean;
-            isCurrent: boolean;
+            updatedAt: Date;
             stateId: string;
             sessionId: string;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         })[];
         pagination: {
             page: number;
@@ -40,13 +40,13 @@ export declare class TermService {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
+        updatedAt: Date;
         stateId: string;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     getTermById(id: string): Promise<{
         session: {
@@ -78,13 +78,13 @@ export declare class TermService {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
+        updatedAt: Date;
         stateId: string;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     createTerm(createTermDto: any): Promise<{
         session: {
@@ -95,13 +95,13 @@ export declare class TermService {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
+        updatedAt: Date;
         stateId: string;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     updateTerm(id: string, updateTermDto: any): Promise<{
         session: {
@@ -112,13 +112,13 @@ export declare class TermService {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
+        updatedAt: Date;
         stateId: string;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     deleteTerm(id: string): Promise<{
         message: string;
@@ -148,13 +148,13 @@ export declare class TermService {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
             createdAt: Date;
-            updatedAt: Date;
-            startDate: Date;
-            endDate: Date;
             isActive: boolean;
-            isCurrent: boolean;
+            updatedAt: Date;
             stateId: string;
             sessionId: string;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         };
     }>;
     activateTerm(id: string): Promise<{
@@ -166,13 +166,13 @@ export declare class TermService {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
+        updatedAt: Date;
         stateId: string;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     deactivateTerm(id: string): Promise<{
         session: {
@@ -183,20 +183,20 @@ export declare class TermService {
         name: import(".prisma/client").$Enums.TermType;
         id: string;
         createdAt: Date;
-        updatedAt: Date;
-        startDate: Date;
-        endDate: Date;
         isActive: boolean;
-        isCurrent: boolean;
+        updatedAt: Date;
         stateId: string;
         sessionId: string;
+        startDate: Date;
+        endDate: Date;
+        isCurrent: boolean;
     }>;
     getTermAssessments(id: string): Promise<({
         student: {
             id: string;
+            studentId: string;
             firstName: string;
             lastName: string;
-            studentId: string;
         };
         subject: {
             name: string;

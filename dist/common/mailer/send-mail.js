@@ -2,8 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendMail = sendMail;
 exports.sendStudentResultEmail = sendStudentResultEmail;
+exports.sendSubebOfficerWelcomeEmail = sendSubebOfficerWelcomeEmail;
 const nodemailer = require("nodemailer");
 const student_result_template_1 = require("../helpers/email-templates/student-result.template");
+const subeb_officer_welcome_template_1 = require("../helpers/email-templates/subeb-officer-welcome.template");
 async function sendMail({ to, subject, html }) {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
         throw new Error('SMTP credentials missing in environment variables');
@@ -32,5 +34,9 @@ async function sendMail({ to, subject, html }) {
 async function sendStudentResultEmail(to, payload) {
     const html = (0, student_result_template_1.studentResultEmailTemplate)(payload);
     await sendMail({ to, subject: `Student Result - ${payload.studentName} (${payload.sessionName} - ${payload.termName})`, html });
+}
+async function sendSubebOfficerWelcomeEmail(to, payload) {
+    const html = (0, subeb_officer_welcome_template_1.subebOfficerWelcomeEmailTemplate)(payload);
+    await sendMail({ to, subject: 'Welcome to ASUBEB Platform (SUBEB Officer)', html });
 }
 //# sourceMappingURL=send-mail.js.map

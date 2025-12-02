@@ -14,10 +14,13 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
 const common_1 = require("@nestjs/common");
+const swagger_1 = require("@nestjs/swagger");
 const auth_service_1 = require("./auth.service");
 const login_dto_1 = require("./dto/login.dto");
 const register_dto_1 = require("./dto/register.dto");
 const jwt_auth_guard_1 = require("./jwt-auth.guard");
+const client_1 = require("@prisma/client");
+const send_mail_1 = require("../../common/mailer/send-mail");
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
@@ -29,6 +32,31 @@ let AuthController = class AuthController {
     async register(dto) {
         return this.authService.register(dto);
     }
+    async registerSubebOfficer(dto) {
+        const tempPassword = Math.random().toString(36).slice(-10);
+        const result = await this.authService.register({
+            ...dto,
+            password: tempPassword,
+            role: client_1.UserRole.SUBEB_OFFICER,
+        });
+        const user = result?.data;
+        if (user?.email &&
+            user?.firstName &&
+            user?.lastName &&
+            (user.role === client_1.UserRole.SUPER_ADMIN ||
+                user.role === client_1.UserRole.SUBEB_ADMIN ||
+                user.role === client_1.UserRole.ADMIN ||
+                user.role === client_1.UserRole.SUBEB_OFFICER)) {
+            (0, send_mail_1.sendSubebOfficerWelcomeEmail)(user.email, {
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                password: tempPassword,
+            }).catch(() => {
+            });
+        }
+        return result;
+    }
     profile(req) {
         return this.authService.getProfile(req.user);
     }
@@ -36,6 +64,9 @@ let AuthController = class AuthController {
 exports.AuthController = AuthController;
 __decorate([
     (0, common_1.Post)('login'),
+    (0, swagger_1.ApiOperation)({ summary: 'User login' }),
+    (0, swagger_1.ApiBody)({ type: login_dto_1.LoginDto }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Login successful' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [login_dto_1.LoginDto]),
@@ -43,20 +74,37 @@ __decorate([
 ], AuthController.prototype, "login", null);
 __decorate([
     (0, common_1.Post)('register'),
+    (0, swagger_1.ApiOperation)({ summary: 'Register a new user' }),
+    (0, swagger_1.ApiBody)({ type: register_dto_1.RegisterDto }),
+    (0, swagger_1.ApiResponse)({ status: 201, description: 'User registered successfully' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [register_dto_1.RegisterDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "register", null);
 __decorate([
+    (0, common_1.Post)('register-subeb-officer'),
+    (0, swagger_1.ApiOperation)({ summary: 'Register a new SUBEB officer (role forced to SUBEB_OFFICER)' }),
+    (0, swagger_1.ApiBody)({ type: register_dto_1.RegisterDto }),
+    (0, swagger_1.ApiResponse)({ status: 201, description: 'SUBEB officer registered successfully' }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [register_dto_1.RegisterDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "registerSubebOfficer", null);
+__decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)('profile'),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Get current user profile' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Profile fetched successfully' }),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "profile", null);
 exports.AuthController = AuthController = __decorate([
+    (0, swagger_1.ApiTags)('auth'),
     (0, common_1.Controller)('auth'),
     __metadata("design:paramtypes", [auth_service_1.AuthService])
 ], AuthController);

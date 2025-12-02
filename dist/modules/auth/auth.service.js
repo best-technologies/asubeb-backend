@@ -16,6 +16,7 @@ const prisma_service_1 = require("../../prisma/prisma.service");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = require("bcryptjs");
 const response_helper_1 = require("../../common/helpers/response.helper");
+const client_1 = require("@prisma/client");
 const colors = require("colors");
 let AuthService = AuthService_1 = class AuthService {
     prisma;
@@ -118,10 +119,34 @@ let AuthService = AuthService_1 = class AuthService {
                     role: data.role,
                     stateId: abiaState.id,
                 },
-                select: { id: true, email: true, role: true, firstName: true, lastName: true },
             });
-            this.logger.log(`Created user ${user.email} (${user.id})`);
-            return response_helper_1.ResponseHelper.created('User registered', user);
+            if (data.role === client_1.UserRole.SUBEB_OFFICER) {
+                const randomDigits = Math.floor(Math.random() * 90000) + 10000;
+                const officerId = `OFF${randomDigits}`;
+                await this.prisma.subebOfficer.create({
+                    data: {
+                        userId: user.id,
+                        officerId,
+                        firstName: data.firstName,
+                        lastName: data.lastName,
+                        email: data.email,
+                        phone: '',
+                        address: null,
+                        designation: null,
+                        stateId: abiaState.id,
+                        enrolledBy: null,
+                    },
+                });
+            }
+            const safeUser = {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                firstName: user.firstName,
+                lastName: user.lastName,
+            };
+            this.logger.log(`Created user ${safeUser.email} (${safeUser.id})`);
+            return response_helper_1.ResponseHelper.created('User registered', safeUser);
         }
         catch (error) {
             if (error instanceof common_1.ConflictException || error instanceof common_1.BadRequestException)

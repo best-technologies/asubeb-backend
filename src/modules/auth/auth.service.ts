@@ -148,11 +148,40 @@ export class AuthService {
           role: data.role,
           stateId: abiaState.id,
         },
-        select: { id: true, email: true, role: true, firstName: true, lastName: true },
       });
 
-      this.logger.log(`Created user ${user.email} (${user.id})`);
-      return ResponseHelper.created('User registered', user as SafeUser);
+      // If this is a SUBEB_OFFICER, also create a SubebOfficer record
+      if (data.role === UserRole.SUBEB_OFFICER) {
+        // Simple officerId generation: OFF + 5 random digits
+        const randomDigits = Math.floor(Math.random() * 90000) + 10000;
+        const officerId = `OFF${randomDigits}`;
+
+        await this.prisma.subebOfficer.create({
+          data: {
+            userId: user.id,
+            officerId,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            phone: '',
+            address: null,
+            designation: null,
+            stateId: abiaState.id,
+            enrolledBy: null,
+          },
+        });
+      }
+
+      const safeUser: SafeUser = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      };
+
+      this.logger.log(`Created user ${safeUser.email} (${safeUser.id})`);
+      return ResponseHelper.created('User registered', safeUser);
     } catch (error) {
       // If we already threw a known exception, rethrow it
       if (error instanceof ConflictException || error instanceof BadRequestException) throw error;

@@ -7,36 +7,36 @@ export declare class GradingController {
         currentSession: {
             name: string;
             id: string;
-            startDate: Date;
-            endDate: Date;
-            isActive: boolean;
-            isCurrent: boolean;
             createdAt: Date;
+            isActive: boolean;
             updatedAt: Date;
             stateId: string;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         } | null;
         currentTerm: {
             name: import(".prisma/client").$Enums.TermType;
             id: string;
-            startDate: Date;
-            endDate: Date;
-            isActive: boolean;
-            isCurrent: boolean;
             createdAt: Date;
+            isActive: boolean;
             updatedAt: Date;
             stateId: string;
             sessionId: string;
+            startDate: Date;
+            endDate: Date;
+            isCurrent: boolean;
         } | null;
         localGovernments: {
             name: string;
+            state: string;
+            description: string | null;
             id: string;
-            isActive: boolean;
             createdAt: Date;
+            isActive: boolean;
             updatedAt: Date;
             stateId: string;
             code: string;
-            state: string;
-            description: string | null;
         }[];
     }>;
     getStudentGrades(studentId: string, subject?: string, semester?: string): Promise<{

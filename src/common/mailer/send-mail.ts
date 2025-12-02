@@ -1,5 +1,6 @@
 import * as nodemailer from 'nodemailer';
 import { studentResultEmailTemplate, StudentResultEmailPayload } from '../helpers/email-templates/student-result.template';
+import { subebOfficerWelcomeEmailTemplate, SubebOfficerWelcomeEmailPayload } from '../helpers/email-templates/subeb-officer-welcome.template';
 
 interface SendMailProps {
   to: string;
@@ -40,5 +41,14 @@ export async function sendStudentResultEmail(to: string, payload: StudentResultE
   const html = studentResultEmailTemplate(payload);
   await sendMail({ to, subject: `Student Result - ${payload.studentName} (${payload.sessionName} - ${payload.termName})`, html });
 }
+
+export async function sendSubebOfficerWelcomeEmail(
+  to: string,
+  payload: SubebOfficerWelcomeEmailPayload,
+): Promise<void> {
+  const html = subebOfficerWelcomeEmailTemplate(payload);
+  await sendMail({ to, subject: 'Welcome to ASUBEB Platform (SUBEB Officer)', html });
+}
+
 
 

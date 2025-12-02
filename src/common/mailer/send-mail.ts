@@ -20,27 +20,35 @@ function getTransporter(): nodemailer.Transporter {
     throw new Error('SMTP credentials missing in environment variables');
   }
 
+  const port = process.env.GOOGLE_SMTP_PORT ? parseInt(process.env.GOOGLE_SMTP_PORT) : 587;
+  const isSecure = port === 465;
+  
   cachedTransporter = nodemailer.createTransport({
     host: process.env.GOOGLE_SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.GOOGLE_SMTP_PORT ? parseInt(process.env.GOOGLE_SMTP_PORT) : 587,
-    secure: process.env.GOOGLE_SMTP_PORT === '465', // true for 465, false for other ports
+    port: port,
+    secure: isSecure, // true for 465, false for other ports
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,
     },
-    // // Connection timeout settings (in milliseconds)
-    // connectionTimeout: 10000, // 10 seconds to establish connection
-    // socketTimeout: 30000, // 30 seconds for socket operations
-    // greetingTimeout: 10000, // 10 seconds for SMTP greeting
-    // // Enable connection pooling
-    // pool: true,
-    // maxConnections: 5,
-    // maxMessages: 100,
-    // // Retry configuration
-    // retry: {
-    //   attempts: 3,
-    //   delay: 2000, // 2 seconds between retries
-    // },
+    // Connection timeout settings optimized for cloud environments
+    connectionTimeout: 60000, // 60 seconds to establish connection (increased for cloud)
+    socketTimeout: 60000, // 60 seconds for socket operations
+    greetingTimeout: 30000, // 30 seconds for SMTP greeting
+    // Enable connection pooling for better performance
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    // Retry configuration for transient failures
+    retry: {
+      attempts: 2,
+      delay: 3000, // 3 seconds between retries
+    },
+    // TLS options for better compatibility with cloud platforms
+    tls: {
+      rejectUnauthorized: true, // Verify certificates (set to false only if needed for testing)
+      minVersion: 'TLSv1.2', // Use modern TLS version
+    },
     // Debug mode (set to true for verbose logging in development)
     debug: process.env.NODE_ENV === 'development',
     logger: process.env.NODE_ENV === 'development',

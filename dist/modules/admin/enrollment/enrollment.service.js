@@ -141,12 +141,18 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
             });
             this.logger.log(colors.blue(`Sending welcome email to ${result.email}`));
             try {
-                await (0, send_mail_1.sendSubebOfficerWelcomeEmail)(result.email, {
+                const emailPromise = (0, send_mail_1.sendSubebOfficerWelcomeEmail)(result.email, {
                     firstName: result.firstName ?? '',
                     lastName: result.lastName ?? '',
                     email: result.email,
                     password: tempPassword,
                 });
+                const emailTimeout = new Promise((_, reject) => {
+                    setTimeout(() => {
+                        reject(new Error('Email sending timeout after 90 seconds. Please check SMTP configuration and network connectivity.'));
+                    }, 90000);
+                });
+                await Promise.race([emailPromise, emailTimeout]);
                 this.logger.log(colors.green(`Welcome email sent successfully to SUBEB officer ${result.email}`));
             }
             catch (emailError) {
@@ -157,7 +163,9 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
                     response: emailError?.response,
                     responseCode: emailError?.responseCode,
                 }, null, 2)}`);
-                throw emailError;
+                throw new common_1.InternalServerErrorException(`Failed to send welcome email. Enrollment aborted because credentials could not be delivered. ` +
+                    `Error: ${emailError?.message || 'Unknown error'}. ` +
+                    `Please check SMTP configuration and try again.`);
             }
             this.logger.log(`Created SUBEB officer ${result.email} (${result.id}) via EnrollmentModule`);
             return response_helper_1.ResponseHelper.created('SUBEB officer registered', result);

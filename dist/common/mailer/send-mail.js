@@ -14,13 +14,29 @@ function getTransporter() {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
         throw new Error('SMTP credentials missing in environment variables');
     }
+    const port = process.env.GOOGLE_SMTP_PORT ? parseInt(process.env.GOOGLE_SMTP_PORT) : 587;
+    const isSecure = port === 465;
     cachedTransporter = nodemailer.createTransport({
         host: process.env.GOOGLE_SMTP_HOST || 'smtp.gmail.com',
-        port: process.env.GOOGLE_SMTP_PORT ? parseInt(process.env.GOOGLE_SMTP_PORT) : 587,
-        secure: process.env.GOOGLE_SMTP_PORT === '465',
+        port: port,
+        secure: isSecure,
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASSWORD,
+        },
+        connectionTimeout: 60000,
+        socketTimeout: 60000,
+        greetingTimeout: 30000,
+        pool: true,
+        maxConnections: 3,
+        maxMessages: 100,
+        retry: {
+            attempts: 2,
+            delay: 3000,
+        },
+        tls: {
+            rejectUnauthorized: true,
+            minVersion: 'TLSv1.2',
         },
         debug: process.env.NODE_ENV === 'development',
         logger: process.env.NODE_ENV === 'development',

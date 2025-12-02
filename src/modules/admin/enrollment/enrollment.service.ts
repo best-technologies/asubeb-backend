@@ -224,16 +224,29 @@ export class EnrollmentService {
       });
 
       // 7. Send welcome email with temp password.
-      // If this fails, we treat the entire operation as failed because the officer
-      // needs the emailed credentials to access the platform.
+      // This MUST succeed - if email fails, the entire enrollment fails because
+      // the officer needs the emailed credentials to access the platform.
       this.logger.log(colors.blue(`Sending welcome email to ${result.email}`));
+      
       try {
-        await sendSubebOfficerWelcomeEmail(result.email, {
+        // Send email with timeout wrapper to prevent indefinite hanging
+        const emailPromise = sendSubebOfficerWelcomeEmail(result.email, {
           firstName: result.firstName ?? '',
           lastName: result.lastName ?? '',
           email: result.email,
           password: tempPassword,
         });
+
+        // Set a timeout for email sending (90 seconds - allows for SMTP timeouts + retries)
+        const emailTimeout = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Email sending timeout after 90 seconds. Please check SMTP configuration and network connectivity.'));
+          }, 90000);
+        });
+
+        // Race between email sending and timeout - if timeout wins, enrollment fails
+        await Promise.race([emailPromise, emailTimeout]);
+        
         this.logger.log(
           colors.green(`Welcome email sent successfully to SUBEB officer ${result.email}`),
         );
@@ -255,8 +268,12 @@ export class EnrollmentService {
             2,
           )}`,
         );
-        // Re-throw to fail the entire enrollment
-        throw emailError;
+        // Re-throw to fail the entire enrollment - user won't get password if email fails
+        throw new InternalServerErrorException(
+          `Failed to send welcome email. Enrollment aborted because credentials could not be delivered. ` +
+          `Error: ${emailError?.message || 'Unknown error'}. ` +
+          `Please check SMTP configuration and try again.`,
+        );
       }
 
       this.logger.log(`Created SUBEB officer ${result.email} (${result.id}) via EnrollmentModule`);

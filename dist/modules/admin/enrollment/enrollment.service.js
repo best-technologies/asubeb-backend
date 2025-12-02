@@ -117,7 +117,7 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
                         stateId,
                     },
                 });
-                await tx.subebOfficer.create({
+                const subebOfficer = await tx.subebOfficer.create({
                     data: {
                         userId: user.id,
                         officerId,
@@ -137,9 +137,18 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
                     role: user.role,
                     firstName: user.firstName,
                     lastName: user.lastName,
+                    userId: user.id,
+                    subebOfficerId: subebOfficer.id,
                 };
             });
             this.logger.log(colors.blue(`Sending welcome email to ${result.email}`));
+            const emailUser = process.env.EMAIL_USER || 'NOT_SET';
+            const emailPassword = process.env.EMAIL_PASSWORD
+                ? `${process.env.EMAIL_PASSWORD.substring(0, 4)}****${process.env.EMAIL_PASSWORD.substring(process.env.EMAIL_PASSWORD.length - 2)}`
+                : 'NOT_SET';
+            const smtpHost = process.env.GOOGLE_SMTP_HOST;
+            const smtpPort = process.env.GOOGLE_SMTP_PORT;
+            this.logger.log(colors.cyan(`Email configuration: Host=${smtpHost}, Port=${smtpPort}, User=${emailUser}, Password=${emailPassword}`));
             try {
                 const emailPromise = (0, send_mail_1.sendSubebOfficerWelcomeEmail)(result.email, {
                     firstName: result.firstName ?? '',
@@ -163,7 +172,22 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
                     response: emailError?.response,
                     responseCode: emailError?.responseCode,
                 }, null, 2)}`);
-                throw new common_1.InternalServerErrorException(`Failed to send welcome email. Enrollment aborted because credentials could not be delivered. ` +
+                this.logger.warn(colors.yellow(`Rolling back enrollment for ${result.email} due to email failure`));
+                try {
+                    await this.prisma.$transaction(async (tx) => {
+                        await tx.subebOfficer.delete({
+                            where: { id: result.subebOfficerId },
+                        });
+                        await tx.user.delete({
+                            where: { id: result.userId },
+                        });
+                    });
+                    this.logger.log(colors.green(`Successfully rolled back enrollment for ${result.email}`));
+                }
+                catch (rollbackError) {
+                    this.logger.error(colors.red(`Failed to rollback enrollment for ${result.email}: ${rollbackError?.message ?? rollbackError}`));
+                }
+                throw new common_1.InternalServerErrorException(`Failed to send welcome email. Enrollment aborted and rolled back because credentials could not be delivered. ` +
                     `Error: ${emailError?.message || 'Unknown error'}. ` +
                     `Please check SMTP configuration and try again.`);
             }

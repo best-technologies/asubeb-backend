@@ -16,8 +16,14 @@ function getTransporter() {
     }
     const port = process.env.GOOGLE_SMTP_PORT ? parseInt(process.env.GOOGLE_SMTP_PORT) : 587;
     const isSecure = port === 465;
+    const host = process.env.GOOGLE_SMTP_HOST || 'smtp.gmail.com';
+    const emailUser = process.env.EMAIL_USER;
+    const emailPassword = process.env.EMAIL_PASSWORD
+        ? `${process.env.EMAIL_PASSWORD.substring(0, 4)}****${process.env.EMAIL_PASSWORD.substring(process.env.EMAIL_PASSWORD.length - 2)}`
+        : 'NOT_SET';
+    console.log(`[Email Config] Creating SMTP transporter: Host=${host}, Port=${port}, Secure=${isSecure}, User=${emailUser}, Password=${emailPassword}`);
     cachedTransporter = nodemailer.createTransport({
-        host: process.env.GOOGLE_SMTP_HOST || 'smtp.gmail.com',
+        host: host,
         port: port,
         secure: isSecure,
         auth: {

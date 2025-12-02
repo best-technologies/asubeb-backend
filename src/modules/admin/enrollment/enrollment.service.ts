@@ -199,7 +199,7 @@ export class EnrollmentService {
           },
         });
 
-        await tx.subebOfficer.create({
+        const subebOfficer = await tx.subebOfficer.create({
           data: {
             userId: user.id,
             officerId,
@@ -220,6 +220,8 @@ export class EnrollmentService {
           role: user.role,
           firstName: user.firstName,
           lastName: user.lastName,
+          userId: user.id, // Store for potential rollback
+          subebOfficerId: subebOfficer.id, // Store for potential rollback
         };
       });
 
@@ -227,6 +229,16 @@ export class EnrollmentService {
       // This MUST succeed - if email fails, the entire enrollment fails because
       // the officer needs the emailed credentials to access the platform.
       this.logger.log(colors.blue(`Sending welcome email to ${result.email}`));
+      
+      // Log email configuration (mask password for security)
+      const emailUser = process.env.EMAIL_USER || 'NOT_SET';
+      const emailPassword = process.env.EMAIL_PASSWORD 
+        ? `${process.env.EMAIL_PASSWORD.substring(0, 4)}****${process.env.EMAIL_PASSWORD.substring(process.env.EMAIL_PASSWORD.length - 2)}`
+        : 'NOT_SET';
+      const smtpHost = process.env.GOOGLE_SMTP_HOST;
+      const smtpPort = process.env.GOOGLE_SMTP_PORT
+      
+      this.logger.log(colors.cyan(`Email configuration: Host=${smtpHost}, Port=${smtpPort}, User=${emailUser}, Password=${emailPassword}`));
       
       try {
         // Send email with timeout wrapper to prevent indefinite hanging
@@ -268,9 +280,31 @@ export class EnrollmentService {
             2,
           )}`,
         );
+        
+        // Rollback: Delete the created user and subebOfficer records
+        this.logger.warn(colors.yellow(`Rolling back enrollment for ${result.email} due to email failure`));
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            // Delete SubebOfficer first (due to foreign key constraint)
+            await tx.subebOfficer.delete({
+              where: { id: result.subebOfficerId },
+            });
+            // Then delete User
+            await tx.user.delete({
+              where: { id: result.userId },
+            });
+          });
+          this.logger.log(colors.green(`Successfully rolled back enrollment for ${result.email}`));
+        } catch (rollbackError: any) {
+          this.logger.error(
+            colors.red(`Failed to rollback enrollment for ${result.email}: ${rollbackError?.message ?? rollbackError}`),
+          );
+          // Continue to throw the original email error
+        }
+        
         // Re-throw to fail the entire enrollment - user won't get password if email fails
         throw new InternalServerErrorException(
-          `Failed to send welcome email. Enrollment aborted because credentials could not be delivered. ` +
+          `Failed to send welcome email. Enrollment aborted and rolled back because credentials could not be delivered. ` +
           `Error: ${emailError?.message || 'Unknown error'}. ` +
           `Please check SMTP configuration and try again.`,
         );

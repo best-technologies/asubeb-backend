@@ -224,14 +224,16 @@ export class EnrollmentService {
       });
 
       // 7. Send welcome email with temp password (fire-and-forget)
+      this.logger.log(colors.blue(`Result from enrollment: ${JSON.stringify(result, null, 2)}`));
       if (result?.email && result?.firstName && result?.lastName) {
         sendSubebOfficerWelcomeEmail(result.email, {
           firstName: result.firstName ?? '',
           lastName: result.lastName ?? '',
           email: result.email,
           password: tempPassword,
-        }).catch(() => {
-          // Swallow email errors; main registration should still succeed
+        }).catch((error) => {
+          // Swallow email errors; main registration should still succeed, but og the error 
+          this.logger.error(`Error sending welcome email to ${result.email}: ${error?.message ?? error}`);
         });
       }
 

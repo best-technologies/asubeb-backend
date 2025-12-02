@@ -139,13 +139,15 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
                     lastName: user.lastName,
                 };
             });
+            this.logger.log(colors.blue(`Result from enrollment: ${JSON.stringify(result, null, 2)}`));
             if (result?.email && result?.firstName && result?.lastName) {
                 (0, send_mail_1.sendSubebOfficerWelcomeEmail)(result.email, {
                     firstName: result.firstName ?? '',
                     lastName: result.lastName ?? '',
                     email: result.email,
                     password: tempPassword,
-                }).catch(() => {
+                }).catch((error) => {
+                    this.logger.error(`Error sending welcome email to ${result.email}: ${error?.message ?? error}`);
                 });
             }
             this.logger.log(`Created SUBEB officer ${result.email} (${result.id}) via EnrollmentModule`);

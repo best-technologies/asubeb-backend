@@ -18,6 +18,7 @@ const bcrypt = require("bcryptjs");
 const response_helper_1 = require("../../common/helpers/response.helper");
 const client_1 = require("@prisma/client");
 const colors = require("colors");
+const send_mail_1 = require("../../common/mailer/send-mail");
 let AuthService = AuthService_1 = class AuthService {
     prisma;
     jwtService;
@@ -94,8 +95,8 @@ let AuthService = AuthService_1 = class AuthService {
             throw new common_1.InternalServerErrorException('Failed to generate access token');
         }
     }
-    async register(data) {
-        this.logger.log(colors.yellow(`Registering user ${data.email} with role ${data.role}`));
+    async register(data, role = client_1.UserRole.USER) {
+        this.logger.log(colors.yellow(`Registering user ${data.email} with role ${role}`));
         try {
             const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
             if (existing) {
@@ -116,11 +117,11 @@ let AuthService = AuthService_1 = class AuthService {
                     password: hashed,
                     firstName: data.firstName,
                     lastName: data.lastName,
-                    role: data.role,
+                    role,
                     stateId: abiaState.id,
                 },
             });
-            if (data.role === client_1.UserRole.SUBEB_OFFICER) {
+            if (role === client_1.UserRole.SUBEB_OFFICER) {
                 const randomDigits = Math.floor(Math.random() * 90000) + 10000;
                 const officerId = `OFF${randomDigits}`;
                 await this.prisma.subebOfficer.create({
@@ -154,6 +155,24 @@ let AuthService = AuthService_1 = class AuthService {
             this.logger.error(`Failed to create user ${data.email}: ${error?.message ?? error}`);
             throw new common_1.InternalServerErrorException('Failed to register user');
         }
+    }
+    async registerSubebOfficer(dto) {
+        const tempPassword = Math.random().toString(36).slice(-10);
+        const result = await this.register({
+            ...dto,
+            password: tempPassword,
+        }, client_1.UserRole.SUBEB_OFFICER);
+        const user = result?.data;
+        if (user?.email && user?.firstName && user?.lastName) {
+            (0, send_mail_1.sendSubebOfficerWelcomeEmail)(user.email, {
+                firstName: user.firstName ?? '',
+                lastName: user.lastName ?? '',
+                email: user.email,
+                password: tempPassword,
+            }).catch(() => {
+            });
+        }
+        return result;
     }
     getProfile(user) {
         return response_helper_1.ResponseHelper.success('Profile fetched', user);

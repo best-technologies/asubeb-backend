@@ -19,8 +19,6 @@ const auth_service_1 = require("./auth.service");
 const login_dto_1 = require("./dto/login.dto");
 const register_dto_1 = require("./dto/register.dto");
 const jwt_auth_guard_1 = require("./jwt-auth.guard");
-const client_1 = require("@prisma/client");
-const send_mail_1 = require("../../common/mailer/send-mail");
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
@@ -33,29 +31,7 @@ let AuthController = class AuthController {
         return this.authService.register(dto);
     }
     async registerSubebOfficer(dto) {
-        const tempPassword = Math.random().toString(36).slice(-10);
-        const result = await this.authService.register({
-            ...dto,
-            password: tempPassword,
-            role: client_1.UserRole.SUBEB_OFFICER,
-        });
-        const user = result?.data;
-        if (user?.email &&
-            user?.firstName &&
-            user?.lastName &&
-            (user.role === client_1.UserRole.SUPER_ADMIN ||
-                user.role === client_1.UserRole.SUBEB_ADMIN ||
-                user.role === client_1.UserRole.ADMIN ||
-                user.role === client_1.UserRole.SUBEB_OFFICER)) {
-            (0, send_mail_1.sendSubebOfficerWelcomeEmail)(user.email, {
-                firstName: user.firstName,
-                lastName: user.lastName,
-                email: user.email,
-                password: tempPassword,
-            }).catch(() => {
-            });
-        }
-        return result;
+        return this.authService.registerSubebOfficer(dto);
     }
     profile(req) {
         return this.authService.getProfile(req.user);

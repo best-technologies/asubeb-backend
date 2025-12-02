@@ -14,6 +14,7 @@ import { ResponseHelper } from '../../common/helpers/response.helper';
 import { UserRole } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
 import * as colors from 'colors';
+import { sendSubebOfficerWelcomeEmail } from '../../common/mailer/send-mail';
 
 export type SafeUser = { id: string; email: string; role: string; firstName?: string | null; lastName?: string | null };
 
@@ -119,8 +120,8 @@ export class AuthService {
    * Register a new user. By default assigns role 'grade-entry-officer' unless overridden.
    * Returns formatted response with user data.
    */
-  async register(data: RegisterDto) {
-    this.logger.log(colors.yellow(`Registering user ${data.email} with role ${data.role}`));
+  async register(data: RegisterDto, role: UserRole = UserRole.USER) {
+    this.logger.log(colors.yellow(`Registering user ${data.email} with role ${role}`));
 
     try {
       const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
@@ -145,13 +146,13 @@ export class AuthService {
           password: hashed,
           firstName: data.firstName,
           lastName: data.lastName,
-          role: data.role,
+          role,
           stateId: abiaState.id,
         },
       });
 
       // If this is a SUBEB_OFFICER, also create a SubebOfficer record
-      if (data.role === UserRole.SUBEB_OFFICER) {
+      if (role === UserRole.SUBEB_OFFICER) {
         // Simple officerId generation: OFF + 5 random digits
         const randomDigits = Math.floor(Math.random() * 90000) + 10000;
         const officerId = `OFF${randomDigits}`;
@@ -189,6 +190,38 @@ export class AuthService {
       this.logger.error(`Failed to create user ${data.email}: ${error?.message ?? error}`);
       throw new InternalServerErrorException('Failed to register user');
     }
+  }
+
+  /**
+   * Register a SUBEB officer:
+   * - Generates a temporary password
+   * - Creates User with SUBEB_OFFICER role (+ SubebOfficer record via register)
+   * - Sends welcome email with temp password
+   */
+  async registerSubebOfficer(dto: RegisterDto) {
+    const tempPassword = Math.random().toString(36).slice(-10);
+
+    const result = await this.register(
+      {
+        ...dto,
+        password: tempPassword,
+      },
+      UserRole.SUBEB_OFFICER,
+    );
+
+    const user = result?.data as SafeUser | undefined;
+    if (user?.email && user?.firstName && user?.lastName) {
+      sendSubebOfficerWelcomeEmail(user.email, {
+        firstName: user.firstName ?? '',
+        lastName: user.lastName ?? '',
+        email: user.email,
+        password: tempPassword,
+      }).catch(() => {
+        // Swallow email errors; main registration should still succeed
+      });
+    }
+
+    return result;
   }
 
   /**

@@ -1,5 +1,6 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
+import { UserRole } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
 export type SafeUser = {
     id: string;
@@ -23,7 +24,15 @@ export declare class AuthService {
         statusCode: number;
     }>;
     private login;
-    register(data: RegisterDto): Promise<{
+    register(data: RegisterDto, role?: UserRole): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    }>;
+    registerSubebOfficer(dto: RegisterDto): Promise<{
         success: boolean;
         message: string;
         data: any;

@@ -139,7 +139,7 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
                     lastName: user.lastName,
                 };
             });
-            this.logger.log(colors.blue(`Result from enrollment: ${JSON.stringify(result, null, 2)}`));
+            this.logger.log(colors.blue(`sending email to ${result.email}`));
             await (0, send_mail_1.sendSubebOfficerWelcomeEmail)(result.email, {
                 firstName: result.firstName ?? '',
                 lastName: result.lastName ?? '',

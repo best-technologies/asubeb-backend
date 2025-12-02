@@ -226,7 +226,7 @@ export class EnrollmentService {
       // 7. Send welcome email with temp password.
       // If this fails, we treat the entire operation as failed because the officer
       // needs the emailed credentials to access the platform.
-      this.logger.log(colors.blue(`Result from enrollment: ${JSON.stringify(result, null, 2)}`));
+      this.logger.log(colors.blue(`sending email to ${result.email}`));
       await sendSubebOfficerWelcomeEmail(result.email, {
         firstName: result.firstName ?? '',
         lastName: result.lastName ?? '',

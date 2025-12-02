@@ -173,5 +173,89 @@ export class GradeEntryStudentsResponseDto {
   statusCode: number;
 }
 
+export class GradeEntryMetadataLocalGovernmentDto {
+  @ApiProperty({ description: 'Local Government Area ID', example: 'lga-uuid-123' })
+  id: string;
+
+  @ApiProperty({ description: 'Local Government Area name', example: 'Umuahia North' })
+  name: string;
+
+  @ApiProperty({
+    description: 'Total number of schools in this Local Government Area',
+    example: 25,
+  })
+  totalSchools: number;
+}
+
+export class GradeEntryMetadataDataDto {
+  @ApiProperty({ description: 'State ID', example: 'state-uuid-123' })
+  stateId: string;
+
+  @ApiProperty({
+    description: 'Current academic session information',
+    required: false,
+    nullable: true,
+    example: {
+      id: 'session-uuid-123',
+      name: '2024/2025',
+      isCurrent: true,
+    },
+  })
+  currentSession?: {
+    id: string;
+    name: string;
+    isCurrent: boolean;
+  } | null;
+
+  @ApiProperty({
+    description: 'Current academic term information',
+    required: false,
+    nullable: true,
+    example: {
+      id: 'term-uuid-123',
+      name: 'SECOND_TERM',
+      isCurrent: true,
+    },
+  })
+  currentTerm?: {
+    id: string;
+    name: string;
+    isCurrent: boolean;
+  } | null;
+
+  @ApiProperty({
+    description: 'Total number of Local Government Areas in the state',
+    example: 17,
+  })
+  totalLocalGovernments: number;
+
+  @ApiProperty({
+    description:
+      'List of Local Government Areas in the state, each including school counts used for grade entry',
+    type: [GradeEntryMetadataLocalGovernmentDto],
+  })
+  localGovernments: GradeEntryMetadataLocalGovernmentDto[];
+}
+
+export class GradeEntryMetadataResponseDto {
+  @ApiProperty({ description: 'Operation success flag', example: true })
+  success: boolean;
+
+  @ApiProperty({
+    description: 'Response message',
+    example: 'Academic metadata retrieved successfully',
+  })
+  message: string;
+
+  @ApiProperty({
+    description: 'Response data payload containing session, term and LGA metadata',
+    type: GradeEntryMetadataDataDto,
+  })
+  data: GradeEntryMetadataDataDto;
+
+  @ApiProperty({ description: 'HTTP status code', example: 200 })
+  statusCode: number;
+}
+
 
 

@@ -40,7 +40,10 @@ exports.GradingController = GradingController;
 __decorate([
     (0, common_1.Get)('metadata/grade-entry'),
     (0, swagger_1.ApiOperation)({ summary: 'Fetch academic metadata for grade entry (SUBEB_OFFICER only)' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Academic metadata retrieved successfully' }),
+    (0, swagger_1.ApiOkResponse)({
+        description: 'Academic metadata retrieved successfully',
+        type: grading_metadata_dto_1.GradeEntryMetadataResponseDto,
+    }),
     __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

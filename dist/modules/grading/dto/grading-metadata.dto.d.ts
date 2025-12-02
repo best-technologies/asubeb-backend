@@ -72,3 +72,29 @@ export declare class GradeEntryStudentsResponseDto {
     data: GradeEntryStudentsDataDto;
     statusCode: number;
 }
+export declare class GradeEntryMetadataLocalGovernmentDto {
+    id: string;
+    name: string;
+    totalSchools: number;
+}
+export declare class GradeEntryMetadataDataDto {
+    stateId: string;
+    currentSession?: {
+        id: string;
+        name: string;
+        isCurrent: boolean;
+    } | null;
+    currentTerm?: {
+        id: string;
+        name: string;
+        isCurrent: boolean;
+    } | null;
+    totalLocalGovernments: number;
+    localGovernments: GradeEntryMetadataLocalGovernmentDto[];
+}
+export declare class GradeEntryMetadataResponseDto {
+    success: boolean;
+    message: string;
+    data: GradeEntryMetadataDataDto;
+    statusCode: number;
+}

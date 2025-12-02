@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GradeEntryStudentsResponseDto = exports.GradeEntryStudentsDataDto = exports.GradeEntryStudentDto = exports.GradeEntryClassesResponseDto = exports.GradeEntryClassesDataDto = exports.GradeEntryClassDto = exports.GradeEntrySchoolsResponseDto = exports.GradeEntrySchoolsDataDto = exports.GradeEntrySchoolDto = void 0;
+exports.GradeEntryMetadataResponseDto = exports.GradeEntryMetadataDataDto = exports.GradeEntryMetadataLocalGovernmentDto = exports.GradeEntryStudentsResponseDto = exports.GradeEntryStudentsDataDto = exports.GradeEntryStudentDto = exports.GradeEntryClassesResponseDto = exports.GradeEntryClassesDataDto = exports.GradeEntryClassDto = exports.GradeEntrySchoolsResponseDto = exports.GradeEntrySchoolsDataDto = exports.GradeEntrySchoolDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 class GradeEntrySchoolDto {
     id;
@@ -281,4 +281,106 @@ __decorate([
     (0, swagger_1.ApiProperty)({ description: 'HTTP status code', example: 200 }),
     __metadata("design:type", Number)
 ], GradeEntryStudentsResponseDto.prototype, "statusCode", void 0);
+class GradeEntryMetadataLocalGovernmentDto {
+    id;
+    name;
+    totalSchools;
+}
+exports.GradeEntryMetadataLocalGovernmentDto = GradeEntryMetadataLocalGovernmentDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Local Government Area ID', example: 'lga-uuid-123' }),
+    __metadata("design:type", String)
+], GradeEntryMetadataLocalGovernmentDto.prototype, "id", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Local Government Area name', example: 'Umuahia North' }),
+    __metadata("design:type", String)
+], GradeEntryMetadataLocalGovernmentDto.prototype, "name", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Total number of schools in this Local Government Area',
+        example: 25,
+    }),
+    __metadata("design:type", Number)
+], GradeEntryMetadataLocalGovernmentDto.prototype, "totalSchools", void 0);
+class GradeEntryMetadataDataDto {
+    stateId;
+    currentSession;
+    currentTerm;
+    totalLocalGovernments;
+    localGovernments;
+}
+exports.GradeEntryMetadataDataDto = GradeEntryMetadataDataDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'State ID', example: 'state-uuid-123' }),
+    __metadata("design:type", String)
+], GradeEntryMetadataDataDto.prototype, "stateId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Current academic session information',
+        required: false,
+        nullable: true,
+        example: {
+            id: 'session-uuid-123',
+            name: '2024/2025',
+            isCurrent: true,
+        },
+    }),
+    __metadata("design:type", Object)
+], GradeEntryMetadataDataDto.prototype, "currentSession", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Current academic term information',
+        required: false,
+        nullable: true,
+        example: {
+            id: 'term-uuid-123',
+            name: 'SECOND_TERM',
+            isCurrent: true,
+        },
+    }),
+    __metadata("design:type", Object)
+], GradeEntryMetadataDataDto.prototype, "currentTerm", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Total number of Local Government Areas in the state',
+        example: 17,
+    }),
+    __metadata("design:type", Number)
+], GradeEntryMetadataDataDto.prototype, "totalLocalGovernments", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'List of Local Government Areas in the state, each including school counts used for grade entry',
+        type: [GradeEntryMetadataLocalGovernmentDto],
+    }),
+    __metadata("design:type", Array)
+], GradeEntryMetadataDataDto.prototype, "localGovernments", void 0);
+class GradeEntryMetadataResponseDto {
+    success;
+    message;
+    data;
+    statusCode;
+}
+exports.GradeEntryMetadataResponseDto = GradeEntryMetadataResponseDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Operation success flag', example: true }),
+    __metadata("design:type", Boolean)
+], GradeEntryMetadataResponseDto.prototype, "success", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Response message',
+        example: 'Academic metadata retrieved successfully',
+    }),
+    __metadata("design:type", String)
+], GradeEntryMetadataResponseDto.prototype, "message", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Response data payload containing session, term and LGA metadata',
+        type: GradeEntryMetadataDataDto,
+    }),
+    __metadata("design:type", GradeEntryMetadataDataDto)
+], GradeEntryMetadataResponseDto.prototype, "data", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'HTTP status code', example: 200 }),
+    __metadata("design:type", Number)
+], GradeEntryMetadataResponseDto.prototype, "statusCode", void 0);
 //# sourceMappingURL=grading-metadata.dto.js.map

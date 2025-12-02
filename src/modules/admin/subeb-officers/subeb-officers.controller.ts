@@ -14,19 +14,19 @@ import { ApiEnrollOfficer, ApiGetAllOfficers, ApiUpdateOfficer } from './subeb-o
 export class SubebOfficersController {
   constructor(private readonly subebOfficersService: SubebOfficersService) {}
 
-  @Post('enroll-officer')
-  @Roles('subeb-admin', 'admin')
-  @ApiEnrollOfficer()
-  async enrollOfficer(@Body() dto: EnrollOfficerDto, @Request() req) {
-    const enrolledByUserId = req.user?.id;
-    if (!enrolledByUserId) {
-      throw new UnauthorizedException('User ID not found in request. Please ensure JWT authentication is working correctly.');
-    }
-    return this.subebOfficersService.enrollOfficer(dto, enrolledByUserId);
-  }
+  // @Post('enroll-officer')
+  // @Roles('subeb-admin', 'admin')
+  // @ApiEnrollOfficer()
+  // async enrollOfficer(@Body() dto: EnrollOfficerDto, @Request() req) {
+  //   const enrolledByUserId = req.user?.id;
+  //   if (!enrolledByUserId) {
+  //     throw new UnauthorizedException('User ID not found in request. Please ensure JWT authentication is working correctly.');
+  //   }
+  //   return this.subebOfficersService.enrollOfficer(dto, enrolledByUserId);
+  // }
 
   @Get()
-  @Roles('subeb-admin', 'admin')
+  @Roles('SUBEB_ADMIN', 'ADMIN', 'SUPER_ADMIN')
   @ApiGetAllOfficers()
   async getAllOfficers(
     @Query('page') page: number = 1,

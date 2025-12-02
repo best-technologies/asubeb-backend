@@ -16,6 +16,7 @@ const lga_module_1 = require("./lga/lga.module");
 const excel_upload_module_1 = require("./excel-upload/excel-upload.module");
 const bigquery_import_module_1 = require("./bigquery-import/bigquery-import.module");
 const subeb_officers_module_1 = require("./subeb-officers/subeb-officers.module");
+const enrollment_module_1 = require("./enrollment/enrollment.module");
 let AdminModule = class AdminModule {
 };
 exports.AdminModule = AdminModule;
@@ -30,6 +31,7 @@ exports.AdminModule = AdminModule = __decorate([
             excel_upload_module_1.ExcelUploadModule,
             bigquery_import_module_1.BigQueryImportModule,
             subeb_officers_module_1.SubebOfficersModule,
+            enrollment_module_1.EnrollmentModule,
         ],
         exports: [
             dashboard_module_1.DashboardModule,
@@ -40,6 +42,7 @@ exports.AdminModule = AdminModule = __decorate([
             excel_upload_module_1.ExcelUploadModule,
             bigquery_import_module_1.BigQueryImportModule,
             subeb_officers_module_1.SubebOfficersModule,
+            enrollment_module_1.EnrollmentModule,
         ],
     })
 ], AdminModule);

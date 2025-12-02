@@ -20,14 +20,6 @@ export declare class AuthController {
         meta: any;
         statusCode: number;
     }>;
-    registerSubebOfficer(dto: RegisterDto): Promise<{
-        success: boolean;
-        message: string;
-        data: any;
-        length: number | undefined;
-        meta: any;
-        statusCode: number;
-    }>;
     profile(req: any): {
         success: boolean;
         message: string;

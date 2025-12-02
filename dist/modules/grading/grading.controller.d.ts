@@ -3,171 +3,55 @@ export declare class GradingController {
     private readonly gradingService;
     constructor(gradingService: GradingService);
     fetchAcademicMetadataForGradeEntry(req: any): Promise<{
-        stateId: string;
-        currentSession: {
-            name: string;
-            id: string;
-            createdAt: Date;
-            isActive: boolean;
-            updatedAt: Date;
-            stateId: string;
-            startDate: Date;
-            endDate: Date;
-            isCurrent: boolean;
-        } | null;
-        currentTerm: {
-            name: import(".prisma/client").$Enums.TermType;
-            id: string;
-            createdAt: Date;
-            isActive: boolean;
-            updatedAt: Date;
-            stateId: string;
-            sessionId: string;
-            startDate: Date;
-            endDate: Date;
-            isCurrent: boolean;
-        } | null;
-        localGovernments: {
-            name: string;
-            state: string;
-            description: string | null;
-            id: string;
-            createdAt: Date;
-            isActive: boolean;
-            updatedAt: Date;
-            stateId: string;
-            code: string;
-        }[];
-    }>;
-    getStudentGrades(studentId: string, subject?: string, semester?: string): Promise<{
-        studentId: string;
-        grades: {
-            id: string;
-            studentId: string;
-            subject: string;
-            semester: string;
-            academicYear: string;
-            assignmentScore: number;
-            examScore: number;
-            totalScore: number;
-            grade: string;
-            remarks: string;
-            teacherId: string;
-            teacherName: string;
-            createdAt: string;
-            updatedAt: string;
-        }[];
-        summary: {
-            totalSubjects: number;
-            averageScore: number;
-            highestGrade: number;
-            lowestGrade: number;
-        };
-    }>;
-    addStudentGrade(studentId: string, gradeData: any): Promise<any>;
-    updateStudentGrade(studentId: string, gradeId: string, gradeData: any): Promise<{
-        id: string;
-        studentId: string;
-        subject: string;
-        semester: string;
-        academicYear: string;
-        assignmentScore: number;
-        examScore: number;
-        totalScore: number;
-        grade: string;
-        remarks: string;
-        teacherId: string;
-        teacherName: string;
-        createdAt: string;
-        updatedAt: string;
-    }>;
-    getClassGrades(classId: string, subject?: string): Promise<{
-        classId: string;
-        grades: {
-            id: string;
-            studentId: string;
-            subject: string;
-            semester: string;
-            academicYear: string;
-            assignmentScore: number;
-            examScore: number;
-            totalScore: number;
-            grade: string;
-            remarks: string;
-            teacherId: string;
-            teacherName: string;
-            createdAt: string;
-            updatedAt: string;
-        }[];
-        summary: {
-            totalStudents: number;
-            averageScore: number;
-            gradeDistribution: {
-                [key: string]: number;
-            };
-        };
-    }>;
-    addBulkGrades(classId: string, gradesData: any): Promise<{
+        success: boolean;
         message: string;
-        addedGrades: any;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    } | {
+        success: false;
+        message: string;
+        error: any;
+        statusCode: number;
     }>;
-    getSubjects(): Promise<{
-        id: string;
-        name: string;
-        code: string;
-    }[]>;
-    getGradeScales(): Promise<{
-        grade: string;
-        minScore: number;
-        maxScore: number;
-        points: number;
-    }[]>;
-    getClassGradeReport(classId: string): Promise<{
-        classId: string;
-        reportGeneratedAt: string;
-        summary: {
-            totalStudents: number;
-            averageScore: number;
-            gradeDistribution: {
-                [key: string]: number;
-            };
-            subjectPerformance: {
-                [key: string]: number;
-            };
-        };
-        topPerformers: {
-            id: string;
-            studentId: string;
-            subject: string;
-            semester: string;
-            academicYear: string;
-            assignmentScore: number;
-            examScore: number;
-            totalScore: number;
-            grade: string;
-            remarks: string;
-            teacherId: string;
-            teacherName: string;
-            createdAt: string;
-            updatedAt: string;
-        }[];
+    fetchSchoolsByLocalGovernment(req: any, lgaId: string): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    } | {
+        success: false;
+        message: string;
+        error: any;
+        statusCode: number;
     }>;
-    getStudentGradeReport(studentId: string): Promise<{
-        studentId: string;
-        reportGeneratedAt: string;
-        summary: {
-            totalSubjects: number;
-            averageScore: number;
-            gpa: number;
-            gradeDistribution: {
-                [key: string]: number;
-            };
-        };
-        subjectBreakdown: {
-            subject: string;
-            score: number;
-            grade: string;
-            remarks: string;
-        }[];
+    fetchClassesBySchool(req: any, schoolId: string): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    } | {
+        success: false;
+        message: string;
+        error: any;
+        statusCode: number;
+    }>;
+    fetchAllStudentsByClassId(req: any, classId: string): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    } | {
+        success: false;
+        message: string;
+        error: any;
+        statusCode: number;
     }>;
 }

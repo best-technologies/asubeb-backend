@@ -26,13 +26,6 @@ let SubebOfficersController = class SubebOfficersController {
     constructor(subebOfficersService) {
         this.subebOfficersService = subebOfficersService;
     }
-    async enrollOfficer(dto, req) {
-        const enrolledByUserId = req.user?.id;
-        if (!enrolledByUserId) {
-            throw new common_1.UnauthorizedException('User ID not found in request. Please ensure JWT authentication is working correctly.');
-        }
-        return this.subebOfficersService.enrollOfficer(dto, enrolledByUserId);
-    }
     async getAllOfficers(page = 1, limit = 10, req) {
         const userStateId = req.user?.stateId;
         return this.subebOfficersService.getAllOfficers(page, limit, userStateId);
@@ -43,18 +36,8 @@ let SubebOfficersController = class SubebOfficersController {
 };
 exports.SubebOfficersController = SubebOfficersController;
 __decorate([
-    (0, common_1.Post)('enroll-officer'),
-    (0, roles_decorator_1.Roles)('subeb-admin', 'admin'),
-    (0, subeb_officers_api_decorators_1.ApiEnrollOfficer)(),
-    __param(0, (0, common_1.Body)()),
-    __param(1, (0, common_1.Request)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [dto_1.EnrollOfficerDto, Object]),
-    __metadata("design:returntype", Promise)
-], SubebOfficersController.prototype, "enrollOfficer", null);
-__decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)('subeb-admin', 'admin'),
+    (0, roles_decorator_1.Roles)('SUBEB_ADMIN', 'ADMIN', 'SUPER_ADMIN'),
     (0, subeb_officers_api_decorators_1.ApiGetAllOfficers)(),
     __param(0, (0, common_1.Query)('page')),
     __param(1, (0, common_1.Query)('limit')),

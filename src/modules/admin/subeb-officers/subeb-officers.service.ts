@@ -11,6 +11,7 @@ import { EnrollOfficerDto, UpdateOfficerDto } from './dto';
 import { ResponseHelper } from '../../../common/helpers/response.helper';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { sendSubebOfficerWelcomeEmail } from '../../../common/mailer/send-mail';
 
 @Injectable()
 export class SubebOfficersService {
@@ -50,139 +51,144 @@ export class SubebOfficersService {
     return officerId!;
   }
 
-  /**
-   * Enroll a new SUBEB officer.
-   * Creates records in both User and SubebOfficer tables.
-   * Updates the totalOfficers counter in State table.
-   * Only users with role 'subeb-admin' or 'admin' can enroll officers.
-   * @param data - Officer enrollment data
-   * @param enrolledByUserId - ID of the user performing the enrollment
-   */
-  async enrollOfficer(data: EnrollOfficerDto, enrolledByUserId: string) {
-    this.logger.log(`Enrolling SUBEB officer: ${data.email} by user: ${enrolledByUserId}`);
-    if (!data?.email || !data?.password || !data?.firstName || !data?.lastName || !data?.phone) {
-      this.logger.warn('enrollOfficer called with missing required fields');
-      throw new BadRequestException('Email, password, firstName, lastName, and phone are required');
-    }
+  // /**
+  //  * Enroll a new SUBEB officer.
+  //  * Creates records in both User and SubebOfficer tables.
+  //  * Updates the totalOfficers counter in State table.
+  //  * Only users with role 'subeb-admin' or 'admin' can enroll officers.
+  //  * @param data - Officer enrollment data
+  //  * @param enrolledByUserId - ID of the user performing the enrollment
+  //  */
+  // async enrollOfficer(data: EnrollOfficerDto, enrolledByUserId: string) {
+  //   this.logger.log(`Enrolling SUBEB officer: ${data.email} by user: ${enrolledByUserId}`);
 
-    if (!enrolledByUserId) {
-      this.logger.warn('enrollOfficer called without enrolledByUserId');
-      throw new BadRequestException('Enrolled by user ID is required');
-    }
+  //   try {
+  //     // Check if user with this email already exists
+  //     const existing = await this.prisma.user.findUnique({
+  //       where: { email: data.email },
+  //     });
 
-    try {
-      // Check if user with this email already exists
-      const existing = await this.prisma.user.findUnique({
-        where: { email: data.email },
-      });
+  //     if (existing) {
+  //       this.logger.warn(`Attempt to enroll officer with existing email: ${data.email}`);
+  //       return ResponseHelper.error('User with this email already exists', null, 409);
+  //     }
 
-      if (existing) {
-        this.logger.warn(`Attempt to enroll officer with existing email: ${data.email}`);
-        throw new ConflictException('User with this email already exists');
-      }
+  //     // Generate a temporary password and hash it
+  //     const tempPassword = Math.random().toString(36).slice(-10);
+  //     const hashed = await bcrypt.hash(tempPassword, 10);
 
-      // Hash the password
-      const hashed = await bcrypt.hash(data.password, 10);
+  //     // Generate unique officer ID
+  //     const officerId = await this.generateUniqueOfficerId();
 
-      // Generate unique officer ID
-      const officerId = await this.generateUniqueOfficerId();
+  //     // Resolve stateId strictly from the enrolling user's state
+  //     const enrollingUser = await this.prisma.user.findUnique({
+  //       where: { id: enrolledByUserId },
+  //       select: { stateId: true },
+  //     });
 
-      // Get default Abia State if stateId not provided
-      let stateId = data.stateId;
-      if (!stateId) {
-        const abiaState = await this.prisma.state.findFirst({
-          where: { stateId: 'ABIA' },
-        });
-        if (!abiaState) {
-          throw new BadRequestException('Abia State not found. Please provide a stateId.');
-        }
-        stateId = abiaState.id;
-      }
+  //     if (!enrollingUser?.stateId) {
+  //       this.logger.warn('Enrolling user has no stateId. stateId is required.');
+  //       throw new BadRequestException('Enrolling user must be associated with a state to enroll a SUBEB officer');
+  //     }
 
-      // Use transaction to ensure atomicity
-      const result = await this.prisma.$transaction(async (tx) => {
-        // Create the officer user with role 'SUBEB_OFFICER'
-        const user = await tx.user.create({
-          data: {
-            email: data.email,
-            username: data.email,
-            password: hashed,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            role: UserRole.SUBEB_OFFICER,
-            stateId: stateId,
-          },
-        });
+  //     const stateId = enrollingUser.stateId;
 
-        // Create the SubebOfficer record
-        const subebOfficer = await tx.subebOfficer.create({
-          data: {
-            userId: user.id,
-            officerId: officerId,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            email: data.email,
-            phone: data.phone,
-            address: data.address,
-            designation: data.designation,
-            stateId: stateId,
-            enrolledBy: enrolledByUserId,
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-                isActive: true,
-                createdAt: true,
-              },
-            },
-            enrolledByUser: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-              },
-            },
-          },
-        });
+  //     // Use transaction to ensure atomicity
+  //     const result = await this.prisma.$transaction(async (tx) => {
+  //       // Create the officer user with role 'SUBEB_OFFICER'
+  //       const user = await tx.user.create({
+  //         data: {
+  //           email: data.email,
+  //           username: data.email,
+  //           password: hashed,
+  //           firstName: data.firstName,
+  //           lastName: data.lastName,
+  //           role: UserRole.SUBEB_OFFICER,
+  //           stateId: stateId,
+  //         },
+  //       });
 
-        // Update State counter
-        await tx.state.update({
-          where: { id: stateId },
-          data: {
-            totalOfficers: {
-              increment: 1,
-            },
-          },
-        });
+  //       // Create the SubebOfficer record
+  //       const subebOfficer = await tx.subebOfficer.create({
+  //         data: {
+  //           userId: user.id,
+  //           officerId: officerId,
+  //           firstName: data.firstName,
+  //           lastName: data.lastName,
+  //           email: data.email,
+  //           phone: data.phone,
+  //           address: data.address,
+  //           designation: data.designation,
+  //           stateId: stateId,
+  //           enrolledBy: enrolledByUserId,
+  //         },
+  //         include: {
+  //           user: {
+  //             select: {
+  //               id: true,
+  //               email: true,
+  //               username: true,
+  //               firstName: true,
+  //               lastName: true,
+  //               role: true,
+  //               isActive: true,
+  //               createdAt: true,
+  //             },
+  //           },
+  //           enrolledByUser: {
+  //             select: {
+  //               id: true,
+  //               email: true,
+  //               firstName: true,
+  //               lastName: true,
+  //               role: true,
+  //             },
+  //           },
+  //         },
+  //       });
 
-        return subebOfficer;
-      });
+  //       // Update State counter
+  //       await tx.state.update({
+  //         where: { id: stateId },
+  //         data: {
+  //           totalOfficers: {
+  //             increment: 1,
+  //           },
+  //         },
+  //       });
 
-      this.logger.log(`Enrolled SUBEB officer: ${result.email} (${result.id})`);
-      return ResponseHelper.created('SUBEB officer enrolled successfully', result);
-    } catch (error) {
-      // If we already threw a known exception, rethrow it
-      if (
-        error instanceof ConflictException ||
-        error instanceof BadRequestException
-      ) {
-        throw error;
-      }
+  //       return subebOfficer;
+  //     });
 
-      this.logger.error(
-        `Failed to enroll SUBEB officer ${data.email}: ${error?.message ?? error}`,
-      );
-      throw new InternalServerErrorException('Failed to enroll SUBEB officer');
-    }
-  }
+  //     // Send welcome email with temp password (fire-and-forget)
+  //     if (result?.email && result?.firstName && result?.lastName) {
+  //       sendSubebOfficerWelcomeEmail(result.email, {
+  //         firstName: result.firstName ?? '',
+  //         lastName: result.lastName ?? '',
+  //         email: result.email,
+  //         password: tempPassword,
+  //       }).catch(() => {
+  //         // Swallow email errors; main enrollment should still succeed
+  //       });
+  //     }
+
+  //     this.logger.log(`Enrolled SUBEB officer: ${result.email} (${result.id})`);
+  //     return ResponseHelper.created('SUBEB officer enrolled successfully', result);
+  //   } catch (error) {
+  //     // If we already threw a known exception, rethrow it
+  //     if (
+  //       error instanceof ConflictException ||
+  //       error instanceof BadRequestException
+  //     ) {
+  //       throw error;
+  //     }
+
+  //     this.logger.error(
+  //       `Failed to enroll SUBEB officer ${data.email}: ${error?.message ?? error}`,
+  //     );
+  //     throw new InternalServerErrorException('Failed to enroll SUBEB officer');
+  //   }
+  // }
 
   /**
    * Get all enrolled SUBEB officers with pagination

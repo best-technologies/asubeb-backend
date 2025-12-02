@@ -10,13 +10,16 @@ exports.AcademicModule = void 0;
 const common_1 = require("@nestjs/common");
 const session_module_1 = require("./session/session.module");
 const term_module_1 = require("./term/term.module");
+const prisma_module_1 = require("../../prisma/prisma.module");
+const academic_context_service_1 = require("./academic-context.service");
 let AcademicModule = class AcademicModule {
 };
 exports.AcademicModule = AcademicModule;
 exports.AcademicModule = AcademicModule = __decorate([
     (0, common_1.Module)({
-        imports: [session_module_1.SessionModule, term_module_1.TermModule],
-        exports: [session_module_1.SessionModule, term_module_1.TermModule],
+        imports: [session_module_1.SessionModule, term_module_1.TermModule, prisma_module_1.PrismaModule],
+        providers: [academic_context_service_1.AcademicContextService],
+        exports: [session_module_1.SessionModule, term_module_1.TermModule, academic_context_service_1.AcademicContextService],
     })
 ], AcademicModule);
 //# sourceMappingURL=academic.module.js.map

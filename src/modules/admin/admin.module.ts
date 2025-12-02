@@ -7,6 +7,7 @@ import { LgaModule } from './lga/lga.module';
 import { ExcelUploadModule } from './excel-upload/excel-upload.module';
 import { BigQueryImportModule } from './bigquery-import/bigquery-import.module';
 import { SubebOfficersModule } from './subeb-officers/subeb-officers.module';
+import { EnrollmentModule } from './enrollment/enrollment.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { SubebOfficersModule } from './subeb-officers/subeb-officers.module';
     ExcelUploadModule,
     BigQueryImportModule,
     SubebOfficersModule,
+    EnrollmentModule,
   ],
   exports: [
     DashboardModule,
@@ -28,6 +30,7 @@ import { SubebOfficersModule } from './subeb-officers/subeb-officers.module';
     ExcelUploadModule,
     BigQueryImportModule,
     SubebOfficersModule,
+    EnrollmentModule,
   ],
 })
 export class AdminModule {} 

@@ -8,14 +8,21 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var GradingService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GradingService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
-let GradingService = class GradingService {
+const response_helper_1 = require("../../common/helpers/response.helper");
+const colors = require("colors");
+const academic_context_service_1 = require("../academic/academic-context.service");
+let GradingService = GradingService_1 = class GradingService {
     prisma;
-    constructor(prisma) {
+    academicContext;
+    logger = new common_1.Logger(GradingService_1.name);
+    constructor(prisma, academicContext) {
         this.prisma = prisma;
+        this.academicContext = academicContext;
     }
     grades = [
         {
@@ -71,177 +78,160 @@ let GradingService = class GradingService {
         { grade: 'F', minScore: 0, maxScore: 49, points: 0.0 },
     ];
     async getAcademicMetadataForGradeEntry(stateId) {
-        const [currentSession, currentTerm, lgas] = await this.prisma.$transaction([
-            this.prisma.session.findFirst({
-                where: { stateId, isCurrent: true },
-            }),
-            this.prisma.term.findFirst({
-                where: { stateId, isCurrent: true },
-            }),
-            this.prisma.localGovernmentArea.findMany({
-                where: { stateId, isActive: true },
-                orderBy: { name: 'asc' },
-            }),
-        ]);
-        return {
-            stateId,
-            currentSession,
-            currentTerm,
-            localGovernments: lgas,
-        };
-    }
-    async getStudentGrades(studentId, subject, semester) {
-        let filteredGrades = this.grades.filter(g => g.studentId === studentId);
-        if (subject) {
-            filteredGrades = filteredGrades.filter(g => g.subject === subject);
+        this.logger.log(colors.magenta(`Fetching academic metadata for grade entry for state ${stateId}`));
+        try {
+            const [{ currentSession, currentTerm }, lgas] = await Promise.all([
+                this.academicContext.getCurrentSessionAndTerm(stateId),
+                this.academicContext.getLgasWithSchoolCounts(stateId),
+            ]);
+            this.logger.log(colors.green('Academic metadata for grade entry retrieved successfully'));
+            return response_helper_1.ResponseHelper.success('Academic metadata retrieved successfully', {
+                stateId,
+                currentSession,
+                currentTerm,
+                totalLocalGovernments: lgas.length,
+                localGovernments: lgas,
+            });
         }
-        if (semester) {
-            filteredGrades = filteredGrades.filter(g => g.semester === semester);
+        catch (error) {
+            this.logger.error(colors.red(`Failed to fetch academic metadata for grade entry: ${error?.message ?? error}`));
+            return response_helper_1.ResponseHelper.error('Failed to fetch academic metadata for grade entry', error?.message ?? error, 500);
         }
-        return {
-            studentId,
-            grades: filteredGrades,
-            summary: {
-                totalSubjects: filteredGrades.length,
-                averageScore: filteredGrades.reduce((sum, g) => sum + g.totalScore, 0) / filteredGrades.length,
-                highestGrade: Math.max(...filteredGrades.map(g => g.totalScore)),
-                lowestGrade: Math.min(...filteredGrades.map(g => g.totalScore)),
-            },
-        };
     }
-    async addStudentGrade(studentId, gradeData) {
-        const newGrade = {
-            id: (this.grades.length + 1).toString(),
-            studentId,
-            ...gradeData,
-            totalScore: (gradeData.assignmentScore + gradeData.examScore) / 2,
-            grade: this.calculateGrade((gradeData.assignmentScore + gradeData.examScore) / 2),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-        };
-        this.grades.push(newGrade);
-        return newGrade;
-    }
-    async updateStudentGrade(studentId, gradeId, gradeData) {
-        const gradeIndex = this.grades.findIndex(g => g.id === gradeId && g.studentId === studentId);
-        if (gradeIndex === -1) {
-            throw new common_1.NotFoundException(`Grade not found`);
+    async getSchoolsByLocalGovernment(stateId, lgaId) {
+        this.logger.log(colors.magenta(`Fetching schools for state ${stateId} and LGA ${lgaId}`));
+        try {
+            const schools = await this.academicContext.getSchoolsWithClassCounts(stateId, lgaId);
+            this.logger.log(colors.green(`Retrieved ${schools.length} schools for LGA ${lgaId}`));
+            return response_helper_1.ResponseHelper.success('Schools in LGA retrieved successfully', {
+                stateId,
+                lgaId,
+                total: schools.length,
+                schools,
+            });
         }
-        this.grades[gradeIndex] = {
-            ...this.grades[gradeIndex],
-            ...gradeData,
-            totalScore: (gradeData.assignmentScore + gradeData.examScore) / 2,
-            grade: this.calculateGrade((gradeData.assignmentScore + gradeData.examScore) / 2),
-            updatedAt: new Date().toISOString(),
-        };
-        return this.grades[gradeIndex];
-    }
-    async getClassGrades(classId, subject) {
-        let filteredGrades = this.grades;
-        if (subject) {
-            filteredGrades = filteredGrades.filter(g => g.subject === subject);
+        catch (error) {
+            this.logger.error(colors.red(`Failed to fetch schools for LGA ${lgaId}: ${error?.message ?? error}`));
+            return response_helper_1.ResponseHelper.error('Failed to fetch schools for LGA', error?.message ?? error, 500);
         }
-        return {
-            classId,
-            grades: filteredGrades,
-            summary: {
-                totalStudents: filteredGrades.length,
-                averageScore: filteredGrades.reduce((sum, g) => sum + g.totalScore, 0) / filteredGrades.length,
-                gradeDistribution: this.getGradeDistribution(filteredGrades),
-            },
-        };
     }
-    async addBulkGrades(classId, gradesData) {
-        const newGrades = gradesData.grades.map((gradeData, index) => ({
-            id: (this.grades.length + index + 1).toString(),
-            classId,
-            ...gradeData,
-            totalScore: (gradeData.assignmentScore + gradeData.examScore) / 2,
-            grade: this.calculateGrade((gradeData.assignmentScore + gradeData.examScore) / 2),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-        }));
-        this.grades.push(...newGrades);
-        return {
-            message: `${newGrades.length} grades added successfully`,
-            addedGrades: newGrades,
-        };
-    }
-    async getSubjects() {
-        return this.subjects;
-    }
-    async getGradeScales() {
-        return this.gradeScales;
-    }
-    async getClassGradeReport(classId) {
-        const classGrades = this.grades;
-        return {
-            classId,
-            reportGeneratedAt: new Date().toISOString(),
-            summary: {
-                totalStudents: classGrades.length,
-                averageScore: classGrades.reduce((sum, g) => sum + g.totalScore, 0) / classGrades.length,
-                gradeDistribution: this.getGradeDistribution(classGrades),
-                subjectPerformance: this.getSubjectPerformance(classGrades),
-            },
-            topPerformers: classGrades
-                .sort((a, b) => b.totalScore - a.totalScore)
-                .slice(0, 5),
-        };
-    }
-    async getStudentGradeReport(studentId) {
-        const studentGrades = this.grades.filter(g => g.studentId === studentId);
-        if (studentGrades.length === 0) {
-            throw new common_1.NotFoundException(`No grades found for student ${studentId}`);
+    async getClassesBySchool(stateId, schoolId) {
+        this.logger.log(colors.magenta(`Fetching classes for state ${stateId} and school ${schoolId}`));
+        try {
+            const classes = await this.academicContext.getClassesWithStudentCounts(stateId, schoolId);
+            this.logger.log(colors.green(`Retrieved ${classes.length} classes for school ${schoolId}`));
+            return response_helper_1.ResponseHelper.success('Classes in school retrieved successfully', {
+                stateId,
+                schoolId,
+                total: classes.length,
+                classes,
+            });
         }
-        return {
-            studentId,
-            reportGeneratedAt: new Date().toISOString(),
-            summary: {
-                totalSubjects: studentGrades.length,
-                averageScore: studentGrades.reduce((sum, g) => sum + g.totalScore, 0) / studentGrades.length,
-                gpa: this.calculateGPA(studentGrades),
-                gradeDistribution: this.getGradeDistribution(studentGrades),
-            },
-            subjectBreakdown: studentGrades.map(grade => ({
-                subject: grade.subject,
-                score: grade.totalScore,
-                grade: grade.grade,
-                remarks: grade.remarks,
-            })),
-        };
+        catch (error) {
+            this.logger.error(colors.red(`Failed to fetch classes for school ${schoolId}: ${error?.message ?? error}`));
+            return response_helper_1.ResponseHelper.error('Failed to fetch classes for school', error?.message ?? error, 500);
+        }
     }
-    calculateGrade(score) {
-        const gradeScale = this.gradeScales.find(gs => score >= gs.minScore && score <= gs.maxScore);
-        return gradeScale ? gradeScale.grade : 'F';
+    async fetchAllStudentsByClassId(classId) {
+        this.logger.log(colors.magenta(`Fetching students for class ${classId}`));
+        try {
+            const students = await this.prisma.student.findMany({
+                where: {
+                    classId,
+                    isActive: true,
+                },
+                select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    studentId: true,
+                    gender: true,
+                    email: true,
+                    schoolId: true,
+                    stateId: true,
+                },
+                orderBy: { lastName: 'asc' },
+            });
+            if (students.length === 0) {
+                this.logger.log(colors.yellow(`No students found for class ${classId}`));
+                return response_helper_1.ResponseHelper.success('No students found for class', {
+                    currentSession: null,
+                    currentTerm: null,
+                    stateId: null,
+                    schoolId: null,
+                    classId,
+                    total: 0,
+                    students: [],
+                });
+            }
+            const stateId = students[0].stateId;
+            const { currentSession, currentTerm } = await this.academicContext.getCurrentSessionAndTerm(stateId);
+            let studentIdsWithResults = new Set();
+            if (currentTerm) {
+                const assessments = await this.prisma.assessment.findMany({
+                    where: {
+                        classId,
+                        termId: currentTerm.id,
+                    },
+                    select: {
+                        studentId: true,
+                    },
+                });
+                studentIdsWithResults = new Set(assessments.map(a => a.studentId));
+            }
+            this.logger.log(colors.green(`Retrieved ${students.length} students for class ${classId}`));
+            const schoolId = students[0]?.schoolId ?? null;
+            return response_helper_1.ResponseHelper.success('Students in class retrieved successfully', {
+                currentSession: currentSession
+                    ? {
+                        id: currentSession.id,
+                        name: currentSession.name,
+                        isCurrent: currentSession.isCurrent,
+                    }
+                    : null,
+                currentTerm: currentTerm
+                    ? {
+                        isCurrent: currentTerm.isCurrent,
+                        name: currentTerm.name,
+                        id: currentTerm.id,
+                    }
+                    : null,
+                stateId,
+                schoolId,
+                classId,
+                total: students.length,
+                students: students.map(({ schoolId, firstName, lastName, ...rest }) => {
+                    const rawFullName = `${firstName ?? ''} ${lastName ?? ''}`.trim() || firstName || lastName || '';
+                    const formattedFullName = this.formatFullName(rawFullName);
+                    return {
+                        ...rest,
+                        firstName,
+                        lastName,
+                        fullName: formattedFullName,
+                        hasResultForActiveTerm: currentTerm ? studentIdsWithResults.has(rest.id) : false,
+                    };
+                }),
+            });
+        }
+        catch (error) {
+            this.logger.error(colors.red(`Failed to fetch students for class ${classId}: ${error?.message ?? error}`));
+            return response_helper_1.ResponseHelper.error('Failed to fetch students for class', error?.message ?? error, 500);
+        }
     }
-    getGradeDistribution(grades) {
-        const distribution = {};
-        this.gradeScales.forEach(gs => {
-            distribution[gs.grade] = grades.filter(g => g.grade === gs.grade).length;
-        });
-        return distribution;
-    }
-    getSubjectPerformance(grades) {
-        const subjectPerformance = {};
-        const subjects = [...new Set(grades.map(g => g.subject))];
-        subjects.forEach(subject => {
-            const subjectGrades = grades.filter(g => g.subject === subject);
-            subjectPerformance[subject] = subjectGrades.reduce((sum, g) => sum + g.totalScore, 0) / subjectGrades.length;
-        });
-        return subjectPerformance;
-    }
-    calculateGPA(grades) {
-        const totalPoints = grades.reduce((sum, grade) => {
-            const gradeScale = this.gradeScales.find(gs => gs.grade === grade.grade);
-            return sum + (gradeScale ? gradeScale.points : 0);
-        }, 0);
-        return totalPoints / grades.length;
+    formatFullName(name) {
+        if (!name)
+            return '';
+        return name
+            .split(/\s+/)
+            .filter(Boolean)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join(' ');
     }
 };
 exports.GradingService = GradingService;
-exports.GradingService = GradingService = __decorate([
+exports.GradingService = GradingService = GradingService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        academic_context_service_1.AcademicContextService])
 ], GradingService);
 //# sourceMappingURL=grading.service.js.map

@@ -34,14 +34,6 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
-  @Post('register-subeb-officer')
-  @ApiOperation({ summary: 'Register a new SUBEB officer (role forced to SUBEB_OFFICER)' })
-  @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: 201, description: 'SUBEB officer registered successfully' })
-  async registerSubebOfficer(@Body() dto: RegisterDto) {
-    return this.authService.registerSubebOfficer(dto);
-  }
-
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiBearerAuth()

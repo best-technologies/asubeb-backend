@@ -14,13 +14,11 @@ const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 class EnrollOfficerDto {
     email;
-    password;
     firstName;
     lastName;
     phone;
     address;
     designation;
-    stateId;
 }
 exports.EnrollOfficerDto = EnrollOfficerDto;
 __decorate([
@@ -37,11 +35,6 @@ __decorate([
         description: 'Password for the officer account',
         example: 'SecurePassword123!',
     }),
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", String)
-], EnrollOfficerDto.prototype, "password", void 0);
-__decorate([
     (0, swagger_1.ApiProperty)({
         description: 'First name of the officer',
         example: 'John',
@@ -86,13 +79,4 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], EnrollOfficerDto.prototype, "designation", void 0);
-__decorate([
-    (0, swagger_1.ApiPropertyOptional)({
-        description: 'State ID to associate the officer with',
-        example: 'state-uuid-123',
-    }),
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], EnrollOfficerDto.prototype, "stateId", void 0);
 //# sourceMappingURL=enroll-officer.dto.js.map

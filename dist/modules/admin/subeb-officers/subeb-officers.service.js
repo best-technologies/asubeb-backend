@@ -14,8 +14,6 @@ exports.SubebOfficersService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../prisma/prisma.service");
 const response_helper_1 = require("../../../common/helpers/response.helper");
-const client_1 = require("@prisma/client");
-const bcrypt = require("bcryptjs");
 let SubebOfficersService = SubebOfficersService_1 = class SubebOfficersService {
     prisma;
     logger = new common_1.Logger(SubebOfficersService_1.name);
@@ -44,107 +42,6 @@ let SubebOfficersService = SubebOfficersService_1 = class SubebOfficersService {
             throw new common_1.InternalServerErrorException('Unable to generate unique officer ID');
         }
         return officerId;
-    }
-    async enrollOfficer(data, enrolledByUserId) {
-        this.logger.log(`Enrolling SUBEB officer: ${data.email} by user: ${enrolledByUserId}`);
-        if (!data?.email || !data?.password || !data?.firstName || !data?.lastName || !data?.phone) {
-            this.logger.warn('enrollOfficer called with missing required fields');
-            throw new common_1.BadRequestException('Email, password, firstName, lastName, and phone are required');
-        }
-        if (!enrolledByUserId) {
-            this.logger.warn('enrollOfficer called without enrolledByUserId');
-            throw new common_1.BadRequestException('Enrolled by user ID is required');
-        }
-        try {
-            const existing = await this.prisma.user.findUnique({
-                where: { email: data.email },
-            });
-            if (existing) {
-                this.logger.warn(`Attempt to enroll officer with existing email: ${data.email}`);
-                throw new common_1.ConflictException('User with this email already exists');
-            }
-            const hashed = await bcrypt.hash(data.password, 10);
-            const officerId = await this.generateUniqueOfficerId();
-            let stateId = data.stateId;
-            if (!stateId) {
-                const abiaState = await this.prisma.state.findFirst({
-                    where: { stateId: 'ABIA' },
-                });
-                if (!abiaState) {
-                    throw new common_1.BadRequestException('Abia State not found. Please provide a stateId.');
-                }
-                stateId = abiaState.id;
-            }
-            const result = await this.prisma.$transaction(async (tx) => {
-                const user = await tx.user.create({
-                    data: {
-                        email: data.email,
-                        username: data.email,
-                        password: hashed,
-                        firstName: data.firstName,
-                        lastName: data.lastName,
-                        role: client_1.UserRole.SUBEB_OFFICER,
-                        stateId: stateId,
-                    },
-                });
-                const subebOfficer = await tx.subebOfficer.create({
-                    data: {
-                        userId: user.id,
-                        officerId: officerId,
-                        firstName: data.firstName,
-                        lastName: data.lastName,
-                        email: data.email,
-                        phone: data.phone,
-                        address: data.address,
-                        designation: data.designation,
-                        stateId: stateId,
-                        enrolledBy: enrolledByUserId,
-                    },
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                email: true,
-                                username: true,
-                                firstName: true,
-                                lastName: true,
-                                role: true,
-                                isActive: true,
-                                createdAt: true,
-                            },
-                        },
-                        enrolledByUser: {
-                            select: {
-                                id: true,
-                                email: true,
-                                firstName: true,
-                                lastName: true,
-                                role: true,
-                            },
-                        },
-                    },
-                });
-                await tx.state.update({
-                    where: { id: stateId },
-                    data: {
-                        totalOfficers: {
-                            increment: 1,
-                        },
-                    },
-                });
-                return subebOfficer;
-            });
-            this.logger.log(`Enrolled SUBEB officer: ${result.email} (${result.id})`);
-            return response_helper_1.ResponseHelper.created('SUBEB officer enrolled successfully', result);
-        }
-        catch (error) {
-            if (error instanceof common_1.ConflictException ||
-                error instanceof common_1.BadRequestException) {
-                throw error;
-            }
-            this.logger.error(`Failed to enroll SUBEB officer ${data.email}: ${error?.message ?? error}`);
-            throw new common_1.InternalServerErrorException('Failed to enroll SUBEB officer');
-        }
     }
     async getAllOfficers(page = 1, limit = 10, stateId) {
         this.logger.log(`Fetching SUBEB officers - page: ${page}, limit: ${limit}, stateId: ${stateId || 'all'}`);

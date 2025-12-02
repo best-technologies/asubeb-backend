@@ -30,9 +30,6 @@ let AuthController = class AuthController {
     async register(dto) {
         return this.authService.register(dto);
     }
-    async registerSubebOfficer(dto) {
-        return this.authService.registerSubebOfficer(dto);
-    }
     profile(req) {
         return this.authService.getProfile(req.user);
     }
@@ -58,16 +55,6 @@ __decorate([
     __metadata("design:paramtypes", [register_dto_1.RegisterDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "register", null);
-__decorate([
-    (0, common_1.Post)('register-subeb-officer'),
-    (0, swagger_1.ApiOperation)({ summary: 'Register a new SUBEB officer (role forced to SUBEB_OFFICER)' }),
-    (0, swagger_1.ApiBody)({ type: register_dto_1.RegisterDto }),
-    (0, swagger_1.ApiResponse)({ status: 201, description: 'SUBEB officer registered successfully' }),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [register_dto_1.RegisterDto]),
-    __metadata("design:returntype", Promise)
-], AuthController.prototype, "registerSubebOfficer", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)('profile'),

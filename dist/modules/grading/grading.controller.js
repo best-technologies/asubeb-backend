@@ -17,50 +17,23 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const grading_service_1 = require("./grading.service");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const grading_metadata_dto_1 = require("./dto/grading-metadata.dto");
 let GradingController = class GradingController {
     gradingService;
     constructor(gradingService) {
         this.gradingService = gradingService;
     }
     async fetchAcademicMetadataForGradeEntry(req) {
-        const user = req.user;
-        if (!user) {
-            throw new common_1.ForbiddenException('User not authenticated');
-        }
-        if (user.role !== 'SUBEB_OFFICER') {
-            throw new common_1.ForbiddenException('Only SUBEB_OFFICER can access this resource');
-        }
-        if (!user.stateId) {
-            throw new common_1.BadRequestException('User state not found');
-        }
-        return this.gradingService.getAcademicMetadataForGradeEntry(user.stateId);
+        return this.gradingService.getAcademicMetadataForGradeEntry(req.user.stateId);
     }
-    async getStudentGrades(studentId, subject, semester) {
-        return this.gradingService.getStudentGrades(studentId, subject, semester);
+    async fetchSchoolsByLocalGovernment(req, lgaId) {
+        return this.gradingService.getSchoolsByLocalGovernment(req.user.stateId, lgaId);
     }
-    async addStudentGrade(studentId, gradeData) {
-        return this.gradingService.addStudentGrade(studentId, gradeData);
+    async fetchClassesBySchool(req, schoolId) {
+        return this.gradingService.getClassesBySchool(req.user.stateId, schoolId);
     }
-    async updateStudentGrade(studentId, gradeId, gradeData) {
-        return this.gradingService.updateStudentGrade(studentId, gradeId, gradeData);
-    }
-    async getClassGrades(classId, subject) {
-        return this.gradingService.getClassGrades(classId, subject);
-    }
-    async addBulkGrades(classId, gradesData) {
-        return this.gradingService.addBulkGrades(classId, gradesData);
-    }
-    async getSubjects() {
-        return this.gradingService.getSubjects();
-    }
-    async getGradeScales() {
-        return this.gradingService.getGradeScales();
-    }
-    async getClassGradeReport(classId) {
-        return this.gradingService.getClassGradeReport(classId);
-    }
-    async getStudentGradeReport(studentId) {
-        return this.gradingService.getStudentGradeReport(studentId);
+    async fetchAllStudentsByClassId(req, classId) {
+        return this.gradingService.fetchAllStudentsByClassId(classId);
     }
 };
 exports.GradingController = GradingController;
@@ -74,102 +47,47 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], GradingController.prototype, "fetchAcademicMetadataForGradeEntry", null);
 __decorate([
-    (0, common_1.Get)('students/:studentId/grades'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get student grades' }),
-    (0, swagger_1.ApiParam)({ name: 'studentId', description: 'Student ID' }),
-    (0, swagger_1.ApiQuery)({ name: 'subject', required: false, description: 'Filter by subject' }),
-    (0, swagger_1.ApiQuery)({ name: 'semester', required: false, description: 'Filter by semester' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Student grades retrieved successfully' }),
-    __param(0, (0, common_1.Param)('studentId')),
-    __param(1, (0, common_1.Query)('subject')),
-    __param(2, (0, common_1.Query)('semester')),
+    (0, common_1.Get)('metadata/lgas/:lgaId/schools'),
+    (0, swagger_1.ApiOperation)({ summary: 'Fetch all schools under a selected LGA for grade entry (SUBEB_OFFICER only)' }),
+    (0, swagger_1.ApiParam)({ name: 'lgaId', description: 'Local Government Area ID' }),
+    (0, swagger_1.ApiOkResponse)({
+        description: 'Schools under the selected LGA retrieved successfully',
+        type: grading_metadata_dto_1.GradeEntrySchoolsResponseDto,
+    }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('lgaId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
-], GradingController.prototype, "getStudentGrades", null);
+], GradingController.prototype, "fetchSchoolsByLocalGovernment", null);
 __decorate([
-    (0, common_1.Post)('students/:studentId/grades'),
-    (0, swagger_1.ApiOperation)({ summary: 'Add student grade' }),
-    (0, swagger_1.ApiParam)({ name: 'studentId', description: 'Student ID' }),
-    (0, swagger_1.ApiResponse)({ status: 201, description: 'Grade added successfully' }),
-    __param(0, (0, common_1.Param)('studentId')),
-    __param(1, (0, common_1.Body)()),
+    (0, common_1.Get)('metadata/schools/:schoolId/classes'),
+    (0, swagger_1.ApiOperation)({ summary: 'Fetch all classes under a selected school for grade entry (SUBEB_OFFICER only)' }),
+    (0, swagger_1.ApiParam)({ name: 'schoolId', description: 'School ID' }),
+    (0, swagger_1.ApiOkResponse)({
+        description: 'Classes under the selected school retrieved successfully',
+        type: grading_metadata_dto_1.GradeEntryClassesResponseDto,
+    }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('schoolId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
-], GradingController.prototype, "addStudentGrade", null);
+], GradingController.prototype, "fetchClassesBySchool", null);
 __decorate([
-    (0, common_1.Put)('students/:studentId/grades/:gradeId'),
-    (0, swagger_1.ApiOperation)({ summary: 'Update student grade' }),
-    (0, swagger_1.ApiParam)({ name: 'studentId', description: 'Student ID' }),
-    (0, swagger_1.ApiParam)({ name: 'gradeId', description: 'Grade ID' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Grade updated successfully' }),
-    __param(0, (0, common_1.Param)('studentId')),
-    __param(1, (0, common_1.Param)('gradeId')),
-    __param(2, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Object]),
-    __metadata("design:returntype", Promise)
-], GradingController.prototype, "updateStudentGrade", null);
-__decorate([
-    (0, common_1.Get)('classes/:classId/grades'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get class grades' }),
+    (0, common_1.Get)('metadata/classes/:classId/students'),
+    (0, swagger_1.ApiOperation)({ summary: 'Fetch all students under a selected class for grade entry (SUBEB_OFFICER only)' }),
     (0, swagger_1.ApiParam)({ name: 'classId', description: 'Class ID' }),
-    (0, swagger_1.ApiQuery)({ name: 'subject', required: false, description: 'Filter by subject' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Class grades retrieved successfully' }),
-    __param(0, (0, common_1.Param)('classId')),
-    __param(1, (0, common_1.Query)('subject')),
+    (0, swagger_1.ApiOkResponse)({
+        description: 'Students under the selected class retrieved successfully',
+        type: grading_metadata_dto_1.GradeEntryStudentsResponseDto,
+    }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('classId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
-], GradingController.prototype, "getClassGrades", null);
-__decorate([
-    (0, common_1.Post)('classes/:classId/grades/bulk'),
-    (0, swagger_1.ApiOperation)({ summary: 'Add bulk grades for class' }),
-    (0, swagger_1.ApiParam)({ name: 'classId', description: 'Class ID' }),
-    (0, swagger_1.ApiResponse)({ status: 201, description: 'Bulk grades added successfully' }),
-    __param(0, (0, common_1.Param)('classId')),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", Promise)
-], GradingController.prototype, "addBulkGrades", null);
-__decorate([
-    (0, common_1.Get)('subjects'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get all subjects' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Subjects retrieved successfully' }),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], GradingController.prototype, "getSubjects", null);
-__decorate([
-    (0, common_1.Get)('grade-scales'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get grade scales' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Grade scales retrieved successfully' }),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], GradingController.prototype, "getGradeScales", null);
-__decorate([
-    (0, common_1.Get)('reports/class/:classId'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get class grade report' }),
-    (0, swagger_1.ApiParam)({ name: 'classId', description: 'Class ID' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Class grade report generated successfully' }),
-    __param(0, (0, common_1.Param)('classId')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], GradingController.prototype, "getClassGradeReport", null);
-__decorate([
-    (0, common_1.Get)('reports/student/:studentId'),
-    (0, swagger_1.ApiOperation)({ summary: 'Get student grade report' }),
-    (0, swagger_1.ApiParam)({ name: 'studentId', description: 'Student ID' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'Student grade report generated successfully' }),
-    __param(0, (0, common_1.Param)('studentId')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], GradingController.prototype, "getStudentGradeReport", null);
+], GradingController.prototype, "fetchAllStudentsByClassId", null);
 exports.GradingController = GradingController = __decorate([
     (0, swagger_1.ApiTags)('grading'),
     (0, swagger_1.ApiBearerAuth)(),

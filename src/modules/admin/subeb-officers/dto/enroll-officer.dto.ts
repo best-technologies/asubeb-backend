@@ -14,9 +14,8 @@ export class EnrollOfficerDto {
     description: 'Password for the officer account',
     example: 'SecurePassword123!',
   })
-  @IsString()
-  @IsNotEmpty()
-  password: string;
+  // Password is now generated automatically on the server side.
+  // Field kept only in Swagger description for legacy docs; it is NOT required in the payload.
 
   @ApiProperty({
     description: 'First name of the officer',
@@ -58,12 +57,7 @@ export class EnrollOfficerDto {
   @IsOptional()
   designation?: string;
 
-  @ApiPropertyOptional({
-    description: 'State ID to associate the officer with',
-    example: 'state-uuid-123',
-  })
-  @IsString()
-  @IsOptional()
-  stateId?: string;
+  // stateId is derived from the currently signed-in (enrolling) user on the server side
+  // and should NOT be sent from the client.
 }
 

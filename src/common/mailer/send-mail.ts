@@ -8,7 +8,7 @@ interface SendMailProps {
   html: string;
 }
 
-// Create a reusable transporter with connection pooling and proper timeouts
+// Reusable transporter (simple Gmail SMTP config, similar to other project)
 let cachedTransporter: nodemailer.Transporter | null = null;
 
 function getTransporter(): nodemailer.Transporter {
@@ -20,47 +20,30 @@ function getTransporter(): nodemailer.Transporter {
     throw new Error('SMTP credentials missing in environment variables');
   }
 
-  const port = process.env.GOOGLE_SMTP_PORT ? parseInt(process.env.GOOGLE_SMTP_PORT) : 587;
-  const isSecure = port === 465;
   const host = process.env.GOOGLE_SMTP_HOST || 'smtp.gmail.com';
-  
+  const port = process.env.GOOGLE_SMTP_PORT ? parseInt(process.env.GOOGLE_SMTP_PORT) : 587;
+
   // Log email configuration (mask password for security)
   const emailUser = process.env.EMAIL_USER;
-  const emailPassword = process.env.EMAIL_PASSWORD 
+  const emailPassword = process.env.EMAIL_PASSWORD
     ? `${process.env.EMAIL_PASSWORD.substring(0, 4)}****${process.env.EMAIL_PASSWORD.substring(process.env.EMAIL_PASSWORD.length - 2)}`
     : 'NOT_SET';
-  
-  console.log(`[Email Config] Creating SMTP transporter: Host=${host}, Port=${port}, Secure=${isSecure}, User=${emailUser}, Password=${emailPassword}`);
-  
+
+  console.log(
+    `[Email Config] Creating SMTP transporter: service=gmail, Host=${host}, Port=${port}, Secure=false, ` +
+      `User=${emailUser}, Password=${emailPassword}`,
+  );
+
+  // Simple Gmail-style configuration (matches your working project)
   cachedTransporter = nodemailer.createTransport({
-    host: host,
-    port: port,
-    secure: isSecure, // true for 465, false for other ports
+    service: 'gmail',
+    host,
+    port,
+    secure: false, // same as your other project; STARTTLS is negotiated on 587
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,
     },
-    // Connection timeout settings optimized for cloud environments
-    connectionTimeout: 60000, // 60 seconds to establish connection (increased for cloud)
-    socketTimeout: 60000, // 60 seconds for socket operations
-    greetingTimeout: 30000, // 30 seconds for SMTP greeting
-    // Enable connection pooling for better performance
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
-    // Retry configuration for transient failures
-    retry: {
-      attempts: 2,
-      delay: 3000, // 3 seconds between retries
-    },
-    // TLS options for better compatibility with cloud platforms
-    tls: {
-      rejectUnauthorized: true, // Verify certificates (set to false only if needed for testing)
-      minVersion: 'TLSv1.2', // Use modern TLS version
-    },
-    // Debug mode (set to true for verbose logging in development)
-    debug: process.env.NODE_ENV === 'development',
-    logger: process.env.NODE_ENV === 'development',
   } as nodemailer.TransportOptions);
 
   return cachedTransporter;

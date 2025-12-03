@@ -56,7 +56,7 @@ __decorate([
 ], EnrollmentController.prototype, "healthCheck", null);
 __decorate([
     (0, common_1.Get)('students/enrollment/metadata'),
-    (0, roles_decorator_1.Roles)('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN'),
+    (0, roles_decorator_1.Roles)('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN', 'SUBEB_OFFICER'),
     (0, swagger_1.ApiOperation)({ summary: 'Fetch academic metadata for student enrollment (current user state)' }),
     (0, swagger_1.ApiOkResponse)({
         description: 'Student enrollment metadata retrieved successfully',
@@ -69,7 +69,7 @@ __decorate([
 ], EnrollmentController.prototype, "getStudentEnrollmentMetadata", null);
 __decorate([
     (0, common_1.Get)('students/enrollment/lgas/:lgaId/schools'),
-    (0, roles_decorator_1.Roles)('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN'),
+    (0, roles_decorator_1.Roles)('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN', 'SUBEB_OFFICER'),
     (0, swagger_1.ApiOperation)({ summary: 'Fetch schools under an LGA for student enrollment' }),
     (0, swagger_1.ApiParam)({ name: 'lgaId', description: 'Local Government Area ID' }),
     (0, swagger_1.ApiOkResponse)({
@@ -84,7 +84,7 @@ __decorate([
 ], EnrollmentController.prototype, "getSchoolsForStudentEnrollment", null);
 __decorate([
     (0, common_1.Get)('students/enrollment/schools/:schoolId/classes'),
-    (0, roles_decorator_1.Roles)('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN'),
+    (0, roles_decorator_1.Roles)('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN', 'SUBEB_OFFICER'),
     (0, swagger_1.ApiOperation)({ summary: 'Fetch classes under a school for student enrollment' }),
     (0, swagger_1.ApiParam)({ name: 'schoolId', description: 'School ID' }),
     (0, swagger_1.ApiOkResponse)({
@@ -99,7 +99,7 @@ __decorate([
 ], EnrollmentController.prototype, "getClassesForStudentEnrollment", null);
 __decorate([
     (0, common_1.Post)('subeb-officers/enroll'),
-    (0, roles_decorator_1.Roles)('SUBEB_ADMIN', 'ADMIN', 'SUPER_ADMIN'),
+    (0, roles_decorator_1.Roles)('SUBEB_ADMIN', 'ADMIN', 'SUPER_ADMIN', 'SUBEB_OFFICER'),
     (0, swagger_1.ApiOperation)({ summary: 'Enroll a new SUBEB officer (role forced to SUBEB_OFFICER)' }),
     (0, swagger_1.ApiBody)({ type: dto_1.EnrollOfficerDto }),
     (0, swagger_1.ApiResponse)({
@@ -115,7 +115,7 @@ __decorate([
 ], EnrollmentController.prototype, "enrollNewSubebOfficer", null);
 __decorate([
     (0, common_1.Post)('students/enrollsingleorbulkstudents'),
-    (0, roles_decorator_1.Roles)('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN'),
+    (0, roles_decorator_1.Roles)('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN', 'SUBEB_OFFICER'),
     (0, swagger_1.ApiOperation)({ summary: 'Enroll single or multiple students into a school and class' }),
     (0, swagger_1.ApiBody)({ type: enroll_student_dto_1.EnrollSingleOrBulkStudentsDto }),
     (0, swagger_1.ApiResponse)({

@@ -112,6 +112,7 @@ model State {
   subebOfficers        SubebOfficer[]
   sessions             Session[]
   terms                Term[]
+  subjects             Subject[]
 
   @@map("states")
 }
@@ -289,19 +290,24 @@ model Parent {
 // Subject model
 model Subject {
   id          String      @id @default(cuid())
-  name        String      @unique
-  code        String      @unique
+  name        String
+  code        String
   level       SchoolLevel
   description String?
   isActive    Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  // Required relation to State
+  stateId     String
+  stateRef    State       @relation(fields: [stateId], references: [id])
 
   // Relations
   classSubjects   ClassSubject[]
   teacherSubjects TeacherSubject[]
   assessments     Assessment[]
 
+  @@unique([stateId, name, level]) // Unique name per state and level (allows same name for PRIMARY and SECONDARY)
+  @@unique([stateId, code, level]) // Unique code per state and level
   @@map("subjects")
 }
 

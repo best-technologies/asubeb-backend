@@ -28,7 +28,7 @@ export class EnrollmentController {
   }
 
   @Get('students/enrollment/metadata')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN', 'SUBEB_OFFICER')
   @ApiOperation({ summary: 'Fetch academic metadata for student enrollment (current user state)' })
   @ApiOkResponse({
     description: 'Student enrollment metadata retrieved successfully',
@@ -39,7 +39,7 @@ export class EnrollmentController {
   }
 
   @Get('students/enrollment/lgas/:lgaId/schools')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN', 'SUBEB_OFFICER')
   @ApiOperation({ summary: 'Fetch schools under an LGA for student enrollment' })
   @ApiParam({ name: 'lgaId', description: 'Local Government Area ID' })
   @ApiOkResponse({
@@ -51,7 +51,7 @@ export class EnrollmentController {
   }
 
   @Get('students/enrollment/schools/:schoolId/classes')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN', 'SUBEB_OFFICER')
   @ApiOperation({ summary: 'Fetch classes under a school for student enrollment' })
   @ApiParam({ name: 'schoolId', description: 'School ID' })
   @ApiOkResponse({
@@ -63,7 +63,7 @@ export class EnrollmentController {
   }
 
   @Post('subeb-officers/enroll')
-  @Roles('SUBEB_ADMIN', 'ADMIN', 'SUPER_ADMIN')
+  @Roles('SUBEB_ADMIN', 'ADMIN', 'SUPER_ADMIN', 'SUBEB_OFFICER')
   @ApiOperation({ summary: 'Enroll a new SUBEB officer (role forced to SUBEB_OFFICER)' })
   @ApiBody({ type: EnrollOfficerDto })
   @ApiResponse({
@@ -76,7 +76,7 @@ export class EnrollmentController {
   }
 
   @Post('students/enrollsingleorbulkstudents')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN', 'SUBEB_OFFICER')
   @ApiOperation({ summary: 'Enroll single or multiple students into a school and class' })
   @ApiBody({ type: EnrollSingleOrBulkStudentsDto })
   @ApiResponse({

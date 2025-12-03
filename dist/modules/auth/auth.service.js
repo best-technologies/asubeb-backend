@@ -18,14 +18,16 @@ const bcrypt = require("bcryptjs");
 const response_helper_1 = require("../../common/helpers/response.helper");
 const client_1 = require("@prisma/client");
 const colors = require("colors");
-const send_mail_1 = require("../../common/mailer/send-mail");
+const mail_service_1 = require("../../common/mailer/mail.service");
 let AuthService = AuthService_1 = class AuthService {
     prisma;
     jwtService;
+    mailService;
     logger = new common_1.Logger(AuthService_1.name);
-    constructor(prisma, jwtService) {
+    constructor(prisma, jwtService, mailService) {
         this.prisma = prisma;
         this.jwtService = jwtService;
+        this.mailService = mailService;
     }
     async validateUser(email, pass) {
         if (!email || !pass) {
@@ -164,12 +166,14 @@ let AuthService = AuthService_1 = class AuthService {
         }, client_1.UserRole.SUBEB_OFFICER);
         const user = result?.data;
         if (user?.email && user?.firstName && user?.lastName) {
-            (0, send_mail_1.sendSubebOfficerWelcomeEmail)(user.email, {
+            this.mailService
+                .sendSubebOfficerWelcomeEmail(user.email, {
                 firstName: user.firstName ?? '',
                 lastName: user.lastName ?? '',
                 email: user.email,
                 password: tempPassword,
-            }).catch(() => {
+            })
+                .catch(() => {
             });
         }
         return result;
@@ -181,6 +185,8 @@ let AuthService = AuthService_1 = class AuthService {
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = AuthService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, jwt_1.JwtService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        jwt_1.JwtService,
+        mail_service_1.MailService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

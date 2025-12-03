@@ -1,12 +1,14 @@
 import { PrismaService } from '../../../prisma/prisma.service';
+import { MailService } from '../../../common/mailer/mail.service';
 import { EnrollOfficerDto } from '../subeb-officers/dto';
 import { AcademicContextService } from '../../academic/academic-context.service';
 import { EnrollSingleOrBulkStudentsDto } from './dto/enroll-student.dto';
 export declare class EnrollmentService {
     private readonly prisma;
     private readonly academicContext;
+    private readonly mailService;
     private readonly logger;
-    constructor(prisma: PrismaService, academicContext: AcademicContextService);
+    constructor(prisma: PrismaService, academicContext: AcademicContextService, mailService: MailService);
     healthCheck(): Promise<{
         ok: boolean;
     }>;

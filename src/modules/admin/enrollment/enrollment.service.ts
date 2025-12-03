@@ -11,7 +11,7 @@ import { ResponseHelper } from '../../../common/helpers/response.helper';
 import { Gender, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import * as colors from 'colors';
-import { sendSubebOfficerWelcomeEmail } from '../../../common/mailer/send-mail';
+import { MailService } from '../../../common/mailer/mail.service';
 import { EnrollOfficerDto } from '../subeb-officers/dto';
 import { AcademicContextService } from '../../academic/academic-context.service';
 import { EnrollSingleOrBulkStudentsDto, EnrollStudentDto } from './dto/enroll-student.dto';
@@ -23,6 +23,7 @@ export class EnrollmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly academicContext: AcademicContextService,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -242,7 +243,7 @@ export class EnrollmentService {
       
       try {
         // Send email with timeout wrapper to prevent indefinite hanging
-        const emailPromise = sendSubebOfficerWelcomeEmail(result.email, {
+        const emailPromise = this.mailService.sendSubebOfficerWelcomeEmail(result.email, {
           firstName: result.firstName ?? '',
           lastName: result.lastName ?? '',
           email: result.email,

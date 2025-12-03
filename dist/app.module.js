@@ -18,6 +18,7 @@ const auth_module_1 = require("./modules/auth/auth.module");
 const grading_module_1 = require("./modules/grading/grading.module");
 const academic_module_1 = require("./modules/academic/academic.module");
 const config_2 = require("./config");
+const mail_module_1 = require("./common/mailer/mail.module");
 const validation_1 = require("./config/validation");
 let AppModule = class AppModule {
 };
@@ -32,6 +33,7 @@ exports.AppModule = AppModule = __decorate([
                 validate: validation_1.validate,
             }),
             prisma_module_1.PrismaModule,
+            mail_module_1.MailModule,
             health_module_1.HealthModule,
             admin_module_1.AdminModule,
             auth_module_1.AuthModule,

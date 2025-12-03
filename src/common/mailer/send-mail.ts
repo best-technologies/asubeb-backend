@@ -1,79 +1,21 @@
-import * as nodemailer from 'nodemailer';
+import { SendMailProps, EmailProvider } from './providers/mail-provider.interface';
+import { getEmailProvider, sendWithGmail } from './providers/gmail.provider';
+import { sendWithSendGrid } from './providers/sendgrid.provider';
+import { sendWithResend } from './providers/resend.provider';
 import { studentResultEmailTemplate, StudentResultEmailPayload } from '../helpers/email-templates/student-result.template';
 import { subebOfficerWelcomeEmailTemplate, SubebOfficerWelcomeEmailPayload } from '../helpers/email-templates/subeb-officer-welcome.template';
-
-interface SendMailProps {
-  to: string;
-  subject: string;
-  html: string;
-}
-
-// Reusable transporter (simple Gmail SMTP config, similar to other project)
-let cachedTransporter: nodemailer.Transporter | null = null;
-
-function getTransporter(): nodemailer.Transporter {
-  if (cachedTransporter) {
-    return cachedTransporter;
-  }
-
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-    throw new Error('SMTP credentials missing in environment variables');
-  }
-
-  const host = process.env.GOOGLE_SMTP_HOST || 'smtp.gmail.com';
-  const port = process.env.GOOGLE_SMTP_PORT ? parseInt(process.env.GOOGLE_SMTP_PORT) : 587;
-
-  // Log email configuration (mask password for security)
-  const emailUser = process.env.EMAIL_USER;
-  const emailPassword = process.env.EMAIL_PASSWORD
-    ? `${process.env.EMAIL_PASSWORD.substring(0, 4)}****${process.env.EMAIL_PASSWORD.substring(process.env.EMAIL_PASSWORD.length - 2)}`
-    : 'NOT_SET';
-
-  console.log(
-    `[Email Config] Creating SMTP transporter: service=gmail, Host=${host}, Port=${port}, Secure=false, ` +
-      `User=${emailUser}, Password=${emailPassword}`,
-  );
-
-  // Simple Gmail-style configuration (matches your working project)
-  cachedTransporter = nodemailer.createTransport({
-    service: 'gmail',
-    host,
-    port,
-    secure: false, // same as your other project; STARTTLS is negotiated on 587
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
-    },
-  } as nodemailer.TransportOptions);
-
-  return cachedTransporter;
-}
+// Facade that chooses the right provider implementation based on EMAIL_PROVIDER
 
 export async function sendMail({ to, subject, html }: SendMailProps): Promise<void> {
-  const transporter = getTransporter();
-
-  const mailOptions = {
-    from: {
-      name: 'ASUBEB',
-      address: process.env.EMAIL_USER as string,
-    },
-    to,
-    subject,
-    html,
-  };
+  const provider = getEmailProvider();
 
   try {
-    // Verify connection before sending (optional, can be removed if too slow)
-    // await transporter.verify();
-    
-    const info = await transporter.sendMail(mailOptions);
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Email sent successfully:', {
-        messageId: info.messageId,
-        to,
-        subject,
-      });
+    if (provider === 'sendgrid') {
+      await sendWithSendGrid({ to, subject, html });
+    } else if (provider === 'resend') {
+      await sendWithResend({ to, subject, html });
+    } else {
+      await sendWithGmail({ to, subject, html });
     }
   } catch (error: any) {
     // Log detailed error information
@@ -85,6 +27,7 @@ export async function sendMail({ to, subject, html }: SendMailProps): Promise<vo
       responseCode: error?.responseCode,
       to,
       subject,
+      provider,
     };
 
     console.error('Email sending failed:', errorDetails);

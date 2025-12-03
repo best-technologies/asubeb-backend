@@ -14,7 +14,7 @@ import { ResponseHelper } from '../../common/helpers/response.helper';
 import { UserRole } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
 import * as colors from 'colors';
-import { sendSubebOfficerWelcomeEmail } from '../../common/mailer/send-mail';
+import { MailService } from '../../common/mailer/mail.service';
 
 export type SafeUser = { id: string; email: string; role: string; firstName?: string | null; lastName?: string | null };
 
@@ -22,7 +22,11 @@ export type SafeUser = { id: string; email: string; role: string; firstName?: st
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  constructor(private prisma: PrismaService, private jwtService: JwtService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+    private readonly mailService: MailService,
+  ) {}
 
   /**
    * Validate user credentials.
@@ -211,14 +215,16 @@ export class AuthService {
 
     const user = result?.data as SafeUser | undefined;
     if (user?.email && user?.firstName && user?.lastName) {
-      sendSubebOfficerWelcomeEmail(user.email, {
-        firstName: user.firstName ?? '',
-        lastName: user.lastName ?? '',
-        email: user.email,
-        password: tempPassword,
-      }).catch(() => {
-        // Swallow email errors; main registration should still succeed
-      });
+      this.mailService
+        .sendSubebOfficerWelcomeEmail(user.email, {
+          firstName: user.firstName ?? '',
+          lastName: user.lastName ?? '',
+          email: user.email,
+          password: tempPassword,
+        })
+        .catch(() => {
+          // Swallow email errors; main registration should still succeed
+        });
     }
 
     return result;

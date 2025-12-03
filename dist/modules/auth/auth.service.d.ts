@@ -2,6 +2,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
+import { MailService } from '../../common/mailer/mail.service';
 export type SafeUser = {
     id: string;
     email: string;
@@ -12,8 +13,9 @@ export type SafeUser = {
 export declare class AuthService {
     private prisma;
     private jwtService;
+    private readonly mailService;
     private readonly logger;
-    constructor(prisma: PrismaService, jwtService: JwtService);
+    constructor(prisma: PrismaService, jwtService: JwtService, mailService: MailService);
     validateUser(email: string, pass: string): Promise<SafeUser | null>;
     authenticate(email: string, password: string): Promise<{
         success: boolean;

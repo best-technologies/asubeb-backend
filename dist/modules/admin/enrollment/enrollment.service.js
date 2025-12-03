@@ -17,15 +17,17 @@ const response_helper_1 = require("../../../common/helpers/response.helper");
 const client_1 = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 const colors = require("colors");
-const send_mail_1 = require("../../../common/mailer/send-mail");
+const mail_service_1 = require("../../../common/mailer/mail.service");
 const academic_context_service_1 = require("../../academic/academic-context.service");
 let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
     prisma;
     academicContext;
+    mailService;
     logger = new common_1.Logger(EnrollmentService_1.name);
-    constructor(prisma, academicContext) {
+    constructor(prisma, academicContext, mailService) {
         this.prisma = prisma;
         this.academicContext = academicContext;
+        this.mailService = mailService;
     }
     async healthCheck() {
         this.logger.log(colors.green('EnrollmentService is up'));
@@ -150,7 +152,7 @@ let EnrollmentService = EnrollmentService_1 = class EnrollmentService {
             const smtpPort = process.env.GOOGLE_SMTP_PORT;
             this.logger.log(colors.cyan(`Email configuration: Host=${smtpHost}, Port=${smtpPort}, User=${emailUser}, Password=${emailPassword}`));
             try {
-                const emailPromise = (0, send_mail_1.sendSubebOfficerWelcomeEmail)(result.email, {
+                const emailPromise = this.mailService.sendSubebOfficerWelcomeEmail(result.email, {
                     firstName: result.firstName ?? '',
                     lastName: result.lastName ?? '',
                     email: result.email,
@@ -406,6 +408,7 @@ exports.EnrollmentService = EnrollmentService;
 exports.EnrollmentService = EnrollmentService = EnrollmentService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        academic_context_service_1.AcademicContextService])
+        academic_context_service_1.AcademicContextService,
+        mail_service_1.MailService])
 ], EnrollmentService);
 //# sourceMappingURL=enrollment.service.js.map

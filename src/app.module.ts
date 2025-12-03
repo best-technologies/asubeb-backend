@@ -9,6 +9,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { GradingModule } from './modules/grading/grading.module';
 import { AcademicModule } from './modules/academic/academic.module';
 import { databaseConfig, appConfig } from './config';
+import { MailModule } from './common/mailer/mail.module';
 import { validate } from './config/validation';
 
 @Module({
@@ -20,6 +21,7 @@ import { validate } from './config/validation';
       validate,
     }),
     PrismaModule,
+    MailModule,
     HealthModule,
     AdminModule,
   AuthModule,

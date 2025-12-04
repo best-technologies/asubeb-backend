@@ -80,10 +80,39 @@ let GradingService = GradingService_1 = class GradingService {
     async getAcademicMetadataForGradeEntry(stateId) {
         this.logger.log(colors.magenta(`Fetching academic metadata for grade entry for state ${stateId}`));
         try {
-            const [{ currentSession, currentTerm }, lgas] = await Promise.all([
+            const [{ currentSession, currentTerm }, lgas, subjects] = await Promise.all([
                 this.academicContext.getCurrentSessionAndTerm(stateId),
                 this.academicContext.getLgasWithSchoolCounts(stateId),
+                this.prisma.subject.findMany({
+                    where: {
+                        stateId,
+                        isActive: true,
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        code: true,
+                        level: true,
+                        description: true,
+                    },
+                    orderBy: [
+                        { level: 'asc' },
+                        { name: 'asc' },
+                    ],
+                }),
             ]);
+            const primarySubjects = subjects.filter((s) => s.level === 'PRIMARY');
+            const secondarySubjects = subjects.filter((s) => s.level === 'SECONDARY');
+            const subjectsByLevel = {
+                primary: {
+                    count: primarySubjects.length,
+                    subjects: primarySubjects,
+                },
+                secondary: {
+                    count: secondarySubjects.length,
+                    subjects: secondarySubjects,
+                },
+            };
             this.logger.log(colors.green('Academic metadata for grade entry retrieved successfully'));
             return response_helper_1.ResponseHelper.success('Academic metadata retrieved successfully', {
                 stateId,
@@ -91,6 +120,8 @@ let GradingService = GradingService_1 = class GradingService {
                 currentTerm,
                 totalLocalGovernments: lgas.length,
                 localGovernments: lgas,
+                totalSubjects: subjects.length,
+                subjects: subjectsByLevel,
             });
         }
         catch (error) {
@@ -226,6 +257,201 @@ let GradingService = GradingService_1 = class GradingService {
             .filter(Boolean)
             .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
             .join(' ');
+    }
+    async uploadResults(stateId, uploadData) {
+        this.logger.log(colors.magenta(`Uploading results for ${uploadData.students.length} students in class ${uploadData.classId}`));
+        const successfulStudents = [];
+        const failedStudents = [];
+        try {
+            const session = await this.prisma.session.findFirst({
+                where: {
+                    id: uploadData.sessionId,
+                    stateId: stateId,
+                },
+            });
+            if (!session) {
+                this.logger.error(colors.red(`Session with ID ${uploadData.sessionId} not found or does not belong to this state`));
+                return response_helper_1.ResponseHelper.error('Session not found or does not belong to this state', `Session with ID ${uploadData.sessionId} not found or does not belong to this state`, 400);
+            }
+            const term = await this.prisma.term.findFirst({
+                where: {
+                    id: uploadData.termId,
+                    sessionId: uploadData.sessionId,
+                    stateId: stateId,
+                },
+            });
+            if (!term) {
+                this.logger.error(colors.red(`Term with ID ${uploadData.termId} not found or does not belong to the specified session`));
+                return response_helper_1.ResponseHelper.error('Term not found or does not belong to the specified session', `Term with ID ${uploadData.termId} not found or does not belong to the specified session`, 400);
+            }
+            const lga = await this.prisma.localGovernmentArea.findFirst({
+                where: {
+                    id: uploadData.lgaId,
+                    stateId: stateId,
+                },
+            });
+            if (!lga) {
+                this.logger.error(colors.red(`LGA not found or does not belong to this state`));
+                return response_helper_1.ResponseHelper.error('LGA not found or does not belong to this state', 400);
+            }
+            const school = await this.prisma.school.findFirst({
+                where: {
+                    id: uploadData.schoolId,
+                    lgaId: uploadData.lgaId,
+                    stateId: stateId,
+                },
+            });
+            if (!school) {
+                this.logger.error(colors.red(`School not found or does not belong to the specified LGA`));
+                return response_helper_1.ResponseHelper.error('School not found or does not belong to the specified LGA', 400);
+            }
+            const classRecord = await this.prisma.class.findFirst({
+                where: {
+                    id: uploadData.classId,
+                    schoolId: uploadData.schoolId,
+                },
+            });
+            if (!classRecord) {
+                this.logger.error(colors.red(`Class not found or does not belong to the specified school`));
+                return response_helper_1.ResponseHelper.error('Class not found or does not belong to the specified school', 400);
+            }
+            const validSubjects = await this.prisma.subject.findMany({
+                where: {
+                    stateId: stateId,
+                    isActive: true,
+                },
+                select: {
+                    id: true,
+                },
+            });
+            const validSubjectIds = new Set(validSubjects.map((s) => s.id));
+            this.logger.log(colors.magenta(`Processing ${uploadData.students.length} students`));
+            for (const studentData of uploadData.students) {
+                try {
+                    const student = await this.prisma.student.findFirst({
+                        where: {
+                            id: studentData.studentId,
+                            classId: uploadData.classId,
+                            schoolId: uploadData.schoolId,
+                            isActive: true,
+                        },
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            studentId: true,
+                        },
+                    });
+                    if (!student) {
+                        failedStudents.push({
+                            studentId: studentData.studentId,
+                            error: 'Student not found or does not belong to the specified class',
+                        });
+                        continue;
+                    }
+                    let assessmentsCount = 0;
+                    const subjectErrors = [];
+                    for (const subjectScore of studentData.subjects) {
+                        if (subjectScore.score < 0 || subjectScore.score > 100) {
+                            subjectErrors.push(`Subject ${subjectScore.subjectId}: Score must be between 0 and 100, got ${subjectScore.score}`);
+                            continue;
+                        }
+                        if (!validSubjectIds.has(subjectScore.subjectId)) {
+                            subjectErrors.push(`Subject ${subjectScore.subjectId}: Subject not found or not active for this state`);
+                            continue;
+                        }
+                        try {
+                            await this.prisma.assessment.upsert({
+                                where: {
+                                    studentId_subjectId_classId_termId_type_title: {
+                                        studentId: student.id,
+                                        subjectId: subjectScore.subjectId,
+                                        classId: uploadData.classId,
+                                        termId: uploadData.termId,
+                                        type: 'EXAM',
+                                        title: 'Grade Entry Assessment',
+                                    },
+                                },
+                                update: {
+                                    score: subjectScore.score,
+                                    maxScore: 100,
+                                    percentage: 100,
+                                    dateGiven: new Date(),
+                                    dateSubmitted: new Date(),
+                                    isSubmitted: true,
+                                    isGraded: true,
+                                    updatedAt: new Date(),
+                                },
+                                create: {
+                                    studentId: student.id,
+                                    subjectId: subjectScore.subjectId,
+                                    classId: uploadData.classId,
+                                    termId: uploadData.termId,
+                                    type: 'EXAM',
+                                    title: 'Grade Entry Assessment',
+                                    maxScore: 100,
+                                    score: subjectScore.score,
+                                    percentage: 100,
+                                    dateGiven: new Date(),
+                                    dateSubmitted: new Date(),
+                                    isSubmitted: true,
+                                    isGraded: true,
+                                },
+                            });
+                            assessmentsCount++;
+                        }
+                        catch (error) {
+                            subjectErrors.push(`Subject ${subjectScore.subjectId}: Failed to create/update assessment - ${error.message}`);
+                        }
+                    }
+                    if (subjectErrors.length > 0) {
+                        failedStudents.push({
+                            studentId: studentData.studentId,
+                            error: subjectErrors.join('; '),
+                            studentName: `${student.firstName} ${student.lastName}`.trim(),
+                        });
+                    }
+                    else if (assessmentsCount > 0) {
+                        successfulStudents.push({
+                            studentId: studentData.studentId,
+                            assessmentsCount: assessmentsCount,
+                            studentName: `${student.firstName} ${student.lastName}`.trim(),
+                        });
+                    }
+                    else {
+                        failedStudents.push({
+                            studentId: studentData.studentId,
+                            error: 'No valid subjects provided for this student',
+                            studentName: `${student.firstName} ${student.lastName}`.trim(),
+                        });
+                    }
+                }
+                catch (error) {
+                    failedStudents.push({
+                        studentId: studentData.studentId,
+                        error: `Unexpected error: ${error.message}`,
+                    });
+                }
+            }
+            const total = uploadData.students.length;
+            const successful = successfulStudents.length;
+            const failed = failedStudents.length;
+            this.logger.log(colors.green(`Results upload completed: ${successful} successful, ${failed} failed out of ${total} total students`));
+            const message = failed > 0
+                ? `Results upload completed. ${successful} successful, ${failed} failed out of ${total} total students.`
+                : `All ${successful} students uploaded successfully.`;
+            return response_helper_1.ResponseHelper.success(message, {
+                total,
+                successful,
+                failed,
+                successfulStudents,
+                failedStudents,
+            });
+        }
+        catch (error) {
+            this.logger.error(colors.red(`Failed to upload results: ${error?.message ?? error}`));
+            return response_helper_1.ResponseHelper.error('Failed to upload results', error?.message ?? error, 500);
+        }
     }
 };
 exports.GradingService = GradingService;

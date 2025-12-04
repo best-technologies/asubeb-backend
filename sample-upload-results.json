@@ -1,0 +1,85 @@
+{
+  "sessionId": "cmgghgfxo0007vlm4wddwfvm4",
+  "termId": "cmgghgfxs0009vlm45mw9vi4v",
+  "lgaId": "cmgghgfx30000vlm4vrxg7nnp",
+  "schoolId": "cmgghgfxa0002vlm42kpm8won",
+  "classId": "cmgghgfxf0004vlm4j19fxf2t",
+  "students": [
+    {
+      "studentId": "cmgghgfxl0006vlm4y0qtp52n",
+      "subjects": [
+        {
+          "subjectId": "cmiq8v5w60001vlvyudv6hcr8",
+          "score": 85
+        },
+        {
+          "subjectId": "cmiq8v6i30003vlvykdgunh2x",
+          "score": 92
+        },
+        {
+          "subjectId": "cmiq8v6tb0005vlvyxzyhgcww",
+          "score": 78
+        },
+        {
+          "subjectId": "cmiq8v74u0007vlvyos8r0nw1",
+          "score": 88
+        },
+        {
+          "subjectId": "cmiq8v7g90009vlvyfdhiiu45",
+          "score": 90
+        }
+      ]
+    },
+    {
+      "studentId": "cmgghgfz4000tvlm4aunfwn6l",
+      "subjects": [
+        {
+          "subjectId": "cmiq8v5w60001vlvyudv6hcr8",
+          "score": 75
+        },
+        {
+          "subjectId": "cmiq8v6i30003vlvykdgunh2x",
+          "score": 82
+        },
+        {
+          "subjectId": "cmiq8v6tb0005vlvyxzyhgcww",
+          "score": 80
+        },
+        {
+          "subjectId": "cmiq8v74u0007vlvyos8r0nw1",
+          "score": 79
+        },
+        {
+          "subjectId": "cmiq8v7g90009vlvyfdhiiu45",
+          "score": 85
+        }
+      ]
+    },
+    {
+      "studentId": "cmgghgg060017vlm4pbanvmzk",
+      "subjects": [
+        {
+          "subjectId": "cmiq8v5w60001vlvyudv6hcr8",
+          "score": 95
+        },
+        {
+          "subjectId": "cmiq8v6i30003vlvykdgunh2x",
+          "score": 88
+        },
+        {
+          "subjectId": "cmiq8v6tb0005vlvyxzyhgcww",
+          "score": 92
+        },
+        {
+          "subjectId": "cmiq8v74u0007vlvyos8r0nw1",
+          "score": 90
+        },
+        {
+          "subjectId": "cmiq8v7g90009vlvyfdhiiu45",
+          "score": 87
+        }
+      ]
+    }
+  ]
+}
+

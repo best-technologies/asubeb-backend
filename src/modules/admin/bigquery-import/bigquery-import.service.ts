@@ -349,7 +349,7 @@ export class BigQueryImportService {
     
     for (const subject of subjects) {
       if (subject.score !== undefined && subject.score !== null && subject.score > 0) {
-        const subjectId = await this.getSubjectId(subject.name);
+        const subjectId = await this.getSubjectId(subject.name, stateId);
         
         // Use upsert to handle duplicates gracefully
         await this.prisma.assessment.upsert({
@@ -549,10 +549,14 @@ export class BigQueryImportService {
     return studentId!;
   }
 
-  private async getSubjectId(subjectName: string): Promise<string> {
+  private async getSubjectId(subjectName: string, stateId: string): Promise<string> {
     // Find or create subject
     let subject = await this.prisma.subject.findFirst({
-      where: { name: subjectName.toLowerCase() },
+      where: { 
+        name: subjectName.toLowerCase(),
+        stateId: stateId,
+        level: 'PRIMARY',
+      },
     });
 
     if (!subject) {
@@ -562,6 +566,7 @@ export class BigQueryImportService {
           code: `SUB-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
           level: 'PRIMARY',
           isActive: true,
+          stateId: stateId,
         },
       });
     }

@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GradeEntryMetadataResponseDto = exports.GradeEntryMetadataDataDto = exports.GradeEntryMetadataLocalGovernmentDto = exports.GradeEntryStudentsResponseDto = exports.GradeEntryStudentsDataDto = exports.GradeEntryStudentDto = exports.GradeEntryClassesResponseDto = exports.GradeEntryClassesDataDto = exports.GradeEntryClassDto = exports.GradeEntrySchoolsResponseDto = exports.GradeEntrySchoolsDataDto = exports.GradeEntrySchoolDto = void 0;
+exports.GradeEntryMetadataResponseDto = exports.GradeEntryMetadataDataDto = exports.GradeEntryMetadataSubjectsGroupedDto = exports.GradeEntryMetadataSubjectsByLevelDto = exports.GradeEntryMetadataSubjectDto = exports.GradeEntryMetadataLocalGovernmentDto = exports.GradeEntryStudentsResponseDto = exports.GradeEntryStudentsDataDto = exports.GradeEntryStudentDto = exports.GradeEntryClassesResponseDto = exports.GradeEntryClassesDataDto = exports.GradeEntryClassDto = exports.GradeEntrySchoolsResponseDto = exports.GradeEntrySchoolsDataDto = exports.GradeEntrySchoolDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 class GradeEntrySchoolDto {
     id;
@@ -302,12 +302,89 @@ __decorate([
     }),
     __metadata("design:type", Number)
 ], GradeEntryMetadataLocalGovernmentDto.prototype, "totalSchools", void 0);
+class GradeEntryMetadataSubjectDto {
+    id;
+    name;
+    code;
+    level;
+    description;
+}
+exports.GradeEntryMetadataSubjectDto = GradeEntryMetadataSubjectDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Subject ID', example: 'subject-uuid-123' }),
+    __metadata("design:type", String)
+], GradeEntryMetadataSubjectDto.prototype, "id", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Subject full name', example: 'English Language' }),
+    __metadata("design:type", String)
+], GradeEntryMetadataSubjectDto.prototype, "name", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Subject code (short form)', example: 'ENG' }),
+    __metadata("design:type", String)
+], GradeEntryMetadataSubjectDto.prototype, "code", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'School level for this subject',
+        example: 'PRIMARY',
+        enum: ['PRIMARY', 'SECONDARY'],
+    }),
+    __metadata("design:type", String)
+], GradeEntryMetadataSubjectDto.prototype, "level", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Subject description',
+        example: 'English Language for Primary School',
+        required: false,
+        nullable: true,
+    }),
+    __metadata("design:type", Object)
+], GradeEntryMetadataSubjectDto.prototype, "description", void 0);
+class GradeEntryMetadataSubjectsByLevelDto {
+    count;
+    subjects;
+}
+exports.GradeEntryMetadataSubjectsByLevelDto = GradeEntryMetadataSubjectsByLevelDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Total number of subjects at this level',
+        example: 13,
+    }),
+    __metadata("design:type", Number)
+], GradeEntryMetadataSubjectsByLevelDto.prototype, "count", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'List of subjects at this level',
+        type: [GradeEntryMetadataSubjectDto],
+    }),
+    __metadata("design:type", Array)
+], GradeEntryMetadataSubjectsByLevelDto.prototype, "subjects", void 0);
+class GradeEntryMetadataSubjectsGroupedDto {
+    primary;
+    secondary;
+}
+exports.GradeEntryMetadataSubjectsGroupedDto = GradeEntryMetadataSubjectsGroupedDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Primary school subjects with count and list',
+        type: GradeEntryMetadataSubjectsByLevelDto,
+    }),
+    __metadata("design:type", GradeEntryMetadataSubjectsByLevelDto)
+], GradeEntryMetadataSubjectsGroupedDto.prototype, "primary", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Secondary school subjects with count and list',
+        type: GradeEntryMetadataSubjectsByLevelDto,
+    }),
+    __metadata("design:type", GradeEntryMetadataSubjectsByLevelDto)
+], GradeEntryMetadataSubjectsGroupedDto.prototype, "secondary", void 0);
 class GradeEntryMetadataDataDto {
     stateId;
     currentSession;
     currentTerm;
     totalLocalGovernments;
     localGovernments;
+    totalSubjects;
+    subjects;
 }
 exports.GradeEntryMetadataDataDto = GradeEntryMetadataDataDto;
 __decorate([
@@ -354,6 +431,20 @@ __decorate([
     }),
     __metadata("design:type", Array)
 ], GradeEntryMetadataDataDto.prototype, "localGovernments", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Total number of active subjects available for the state',
+        example: 24,
+    }),
+    __metadata("design:type", Number)
+], GradeEntryMetadataDataDto.prototype, "totalSubjects", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        description: 'Subjects organized by school level (PRIMARY and SECONDARY), each containing count and list of subjects',
+        type: GradeEntryMetadataSubjectsGroupedDto,
+    }),
+    __metadata("design:type", GradeEntryMetadataSubjectsGroupedDto)
+], GradeEntryMetadataDataDto.prototype, "subjects", void 0);
 class GradeEntryMetadataResponseDto {
     success;
     message;
@@ -374,7 +465,7 @@ __decorate([
 ], GradeEntryMetadataResponseDto.prototype, "message", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({
-        description: 'Response data payload containing session, term and LGA metadata',
+        description: 'Response data payload containing session, term, LGA metadata, and available subjects for grade entry',
         type: GradeEntryMetadataDataDto,
     }),
     __metadata("design:type", GradeEntryMetadataDataDto)

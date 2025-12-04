@@ -187,6 +187,60 @@ export class GradeEntryMetadataLocalGovernmentDto {
   totalSchools: number;
 }
 
+export class GradeEntryMetadataSubjectDto {
+  @ApiProperty({ description: 'Subject ID', example: 'subject-uuid-123' })
+  id: string;
+
+  @ApiProperty({ description: 'Subject full name', example: 'English Language' })
+  name: string;
+
+  @ApiProperty({ description: 'Subject code (short form)', example: 'ENG' })
+  code: string;
+
+  @ApiProperty({
+    description: 'School level for this subject',
+    example: 'PRIMARY',
+    enum: ['PRIMARY', 'SECONDARY'],
+  })
+  level: 'PRIMARY' | 'SECONDARY';
+
+  @ApiProperty({
+    description: 'Subject description',
+    example: 'English Language for Primary School',
+    required: false,
+    nullable: true,
+  })
+  description?: string | null;
+}
+
+export class GradeEntryMetadataSubjectsByLevelDto {
+  @ApiProperty({
+    description: 'Total number of subjects at this level',
+    example: 13,
+  })
+  count: number;
+
+  @ApiProperty({
+    description: 'List of subjects at this level',
+    type: [GradeEntryMetadataSubjectDto],
+  })
+  subjects: GradeEntryMetadataSubjectDto[];
+}
+
+export class GradeEntryMetadataSubjectsGroupedDto {
+  @ApiProperty({
+    description: 'Primary school subjects with count and list',
+    type: GradeEntryMetadataSubjectsByLevelDto,
+  })
+  primary: GradeEntryMetadataSubjectsByLevelDto;
+
+  @ApiProperty({
+    description: 'Secondary school subjects with count and list',
+    type: GradeEntryMetadataSubjectsByLevelDto,
+  })
+  secondary: GradeEntryMetadataSubjectsByLevelDto;
+}
+
 export class GradeEntryMetadataDataDto {
   @ApiProperty({ description: 'State ID', example: 'state-uuid-123' })
   stateId: string;
@@ -235,6 +289,19 @@ export class GradeEntryMetadataDataDto {
     type: [GradeEntryMetadataLocalGovernmentDto],
   })
   localGovernments: GradeEntryMetadataLocalGovernmentDto[];
+
+  @ApiProperty({
+    description: 'Total number of active subjects available for the state',
+    example: 24,
+  })
+  totalSubjects: number;
+
+  @ApiProperty({
+    description:
+      'Subjects organized by school level (PRIMARY and SECONDARY), each containing count and list of subjects',
+    type: GradeEntryMetadataSubjectsGroupedDto,
+  })
+  subjects: GradeEntryMetadataSubjectsGroupedDto;
 }
 
 export class GradeEntryMetadataResponseDto {
@@ -248,7 +315,8 @@ export class GradeEntryMetadataResponseDto {
   message: string;
 
   @ApiProperty({
-    description: 'Response data payload containing session, term and LGA metadata',
+    description:
+      'Response data payload containing session, term, LGA metadata, and available subjects for grade entry',
     type: GradeEntryMetadataDataDto,
   })
   data: GradeEntryMetadataDataDto;

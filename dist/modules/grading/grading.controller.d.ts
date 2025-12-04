@@ -1,4 +1,5 @@
 import { GradingService } from './grading.service';
+import { UploadResultsDto } from './dto/upload-results.dto';
 export declare class GradingController {
     private readonly gradingService;
     constructor(gradingService: GradingService);
@@ -42,6 +43,19 @@ export declare class GradingController {
         statusCode: number;
     }>;
     fetchAllStudentsByClassId(req: any, classId: string): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    } | {
+        success: false;
+        message: string;
+        error: any;
+        statusCode: number;
+    }>;
+    uploadResults(req: any, uploadData: UploadResultsDto): Promise<{
         success: boolean;
         message: string;
         data: any;

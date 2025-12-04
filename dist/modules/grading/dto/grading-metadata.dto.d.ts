@@ -77,6 +77,21 @@ export declare class GradeEntryMetadataLocalGovernmentDto {
     name: string;
     totalSchools: number;
 }
+export declare class GradeEntryMetadataSubjectDto {
+    id: string;
+    name: string;
+    code: string;
+    level: 'PRIMARY' | 'SECONDARY';
+    description?: string | null;
+}
+export declare class GradeEntryMetadataSubjectsByLevelDto {
+    count: number;
+    subjects: GradeEntryMetadataSubjectDto[];
+}
+export declare class GradeEntryMetadataSubjectsGroupedDto {
+    primary: GradeEntryMetadataSubjectsByLevelDto;
+    secondary: GradeEntryMetadataSubjectsByLevelDto;
+}
 export declare class GradeEntryMetadataDataDto {
     stateId: string;
     currentSession?: {
@@ -91,6 +106,8 @@ export declare class GradeEntryMetadataDataDto {
     } | null;
     totalLocalGovernments: number;
     localGovernments: GradeEntryMetadataLocalGovernmentDto[];
+    totalSubjects: number;
+    subjects: GradeEntryMetadataSubjectsGroupedDto;
 }
 export declare class GradeEntryMetadataResponseDto {
     success: boolean;

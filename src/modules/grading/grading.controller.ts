@@ -8,6 +8,10 @@ import {
   GradeEntryStudentsResponseDto,
   GradeEntryMetadataResponseDto,
 } from './dto/grading-metadata.dto';
+import {
+  UploadResultsDto,
+  UploadResultsResponseDto,
+} from './dto/upload-results.dto';
 
 @ApiTags('grading')
 @ApiBearerAuth()
@@ -17,9 +21,13 @@ export class GradingController {
   constructor(private readonly gradingService: GradingService) {}
 
   @Get('metadata/grade-entry')
-  @ApiOperation({ summary: 'Fetch academic metadata for grade entry (SUBEB_OFFICER only)' })
+  @ApiOperation({
+    summary: 'Fetch academic metadata for grade entry (SUBEB_OFFICER only)',
+    description:
+      'Returns current session, current term, all LGAs with school counts, and all available subjects for the state. Subjects are organized by level (PRIMARY and SECONDARY).',
+  })
   @ApiOkResponse({
-    description: 'Academic metadata retrieved successfully',
+    description: 'Academic metadata retrieved successfully, including session, term, LGAs, and subjects',
     type: GradeEntryMetadataResponseDto,
   })
   async fetchAcademicMetadataForGradeEntry(@Req() req: any) {
@@ -57,5 +65,23 @@ export class GradingController {
   })
   async fetchAllStudentsByClassId(@Req() req: any, @Param('classId') classId: string) {
     return this.gradingService.fetchAllStudentsByClassId(classId);
+  }
+
+  @Post('upload-results')
+  @ApiOperation({
+    summary: 'Upload results (assessments) for multiple students in a batch (SUBEB_OFFICER only)',
+    description:
+      'Uploads assessment results for one or more students. Validates session, term, LGA, school, class, students, and subjects. Processes students one by one and returns detailed success/failure information for each student. Scores must be between 0 and 100.',
+  })
+  @ApiOkResponse({
+    description: 'Results upload completed with detailed success/failure information',
+    type: UploadResultsResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error or invalid entity IDs',
+  })
+  async uploadResults(@Req() req: any, @Body() uploadData: UploadResultsDto) {
+    return this.gradingService.uploadResults(req.user.stateId, uploadData);
   }
 } 

@@ -1,5 +1,6 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { AcademicContextService } from '../academic/academic-context.service';
+import { UploadResultsDto } from './dto/upload-results.dto';
 export declare class GradingService {
     private readonly prisma;
     private readonly academicContext;
@@ -61,4 +62,17 @@ export declare class GradingService {
         statusCode: number;
     }>;
     private formatFullName;
+    uploadResults(stateId: string, uploadData: UploadResultsDto): Promise<{
+        success: boolean;
+        message: string;
+        data: any;
+        length: number | undefined;
+        meta: any;
+        statusCode: number;
+    } | {
+        success: false;
+        message: string;
+        error: any;
+        statusCode: number;
+    }>;
 }

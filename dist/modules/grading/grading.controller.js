@@ -18,6 +18,7 @@ const swagger_1 = require("@nestjs/swagger");
 const grading_service_1 = require("./grading.service");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const grading_metadata_dto_1 = require("./dto/grading-metadata.dto");
+const upload_results_dto_1 = require("./dto/upload-results.dto");
 let GradingController = class GradingController {
     gradingService;
     constructor(gradingService) {
@@ -35,13 +36,19 @@ let GradingController = class GradingController {
     async fetchAllStudentsByClassId(req, classId) {
         return this.gradingService.fetchAllStudentsByClassId(classId);
     }
+    async uploadResults(req, uploadData) {
+        return this.gradingService.uploadResults(req.user.stateId, uploadData);
+    }
 };
 exports.GradingController = GradingController;
 __decorate([
     (0, common_1.Get)('metadata/grade-entry'),
-    (0, swagger_1.ApiOperation)({ summary: 'Fetch academic metadata for grade entry (SUBEB_OFFICER only)' }),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Fetch academic metadata for grade entry (SUBEB_OFFICER only)',
+        description: 'Returns current session, current term, all LGAs with school counts, and all available subjects for the state. Subjects are organized by level (PRIMARY and SECONDARY).',
+    }),
     (0, swagger_1.ApiOkResponse)({
-        description: 'Academic metadata retrieved successfully',
+        description: 'Academic metadata retrieved successfully, including session, term, LGAs, and subjects',
         type: grading_metadata_dto_1.GradeEntryMetadataResponseDto,
     }),
     __param(0, (0, common_1.Req)()),
@@ -91,6 +98,26 @@ __decorate([
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], GradingController.prototype, "fetchAllStudentsByClassId", null);
+__decorate([
+    (0, common_1.Post)('upload-results'),
+    (0, swagger_1.ApiOperation)({
+        summary: 'Upload results (assessments) for multiple students in a batch (SUBEB_OFFICER only)',
+        description: 'Uploads assessment results for one or more students. Validates session, term, LGA, school, class, students, and subjects. Processes students one by one and returns detailed success/failure information for each student. Scores must be between 0 and 100.',
+    }),
+    (0, swagger_1.ApiOkResponse)({
+        description: 'Results upload completed with detailed success/failure information',
+        type: upload_results_dto_1.UploadResultsResponseDto,
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 400,
+        description: 'Validation error or invalid entity IDs',
+    }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, upload_results_dto_1.UploadResultsDto]),
+    __metadata("design:returntype", Promise)
+], GradingController.prototype, "uploadResults", null);
 exports.GradingController = GradingController = __decorate([
     (0, swagger_1.ApiTags)('grading'),
     (0, swagger_1.ApiBearerAuth)(),

@@ -3,6 +3,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ResponseHelper } from '../../common/helpers/response.helper';
 import * as colors from 'colors';
 import { AcademicContextService } from '../academic/academic-context.service';
+import {
+  UploadResultsDto,
+  SuccessfulStudentResultDto,
+  FailedStudentResultDto,
+} from './dto/upload-results.dto';
 
 @Injectable()
 export class GradingService {
@@ -71,16 +76,48 @@ export class GradingService {
 
   /**
    * Fetch academic metadata needed for grade entry for a given state.
-   * Returns the current session, current term and all LGAs in the state.
+   * Returns the current session, current term, all LGAs, and all subjects in the state.
    */
   async getAcademicMetadataForGradeEntry(stateId: string) {
     this.logger.log(colors.magenta(`Fetching academic metadata for grade entry for state ${stateId}`));
 
     try {
-      const [{ currentSession, currentTerm }, lgas] = await Promise.all([
+      const [{ currentSession, currentTerm }, lgas, subjects] = await Promise.all([
         this.academicContext.getCurrentSessionAndTerm(stateId),
         this.academicContext.getLgasWithSchoolCounts(stateId),
+        this.prisma.subject.findMany({
+          where: {
+            stateId,
+            isActive: true,
+          },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            level: true,
+            description: true,
+          },
+          orderBy: [
+            { level: 'asc' },
+            { name: 'asc' },
+          ],
+        }),
       ]);
+
+      // Group subjects by level
+      const primarySubjects = subjects.filter((s) => s.level === 'PRIMARY');
+      const secondarySubjects = subjects.filter((s) => s.level === 'SECONDARY');
+
+      const subjectsByLevel = {
+        primary: {
+          count: primarySubjects.length,
+          subjects: primarySubjects,
+        },
+        secondary: {
+          count: secondarySubjects.length,
+          subjects: secondarySubjects,
+        },
+      };
 
       this.logger.log(colors.green('Academic metadata for grade entry retrieved successfully'));
 
@@ -90,6 +127,8 @@ export class GradingService {
         currentTerm,
         totalLocalGovernments: lgas.length,
         localGovernments: lgas,
+        totalSubjects: subjects.length,
+        subjects: subjectsByLevel,
       });
     } catch (error) {
       this.logger.error(colors.red(`Failed to fetch academic metadata for grade entry: ${error?.message ?? error}`));
@@ -278,200 +317,277 @@ export class GradingService {
       .join(' ');
   }
 
+
   /**
-   * Wrapper: validate user and fetch students for a given class.
-   * Keeps controller thin by moving auth/state checks here.
-  //  */
-  // async fetchStudentsByClassForUser(user: any, classId: string) {
-  //   if (!user) {
-  //     throw new ForbiddenException('User not authenticated');
-  //   }
+   * Upload results (assessments) for multiple students in a batch.
+   * Validates all required entities and processes students one by one.
+   * Returns detailed success/failure information for each student.
+   */
+  async uploadResults(stateId: string, uploadData: UploadResultsDto) {
+    this.logger.log(
+      colors.magenta(
+        `Uploading results for ${uploadData.students.length} students in class ${uploadData.classId}`,
+      ),
+    );
 
-  //   if (user.role !== 'SUBEB_OFFICER') {
-  //     throw new ForbiddenException('Only SUBEB_OFFICER can access this resource');
-  //   }
+    const successfulStudents: SuccessfulStudentResultDto[] = [];
+    const failedStudents: FailedStudentResultDto[] = [];
 
-  //   if (!user.stateId) {
-  //     throw new BadRequestException('User state not found');
-  //   }
+    try {
+      // Step 1: Validate Session
+      const session = await this.prisma.session.findFirst({
+        where: {
+          id: uploadData.sessionId,
+          stateId: stateId,
+        },
+      });
 
-  //   return this.getStudentsByClass(user.stateId, classId);
-  // }
+      if (!session) {
+        this.logger.error(colors.red(`Session with ID ${uploadData.sessionId} not found or does not belong to this state`));
+        return ResponseHelper.error(
+          'Session not found or does not belong to this state',
+          `Session with ID ${uploadData.sessionId} not found or does not belong to this state`,
+          400,
+        );
+      }
 
-  // async getStudentGrades(studentId: string, subject?: string, semester?: string) {
-  //   let filteredGrades = this.grades.filter(g => g.studentId === studentId);
-    
-  //   if (subject) {
-  //     filteredGrades = filteredGrades.filter(g => g.subject === subject);
-  //   }
-    
-  //   if (semester) {
-  //     filteredGrades = filteredGrades.filter(g => g.semester === semester);
-  //   }
+      // Step 2: Validate Term
+      const term = await this.prisma.term.findFirst({
+        where: {
+          id: uploadData.termId,
+          sessionId: uploadData.sessionId,
+          stateId: stateId,
+        },
+      });
 
-  //   return {
-  //     studentId,
-  //     grades: filteredGrades,
-  //     summary: {
-  //       totalSubjects: filteredGrades.length,
-  //       averageScore: filteredGrades.reduce((sum, g) => sum + g.totalScore, 0) / filteredGrades.length,
-  //       highestGrade: Math.max(...filteredGrades.map(g => g.totalScore)),
-  //       lowestGrade: Math.min(...filteredGrades.map(g => g.totalScore)),
-  //     },
-  //   };
-  // }
+      if (!term) {
+        this.logger.error(colors.red(`Term with ID ${uploadData.termId} not found or does not belong to the specified session`));
+        return ResponseHelper.error(
+          'Term not found or does not belong to the specified session',
+          `Term with ID ${uploadData.termId} not found or does not belong to the specified session`,
+          400,
+        );
+      }
 
-  // async addStudentGrade(studentId: string, gradeData: any) {
-  //   const newGrade = {
-  //     id: (this.grades.length + 1).toString(),
-  //     studentId,
-  //     ...gradeData,
-  //     totalScore: (gradeData.assignmentScore + gradeData.examScore) / 2,
-  //     grade: this.calculateGrade((gradeData.assignmentScore + gradeData.examScore) / 2),
-  //     createdAt: new Date().toISOString(),
-  //     updatedAt: new Date().toISOString(),
-  //   };
-    
-  //   this.grades.push(newGrade);
-  //   return newGrade;
-  // }
+      // Step 3: Validate LGA
+      const lga = await this.prisma.localGovernmentArea.findFirst({
+        where: {
+          id: uploadData.lgaId,
+          stateId: stateId,
+        },
+      });
 
-  // async updateStudentGrade(studentId: string, gradeId: string, gradeData: any) {
-  //   const gradeIndex = this.grades.findIndex(g => g.id === gradeId && g.studentId === studentId);
-  //   if (gradeIndex === -1) {
-  //     throw new NotFoundException(`Grade not found`);
-  //   }
+      if (!lga) {
+        this.logger.error(colors.red(`LGA not found or does not belong to this state`));
+        return ResponseHelper.error(
+          'LGA not found or does not belong to this state',
+          400,
+        );
+      }
 
-  //   this.grades[gradeIndex] = {
-  //     ...this.grades[gradeIndex],
-  //     ...gradeData,
-  //     totalScore: (gradeData.assignmentScore + gradeData.examScore) / 2,
-  //     grade: this.calculateGrade((gradeData.assignmentScore + gradeData.examScore) / 2),
-  //     updatedAt: new Date().toISOString(),
-  //   };
+      // Step 4: Validate School
+      const school = await this.prisma.school.findFirst({
+        where: {
+          id: uploadData.schoolId,
+          lgaId: uploadData.lgaId,
+          stateId: stateId,
+        },
+      });
 
-  //   return this.grades[gradeIndex];
-  // }
+      if (!school) {
+        this.logger.error(colors.red(`School not found or does not belong to the specified LGA`));
+        return ResponseHelper.error(
+          'School not found or does not belong to the specified LGA',
+          400,
+        );
+      }
 
-  // async getClassGrades(classId: string, subject?: string) {
-  //   // Mock class grades - in real app, this would filter by class
-  //   let filteredGrades = this.grades;
-    
-  //   if (subject) {
-  //     filteredGrades = filteredGrades.filter(g => g.subject === subject);
-  //   }
+      // Step 5: Validate Class
+      const classRecord = await this.prisma.class.findFirst({
+        where: {
+          id: uploadData.classId,
+          schoolId: uploadData.schoolId,
+        },
+      });
 
-  //   return {
-  //     classId,
-  //     grades: filteredGrades,
-  //     summary: {
-  //       totalStudents: filteredGrades.length,
-  //       averageScore: filteredGrades.reduce((sum, g) => sum + g.totalScore, 0) / filteredGrades.length,
-  //       gradeDistribution: this.getGradeDistribution(filteredGrades),
-  //     },
-  //   };
-  // }
+      if (!classRecord) {
+        this.logger.error(colors.red(`Class not found or does not belong to the specified school`));
+        return ResponseHelper.error(
+          'Class not found or does not belong to the specified school',
+          400,
+        );
+      }
 
-  // async addBulkGrades(classId: string, gradesData: any) {
-  //   const newGrades = gradesData.grades.map((gradeData: any, index: number) => ({
-  //     id: (this.grades.length + index + 1).toString(),
-  //     classId,
-  //     ...gradeData,
-  //     totalScore: (gradeData.assignmentScore + gradeData.examScore) / 2,
-  //     grade: this.calculateGrade((gradeData.assignmentScore + gradeData.examScore) / 2),
-  //     createdAt: new Date().toISOString(),
-  //     updatedAt: new Date().toISOString(),
-  //   }));
+      // Step 6: Get all valid subject IDs for this state to validate against
+      const validSubjects = await this.prisma.subject.findMany({
+        where: {
+          stateId: stateId,
+          isActive: true,
+        },
+        select: {
+          id: true,
+        },
+      });
 
-  //   this.grades.push(...newGrades);
-  //   return {
-  //     message: `${newGrades.length} grades added successfully`,
-  //     addedGrades: newGrades,
-  //   };
-  // }
+      const validSubjectIds = new Set(validSubjects.map((s) => s.id));
 
-  // async getSubjects() {
-  //   return this.subjects;
-  // }
+      // Step 7: Process each student one by one
+      this.logger.log(colors.magenta(`Processing ${uploadData.students.length} students`));
+      for (const studentData of uploadData.students) {
+        try {
+          // Validate student exists and belongs to the class
+          const student = await this.prisma.student.findFirst({
+            where: {
+              id: studentData.studentId,
+              classId: uploadData.classId,
+              schoolId: uploadData.schoolId,
+              isActive: true,
+            },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              studentId: true,
+            },
+          });
 
-  // async getGradeScales() {
-  //   return this.gradeScales;
-  // }
+          if (!student) {
+            failedStudents.push({
+              studentId: studentData.studentId,
+              error: 'Student not found or does not belong to the specified class',
+            });
+            continue;
+          }
 
-  // async getClassGradeReport(classId: string) {
-  //   const classGrades = this.grades; // In real app, filter by classId
-    
-  //   return {
-  //     classId,
-  //     reportGeneratedAt: new Date().toISOString(),
-  //     summary: {
-  //       totalStudents: classGrades.length,
-  //       averageScore: classGrades.reduce((sum, g) => sum + g.totalScore, 0) / classGrades.length,
-  //       gradeDistribution: this.getGradeDistribution(classGrades),
-  //       subjectPerformance: this.getSubjectPerformance(classGrades),
-  //     },
-  //     topPerformers: classGrades
-  //       .sort((a, b) => b.totalScore - a.totalScore)
-  //       .slice(0, 5),
-  //   };
-  // }
+          // Validate and process each subject score
+          let assessmentsCount = 0;
+          const subjectErrors: string[] = [];
 
-  // async getStudentGradeReport(studentId: string) {
-  //   const studentGrades = this.grades.filter(g => g.studentId === studentId);
-    
-  //   if (studentGrades.length === 0) {
-  //     throw new NotFoundException(`No grades found for student ${studentId}`);
-  //   }
+          for (const subjectScore of studentData.subjects) {
+            // Validate score is within range (already validated by DTO, but double-check)
+            if (subjectScore.score < 0 || subjectScore.score > 100) {
+              subjectErrors.push(
+                `Subject ${subjectScore.subjectId}: Score must be between 0 and 100, got ${subjectScore.score}`,
+              );
+              continue;
+            }
 
-  //   return {
-  //     studentId,
-  //     reportGeneratedAt: new Date().toISOString(),
-  //     summary: {
-  //       totalSubjects: studentGrades.length,
-  //       averageScore: studentGrades.reduce((sum, g) => sum + g.totalScore, 0) / studentGrades.length,
-  //       gpa: this.calculateGPA(studentGrades),
-  //       gradeDistribution: this.getGradeDistribution(studentGrades),
-  //     },
-  //     subjectBreakdown: studentGrades.map(grade => ({
-  //       subject: grade.subject,
-  //       score: grade.totalScore,
-  //       grade: grade.grade,
-  //       remarks: grade.remarks,
-  //     })),
-  //   };
-  // }
+            // Validate subject exists and belongs to state
+            if (!validSubjectIds.has(subjectScore.subjectId)) {
+              subjectErrors.push(
+                `Subject ${subjectScore.subjectId}: Subject not found or not active for this state`,
+              );
+              continue;
+            }
 
-  // private calculateGrade(score: number): string {
-  //   const gradeScale = this.gradeScales.find(gs => score >= gs.minScore && score <= gs.maxScore);
-  //   return gradeScale ? gradeScale.grade : 'F';
-  // }
+            // Create or update assessment using upsert
+            try {
+              await this.prisma.assessment.upsert({
+                where: {
+                  studentId_subjectId_classId_termId_type_title: {
+                    studentId: student.id,
+                    subjectId: subjectScore.subjectId,
+                    classId: uploadData.classId,
+                    termId: uploadData.termId,
+                    type: 'EXAM',
+                    title: 'Grade Entry Assessment',
+                  },
+                },
+                update: {
+                  score: subjectScore.score,
+                  maxScore: 100,
+                  percentage: 100,
+                  dateGiven: new Date(),
+                  dateSubmitted: new Date(),
+                  isSubmitted: true,
+                  isGraded: true,
+                  updatedAt: new Date(),
+                },
+                create: {
+                  studentId: student.id,
+                  subjectId: subjectScore.subjectId,
+                  classId: uploadData.classId,
+                  termId: uploadData.termId,
+                  type: 'EXAM',
+                  title: 'Grade Entry Assessment',
+                  maxScore: 100,
+                  score: subjectScore.score,
+                  percentage: 100,
+                  dateGiven: new Date(),
+                  dateSubmitted: new Date(),
+                  isSubmitted: true,
+                  isGraded: true,
+                },
+              });
 
-  // private getGradeDistribution(grades: any[]) {
-  //   const distribution: { [key: string]: number } = {};
-  //   this.gradeScales.forEach(gs => {
-  //     distribution[gs.grade] = grades.filter(g => g.grade === gs.grade).length;
-  //   });
-  //   return distribution;
-  // }
+              assessmentsCount++;
+            } catch (error) {
+              subjectErrors.push(
+                `Subject ${subjectScore.subjectId}: Failed to create/update assessment - ${error.message}`,
+              );
+            }
+          }
 
-  // private getSubjectPerformance(grades: any[]) {
-  //   const subjectPerformance: { [key: string]: number } = {};
-  //   const subjects = [...new Set(grades.map(g => g.subject))];
-    
-  //   subjects.forEach(subject => {
-  //     const subjectGrades = grades.filter(g => g.subject === subject);
-  //     subjectPerformance[subject] = subjectGrades.reduce((sum, g) => sum + g.totalScore, 0) / subjectGrades.length;
-  //   });
-    
-  //   return subjectPerformance;
-  // }
+          // If there were subject errors, mark student as failed
+          if (subjectErrors.length > 0) {
+            failedStudents.push({
+              studentId: studentData.studentId,
+              error: subjectErrors.join('; '),
+              studentName: `${student.firstName} ${student.lastName}`.trim(),
+            });
+          } else if (assessmentsCount > 0) {
+            // Student processed successfully
+            successfulStudents.push({
+              studentId: studentData.studentId,
+              assessmentsCount: assessmentsCount,
+              studentName: `${student.firstName} ${student.lastName}`.trim(),
+            });
+          } else {
+            // No valid subjects provided
+            failedStudents.push({
+              studentId: studentData.studentId,
+              error: 'No valid subjects provided for this student',
+              studentName: `${student.firstName} ${student.lastName}`.trim(),
+            });
+          }
+        } catch (error) {
+          // Catch any unexpected errors for this student
+          failedStudents.push({
+            studentId: studentData.studentId,
+            error: `Unexpected error: ${error.message}`,
+          });
+        }
+      }
 
-  // private calculateGPA(grades: any[]): number {
-  //   const totalPoints = grades.reduce((sum, grade) => {
-  //     const gradeScale = this.gradeScales.find(gs => gs.grade === grade.grade);
-  //     return sum + (gradeScale ? gradeScale.points : 0);
-  //   }, 0);
-    
-  //   return totalPoints / grades.length;
-  // }
+      const total = uploadData.students.length;
+      const successful = successfulStudents.length;
+      const failed = failedStudents.length;
+
+      this.logger.log(
+        colors.green(
+          `Results upload completed: ${successful} successful, ${failed} failed out of ${total} total students`,
+        ),
+      );
+
+      const message =
+        failed > 0
+          ? `Results upload completed. ${successful} successful, ${failed} failed out of ${total} total students.`
+          : `All ${successful} students uploaded successfully.`;
+
+      return ResponseHelper.success(message, {
+        total,
+        successful,
+        failed,
+        successfulStudents,
+        failedStudents,
+      });
+    } catch (error) {
+      this.logger.error(colors.red(`Failed to upload results: ${error?.message ?? error}`));
+      return ResponseHelper.error(
+        'Failed to upload results',
+        (error as any)?.message ?? error,
+        500,
+      );
+    }
+  }
 } 

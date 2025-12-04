@@ -179,7 +179,7 @@ let ExcelUploadService = ExcelUploadService_1 = class ExcelUploadService {
         const termId = await this.getCurrentTermId(school.id, stateId);
         for (const subject of subjects) {
             if (subject.score !== undefined && subject.score !== null && subject.score > 0) {
-                const subjectId = await this.getSubjectId(subject.name);
+                const subjectId = await this.getSubjectId(subject.name, stateId);
                 await this.prisma.assessment.create({
                     data: {
                         studentId: student.id,
@@ -330,9 +330,13 @@ let ExcelUploadService = ExcelUploadService_1 = class ExcelUploadService {
         }
         return studentId;
     }
-    async getSubjectId(subjectName) {
+    async getSubjectId(subjectName, stateId) {
         let subject = await this.prisma.subject.findFirst({
-            where: { name: subjectName.toLowerCase() },
+            where: {
+                name: subjectName.toLowerCase(),
+                stateId: stateId,
+                level: 'PRIMARY',
+            },
         });
         if (!subject) {
             subject = await this.prisma.subject.create({
@@ -341,6 +345,7 @@ let ExcelUploadService = ExcelUploadService_1 = class ExcelUploadService {
                     code: `SUB-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
                     level: 'PRIMARY',
                     isActive: true,
+                    stateId: stateId,
                 },
             });
         }

@@ -53,7 +53,7 @@ function restoreDatabase() {
       // Use --if-exists to avoid errors if objects don't exist
       // Use --no-owner to avoid permission issues
       // Use --no-acl to avoid ACL issues
-      execSync(`pg_restore "${databaseUrl}" "${backupPath}" --clean --if-exists --no-owner --no-acl --verbose`, {
+      execSync(`pg_restore -d "${databaseUrl}" "${backupPath}" --clean --if-exists --no-owner --no-acl --verbose`, {
         stdio: 'inherit',
         encoding: 'utf8',
       });

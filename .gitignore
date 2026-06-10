@@ -1,9 +1,17 @@
+# Node modules
 node_modules
-# Keep environment variables out of version control
+
+# Environment variables
 .env
 
 # Build output
 /dist
 
+# Temporary files
+*.log
+
+# Prisma generated code
 /generated/prisma
+
+# Service account
 service_account.json

@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 import { GradingService } from './grading.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
@@ -83,5 +83,23 @@ export class GradingController {
   })
   async uploadResults(@Req() req: any, @Body() uploadData: UploadResultsDto) {
     return this.gradingService.uploadResults(req.user.stateId, uploadData);
+  }
+
+  @Put('results/:id')
+  @ApiOperation({ summary: 'Edit an existing result (assessment score)' })
+  @ApiParam({ name: 'id', description: 'Assessment ID' })
+  @ApiBody({ schema: { type: 'object', properties: { score: { type: 'number' } } } })
+  @ApiResponse({ status: 200, description: 'Result updated successfully' })
+  async editResult(@Param('id') id: string, @Body('score') score: number) {
+    return this.gradingService.editResult(id, score);
+  }
+
+  @Put('results/:id/status')
+  @ApiOperation({ summary: 'Approve or reject a result' })
+  @ApiParam({ name: 'id', description: 'Assessment ID' })
+  @ApiBody({ schema: { type: 'object', properties: { status: { type: 'string', enum: ['APPROVED', 'REJECTED'] } } } })
+  @ApiResponse({ status: 200, description: 'Result status updated successfully' })
+  async updateResultStatus(@Param('id') id: string, @Body('status') status: 'APPROVED' | 'REJECTED', @Req() req: any) {
+    return this.gradingService.updateResultStatus(id, status, req.user.id);
   }
 } 

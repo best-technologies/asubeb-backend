@@ -13,6 +13,7 @@ import * as bcrypt from 'bcryptjs';
 import * as colors from 'colors';
 import { MailService } from '../../../common/mailer/mail.service';
 import { EnrollOfficerDto } from '../subeb-officers/dto';
+import { EnrollSchoolItDto } from './dto/enroll-school-it.dto';
 import { AcademicContextService } from '../../academic/academic-context.service';
 import { EnrollSingleOrBulkStudentsDto, EnrollStudentDto } from './dto/enroll-student.dto';
 
@@ -322,6 +323,137 @@ export class EnrollmentService {
         `Failed to register SUBEB officer ${dto.email} via EnrollmentModule: ${error?.message ?? error}`,
       );
       throw new InternalServerErrorException('Failed to register SUBEB officer');
+    }
+  }
+
+  async enrollNewSchoolItPerson(dto: EnrollSchoolItDto, user: any) {
+    if (!user?.id) {
+      throw new UnauthorizedException(
+        'User ID not found in request. Please ensure JWT authentication is working correctly.',
+      );
+    }
+
+    const enrolledByUserId = user.id;
+    this.logger.log(colors.yellow(`Enrolling School-IT person ${dto.email} from EnrollmentModule by ${enrolledByUserId}`));
+
+    try {
+      // 1. Check if user already exists
+      const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+      if (existing) {
+        this.logger.warn(`Attempt to enroll School-IT person with existing email: ${dto.email}`);
+        throw new ConflictException('User already exists');
+      }
+
+      // 2. Resolve stateId strictly from the enrolling user's state
+      const enrollingUser = await this.prisma.user.findUnique({
+        where: { id: enrolledByUserId },
+        select: { stateId: true },
+      });
+      if (!enrollingUser?.stateId) {
+        throw new BadRequestException('Enrolling user must be associated with a state to enroll a School-IT person');
+      }
+      const stateId = enrollingUser.stateId;
+
+      // Ensure school belongs to the state
+      const school = await this.prisma.school.findFirst({
+        where: { id: dto.schoolId, stateId }
+      });
+      if (!school) {
+        throw new BadRequestException('School not found or does not belong to your state');
+      }
+
+      // 3. Generate a temporary password
+      const tempPassword = Math.random().toString(36).slice(-10);
+
+      // 4. Hash password
+      const hashed = await bcrypt.hash(tempPassword, 10);
+
+      // 5. Generate SchoolIt ID
+      const randomDigits = Math.floor(Math.random() * 90000) + 10000;
+      const schoolItId = `SIT${randomDigits}`;
+
+      // 6. Create user and SchoolIt within a transaction
+      const result = await this.prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            email: dto.email,
+            username: dto.email,
+            password: hashed,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            role: 'SCHOOL_IT' as any, // Cast to any until prisma generated
+            stateId,
+            profilePicture: dto.profilePicture || null,
+          },
+        });
+
+        const schoolIt = await tx.schoolIt.create({
+          data: {
+            userId: newUser.id,
+            schoolItId,
+            schoolId: dto.schoolId,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            email: dto.email,
+            phone: dto.phone,
+            stateId,
+          },
+        });
+
+        return {
+          id: newUser.id,
+          email: newUser.email,
+          role: newUser.role,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          userId: newUser.id,
+          schoolItId: schoolIt.id,
+        };
+      });
+
+      // 7. Send welcome email with temp password.
+      this.logger.log(colors.blue(`Sending welcome email to School-IT ${result.email}`));
+      
+      try {
+        const emailPromise = this.mailService.sendSubebOfficerWelcomeEmail(result.email, {
+          firstName: result.firstName ?? '',
+          lastName: result.lastName ?? '',
+          email: result.email,
+          password: tempPassword,
+        });
+
+        const emailTimeout = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Email sending timeout after 90 seconds.')), 90000);
+        });
+
+        await Promise.race([emailPromise, emailTimeout]);
+        this.logger.log(colors.green(`Welcome email sent successfully to School-IT ${result.email}`));
+      } catch (emailError: any) {
+        this.logger.error(colors.red(`Failed to send welcome email to ${result.email}`));
+        
+        // Rollback
+        this.logger.warn(colors.yellow(`Rolling back enrollment for ${result.email} due to email failure`));
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            await tx.schoolIt.delete({ where: { id: result.schoolItId } });
+            await tx.user.delete({ where: { id: result.userId } });
+          });
+        } catch (rollbackError: any) {
+          this.logger.error(colors.red(`Failed to rollback enrollment for ${result.email}`));
+        }
+        
+        throw new InternalServerErrorException(
+          `Failed to send welcome email. Enrollment aborted and rolled back. Error: ${emailError?.message}`
+        );
+      }
+
+      return ResponseHelper.created('School-IT person registered', result);
+    } catch (error) {
+      if (error instanceof ConflictException || error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Failed to register School-IT person: ${error?.message ?? error}`);
+      throw new InternalServerErrorException('Failed to register School-IT person');
     }
   }
 

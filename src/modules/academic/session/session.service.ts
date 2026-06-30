@@ -304,6 +304,32 @@ export class SessionService {
     }
   }
 
+  async updateSessionStatus(id: string, status: any) { // using any for enum type since Prisma client is out of date
+    this.logger.log(`Updating session status to ${status} for session: ${id}`);
+    
+    try {
+      const session = await this.prisma.session.findUnique({
+        where: { id },
+      });
+
+      if (!session) {
+        this.logger.warn(`Session with ID ${id} not found`);
+        throw new NotFoundException(`Session with ID ${id} not found`);
+      }
+
+      const updatedSession = await this.prisma.session.update({
+        where: { id },
+        data: { status },
+      });
+
+      this.logger.log(`Successfully updated session status: ${updatedSession.name}`);
+      return updatedSession;
+    } catch (error) {
+      this.logger.error(`Error updating session status: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
   async getSessionTerms(id: string) {
     this.logger.log(`Fetching terms for session: ${id}`);
 

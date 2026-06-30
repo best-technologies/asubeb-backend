@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ResponseHelper } from '../../common/helpers/response.helper';
 import * as colors from 'colors';
@@ -588,6 +588,70 @@ export class GradingService {
         (error as any)?.message ?? error,
         500,
       );
+    }
+  }
+
+  async editResult(assessmentId: string, score: number) {
+    this.logger.log(`Editing result for assessment ${assessmentId} to score ${score}`);
+    try {
+      if (score < 0 || score > 100) {
+        throw new BadRequestException('Score must be between 0 and 100');
+      }
+
+      const assessment = await this.prisma.assessment.findUnique({
+        where: { id: assessmentId },
+      });
+
+      if (!assessment) {
+        throw new NotFoundException('Assessment not found');
+      }
+
+      if (assessment.status === 'APPROVED') {
+        throw new ForbiddenException('Cannot edit an approved result');
+      }
+
+      const updated = await this.prisma.assessment.update({
+        where: { id: assessmentId },
+        data: {
+          score,
+          updatedAt: new Date(),
+          status: 'AWAITING_APPROVAL', // reset approval status upon edit
+        },
+      });
+
+      return ResponseHelper.success('Result updated successfully', updated);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Failed to edit result: ${error?.message ?? error}`);
+      throw new InternalServerErrorException('Failed to edit result');
+    }
+  }
+
+  async updateResultStatus(assessmentId: string, status: any, approvedBy: string) {
+    this.logger.log(`Updating result status for assessment ${assessmentId} to ${status}`);
+    try {
+      const assessment = await this.prisma.assessment.findUnique({
+        where: { id: assessmentId },
+      });
+
+      if (!assessment) {
+        throw new NotFoundException('Assessment not found');
+      }
+
+      const updated = await this.prisma.assessment.update({
+        where: { id: assessmentId },
+        data: {
+          status: status,
+        },
+      });
+
+      return ResponseHelper.success(`Result status updated to ${status}`, updated);
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`Failed to update result status: ${error?.message ?? error}`);
+      throw new InternalServerErrorException('Failed to update result status');
     }
   }
 } 

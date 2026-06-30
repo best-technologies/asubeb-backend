@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { SessionService } from './session.service';
 import { CreateSessionDto, UpdateSessionDto } from './dto';
 
@@ -79,6 +79,15 @@ export class SessionController {
   @ApiResponse({ status: 200, description: 'Session deactivated successfully' })
   async deactivateSession(@Param('id') id: string) {
     return this.sessionService.deactivateSession(id);
+  }
+
+  @Put(':id/status')
+  @ApiOperation({ summary: 'Update session status (OPEN/CLOSED)' })
+  @ApiParam({ name: 'id', description: 'Session ID' })
+  @ApiBody({ schema: { type: 'object', properties: { status: { type: 'string', enum: ['OPEN', 'CLOSED'] } } } })
+  @ApiResponse({ status: 200, description: 'Session status updated successfully' })
+  async updateSessionStatus(@Param('id') id: string, @Body('status') status: 'OPEN' | 'CLOSED') {
+    return this.sessionService.updateSessionStatus(id, status);
   }
 
   @Get(':id/terms')

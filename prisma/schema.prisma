@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url = env("DATABASE_URL")
 }
 
 // Gender Enum
@@ -45,31 +45,47 @@ enum UserRole {
   SUBEB_ADMIN
   ADMIN
   SUBEB_OFFICER
+  SCHOOL_IT
   TEACHER
   STUDENT
   PARENT
   USER
 }
 
+// Approval Status Enum
+enum ApprovalStatus {
+  AWAITING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+// Academic Status Enum
+enum AcademicStatus {
+  OPEN
+  CLOSED
+}
+
 // (State model defined later) - removed duplicate to avoid conflicts
 
 // User model for authentication
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  username  String   @unique
-  password  String
-  firstName String?
-  lastName  String?
-  role      UserRole @default(USER)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  email          String   @unique
+  username       String   @unique
+  password       String
+  firstName      String?
+  lastName       String?
+  role           UserRole @default(USER)
+  isActive       Boolean  @default(true)
+  profilePicture String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
   teacher          Teacher?
   student          Student?
   parent           Parent?
+  schoolIt         SchoolIt?
   subebOfficer     SubebOfficer?  @relation("OfficerUser")
   enrolledOfficers SubebOfficer[] @relation("EnrolledOfficers")
   // Required relation to State
@@ -110,6 +126,7 @@ model State {
   teachers             Teacher[]
   parents              Parent[]
   subebOfficers        SubebOfficer[]
+  schoolIts            SchoolIt[]
   sessions             Session[]
   terms                Term[]
   subjects             Subject[]
@@ -129,10 +146,11 @@ model LocalGovernmentArea {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  schools  School[]
+  schools       School[]
+  subebOfficers SubebOfficer[]
   // Required relation to State
-  stateId  String
-  stateRef State    @relation(fields: [stateId], references: [id])
+  stateId       String
+  stateRef      State          @relation(fields: [stateId], references: [id])
 
   @@map("local_government_areas")
 }
@@ -162,11 +180,12 @@ model School {
   updatedAt       DateTime    @updatedAt
 
   // Relations
-  lga      LocalGovernmentArea @relation(fields: [lgaId], references: [id])
-  stateRef State               @relation(fields: [stateId], references: [id])
-  classes  Class[]
-  teachers Teacher[]
-  students Student[]
+  lga       LocalGovernmentArea @relation(fields: [lgaId], references: [id])
+  stateRef  State               @relation(fields: [stateId], references: [id])
+  classes   Class[]
+  teachers  Teacher[]
+  students  Student[]
+  schoolIts SchoolIt[]
 
   @@map("schools")
 }
@@ -244,6 +263,7 @@ model Student {
   dateOfBirth    DateTime
   gender         Gender
   address        String?
+  profilePicture String?
   enrollmentDate DateTime @default(now())
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
@@ -348,17 +368,18 @@ model TeacherSubject {
 
 // Session model (Academic Year)
 model Session {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   name      String // e.g., "2023-2024"
   startDate DateTime
   endDate   DateTime
-  isActive  Boolean  @default(false)
-  isCurrent Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status    AcademicStatus @default(OPEN)
+  isActive  Boolean        @default(false)
+  isCurrent Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
   // Required relation to State
   stateId   String
-  stateRef  State    @relation(fields: [stateId], references: [id])
+  stateRef  State          @relation(fields: [stateId], references: [id])
 
   // Relations
   terms Term[]
@@ -369,18 +390,19 @@ model Session {
 
 // Term model
 model Term {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   sessionId String
   name      TermType
   startDate DateTime
   endDate   DateTime
-  isActive  Boolean  @default(false)
-  isCurrent Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status    AcademicStatus @default(OPEN)
+  isActive  Boolean        @default(false)
+  isCurrent Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
   // Required relation to State
   stateId   String
-  stateRef  State    @relation(fields: [stateId], references: [id])
+  stateRef  State          @relation(fields: [stateId], references: [id])
 
   // Relations
   session     Session      @relation(fields: [sessionId], references: [id])
@@ -409,6 +431,7 @@ model Assessment {
   dateSubmitted DateTime?
   isSubmitted   Boolean        @default(false)
   isGraded      Boolean        @default(false)
+  status        ApprovalStatus @default(AWAITING_APPROVAL)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -425,27 +448,68 @@ model Assessment {
 
 // SUBEB Officer model
 model SubebOfficer {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  officerId      String   @unique // Custom officer ID
+  id             String               @id @default(cuid())
+  userId         String               @unique
+  officerId      String               @unique // Custom officer ID
   firstName      String
   lastName       String
-  email          String   @unique
+  email          String               @unique
   phone          String
   address        String?
   designation    String? // e.g., "Education Officer", "Supervisor"
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  isActive       Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
   // Required relation to State
   stateId        String
-  stateRef       State    @relation(fields: [stateId], references: [id])
+  stateRef       State                @relation(fields: [stateId], references: [id])
+  // Assigned LGA
+  lgaId          String?
+  lga            LocalGovernmentArea? @relation(fields: [lgaId], references: [id])
   // Track who enrolled this officer
   enrolledBy     String? // User ID of the person who enrolled this officer
-  enrolledByUser User?    @relation("EnrolledOfficers", fields: [enrolledBy], references: [id])
+  enrolledByUser User?                @relation("EnrolledOfficers", fields: [enrolledBy], references: [id])
 
   // Relations
   user User @relation("OfficerUser", fields: [userId], references: [id])
 
   @@map("subeb_officers")
+}
+
+// School-IT model
+model SchoolIt {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  schoolItId String   @unique // Custom ID
+  schoolId   String
+  firstName  String
+  lastName   String
+  email      String   @unique
+  phone      String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Required relation to State
+  stateId  String
+  stateRef State  @relation(fields: [stateId], references: [id])
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id])
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@map("school_its")
+}
+
+// Audit Log model
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String // e.g., "APPROVE_RESULT", "CREATE_SESSION"
+  entity    String // e.g., "Assessment", "Session"
+  entityId  String
+  userId    String // Who performed the action
+  details   Json? // Optional extra data
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
 }

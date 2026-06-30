@@ -367,6 +367,32 @@ export class TermService {
     }
   }
 
+  async updateTermStatus(id: string, status: any) { // any for enum type before generation
+    this.logger.log(`Updating term status to ${status} for term: ${id}`);
+    
+    try {
+      const term = await this.prisma.term.findUnique({
+        where: { id },
+      });
+
+      if (!term) {
+        this.logger.warn(`Term with ID ${id} not found`);
+        throw new NotFoundException(`Term with ID ${id} not found`);
+      }
+
+      const updatedTerm = await this.prisma.term.update({
+        where: { id },
+        data: { status },
+      });
+
+      this.logger.log(`Successfully updated term status: ${updatedTerm.name}`);
+      return updatedTerm;
+    } catch (error) {
+      this.logger.error(`Error updating term status: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
   async getTermAssessments(id: string) {
     this.logger.log(`Fetching assessments for term: ${id}`);
 

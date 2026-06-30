@@ -80,6 +80,14 @@ export class TermController {
     return this.termService.deactivateTerm(id);
   }
 
+  @Put(':id/status')
+  @ApiOperation({ summary: 'Update term status (OPEN/CLOSED)' })
+  @ApiParam({ name: 'id', description: 'Term ID' })
+  @ApiResponse({ status: 200, description: 'Term status updated successfully' })
+  async updateTermStatus(@Param('id') id: string, @Body('status') status: 'OPEN' | 'CLOSED') {
+    return this.termService.updateTermStatus(id, status);
+  }
+
   @Get(':id/assessments')
   @ApiOperation({ summary: 'Get assessments for a term' })
   @ApiParam({ name: 'id', description: 'Term ID' })

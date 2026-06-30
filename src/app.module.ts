@@ -12,6 +12,11 @@ import { databaseConfig, appConfig } from './config';
 import { MailModule } from './common/mailer/mail.module';
 import { validate } from './config/validation';
 
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { AuditLogInterceptor } from './modules/admin/audit-log/audit-log.interceptor';
+import { UploadModule } from './modules/upload/upload.module';
+import { AuditLogModule } from './modules/admin/audit-log/audit-log.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,11 +29,19 @@ import { validate } from './config/validation';
     MailModule,
     HealthModule,
     AdminModule,
-  AuthModule,
+    AuthModule,
     GradingModule,
     AcademicModule,
+    UploadModule,
+    AuditLogModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditLogInterceptor,
+    },
+  ],
 })
 export class AppModule {}

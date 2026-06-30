@@ -197,17 +197,19 @@ export class StudentService {
         });
       }
 
+      const termQueryCondition = {
+        ...(currentTerm.includes('_') ? { name: currentTerm as TermType } : { id: currentTerm }),
+        session: {
+          ...(currentSession.includes('/') ? { name: currentSession } : { id: currentSession }),
+        },
+      };
+
       // Build student where conditions for pagination
       const studentWhereConditions: any = {
         isActive: true,
         assessments: {
           some: {
-            term: {
-              name: currentTerm,
-              session: {
-                name: currentSession,
-              },
-            },
+            term: termQueryCondition,
           },
         },
       };
@@ -232,6 +234,7 @@ export class StudentService {
           { firstName: { contains: filters.search, mode: 'insensitive' } },
           { lastName: { contains: filters.search, mode: 'insensitive' } },
           { studentId: { contains: filters.search, mode: 'insensitive' } },
+          { school: { name: { contains: filters.search, mode: 'insensitive' } } },
         ];
       }
 
@@ -258,7 +261,7 @@ export class StudentService {
           class: { select: { name: true } },
           assessments: {
             where: {
-              term: { name: currentTerm, session: { name: currentSession } },
+              term: termQueryCondition,
               ...(filters?.subject && {
                 subject: { name: { contains: filters.subject, mode: 'insensitive' } },
               }),
@@ -509,16 +512,18 @@ export class StudentService {
         throw new NotFoundException(`Student with ID ${studentId} not found`);
       }
 
+      const termQueryCondition = {
+        ...(currentTerm.includes('_') ? { name: currentTerm as TermType } : { id: currentTerm }),
+        session: {
+          ...(currentSession.includes('/') ? { name: currentSession } : { id: currentSession }),
+        },
+      };
+
       // Get assessments for the specified session and term
       const assessments = await this.prisma.assessment.findMany({
         where: {
           studentId: studentId,
-          term: {
-            name: currentTerm,
-            session: {
-              name: currentSession,
-            },
-          },
+          term: termQueryCondition,
         },
         select: {
           id: true,
@@ -742,9 +747,9 @@ export class StudentService {
           assessments: {
             where: {
               term: {
-                name: currentTerm,
+                ...(currentTerm.includes('_') ? { name: currentTerm as TermType } : { id: currentTerm }),
                 session: {
-                  name: currentSession,
+                  ...(currentSession.includes('/') ? { name: currentSession } : { id: currentSession }),
                 },
               },
             },

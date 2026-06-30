@@ -8,6 +8,7 @@ import { ExcelUploadModule } from './excel-upload/excel-upload.module';
 import { BigQueryImportModule } from './bigquery-import/bigquery-import.module';
 import { SubebOfficersModule } from './subeb-officers/subeb-officers.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { EnrollmentModule } from './enrollment/enrollment.module';
     BigQueryImportModule,
     SubebOfficersModule,
     EnrollmentModule,
+    AuditLogModule,
   ],
   exports: [
     DashboardModule,

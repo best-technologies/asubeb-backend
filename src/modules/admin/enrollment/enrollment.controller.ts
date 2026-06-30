@@ -6,6 +6,7 @@ import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { EnrollOfficerDto } from '../subeb-officers/dto';
 import { EnrollSingleOrBulkStudentsDto } from './dto/enroll-student.dto';
+import { EnrollSchoolItDto } from './dto/enroll-school-it.dto';
 import {
   EnrollStudentsResponseDto,
   EnrollSubebOfficerResponseDto,
@@ -73,6 +74,18 @@ export class EnrollmentController {
   })
   async enrollNewSubebOfficer(@Req() req: any, @Body() dto: EnrollOfficerDto) {
     return this.enrollmentService.enrollNewSubebOfficer(dto, req.user);
+  }
+
+  @Post('school-it/enroll')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'SUBEB_ADMIN', 'SUBEB_OFFICER')
+  @ApiOperation({ summary: 'Enroll a new School-IT person' })
+  @ApiBody({ type: EnrollSchoolItDto })
+  @ApiResponse({
+    status: 201,
+    description: 'School-IT person enrolled successfully',
+  })
+  async enrollNewSchoolItPerson(@Req() req: any, @Body() dto: EnrollSchoolItDto) {
+    return this.enrollmentService.enrollNewSchoolItPerson(dto, req.user);
   }
 
   @Post('students/enrollsingleorbulkstudents')

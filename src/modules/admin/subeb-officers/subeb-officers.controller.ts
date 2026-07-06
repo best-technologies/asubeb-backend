@@ -39,7 +39,7 @@ export class SubebOfficersController {
   }
 
   @Patch(':id')
-  @Roles('subeb-admin', 'admin')
+  @Roles('SUBEB_ADMIN', 'ADMIN', 'SUPER_ADMIN')
   @ApiUpdateOfficer()
   async updateOfficer(
     @Param('id') id: string,

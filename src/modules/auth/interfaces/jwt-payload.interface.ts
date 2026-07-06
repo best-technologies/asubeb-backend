@@ -3,4 +3,5 @@ export interface JwtPayload {
   id?: string; // alias for sub
   email: string;
   role: string;
+  stateId?: string | null;
 }

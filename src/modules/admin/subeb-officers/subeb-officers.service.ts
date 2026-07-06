@@ -100,6 +100,7 @@ export class SubebOfficersService {
                 role: true,
               },
             },
+            lga: true,
           },
           orderBy: {
             createdAt: 'desc',
@@ -169,6 +170,7 @@ export class SubebOfficersService {
       if (data.address !== undefined) subebOfficerUpdateData.address = data.address;
       if (data.designation !== undefined) subebOfficerUpdateData.designation = data.designation;
       if (data.isActive !== undefined) subebOfficerUpdateData.isActive = data.isActive;
+      if (data.lgaId !== undefined) subebOfficerUpdateData.lgaId = data.lgaId;
 
       // Build update data for User (only include fields that exist in User model)
       const userUpdateData: any = {};
@@ -223,6 +225,7 @@ export class SubebOfficersService {
                   role: true,
                 },
               },
+              lga: true,
             },
           });
         }
@@ -259,6 +262,7 @@ export class SubebOfficersService {
                 role: true,
               },
             },
+            lga: true,
           },
         });
       });

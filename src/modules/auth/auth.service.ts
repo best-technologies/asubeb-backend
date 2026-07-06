@@ -16,7 +16,7 @@ import { RegisterDto } from './dto/register.dto';
 import * as colors from 'colors';
 import { MailService } from '../../common/mailer/mail.service';
 
-export type SafeUser = { id: string; email: string; role: string; firstName?: string | null; lastName?: string | null };
+export type SafeUser = { id: string; email: string; role: string; firstName?: string | null; lastName?: string | null; stateId?: string | null };
 
 @Injectable()
 export class AuthService {
@@ -57,6 +57,7 @@ export class AuthService {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
+        stateId: user.stateId,
       };
 
       this.logger.log(`User validated: ${email}`);
@@ -105,14 +106,14 @@ export class AuthService {
       throw new BadRequestException('Invalid user');
     }
 
-    const payload: JwtPayload = { sub: user.id, id: user.id, email: user.email, role: user.role };
+    const payload: JwtPayload = { sub: user.id, id: user.id, email: user.email, role: user.role, stateId: user.stateId };
 
     try {
       this.logger.log(`Signing JWT for user ${user.email} (${user.id})`);
       const token = this.jwtService.sign(payload);
       return {
         access_token: token,
-        user: { sub: payload.sub, id: payload.id, email: payload.email, role: payload.role },
+        user: { sub: payload.sub, id: payload.id, email: payload.email, role: payload.role, stateId: payload.stateId },
       };
     } catch (error) {
       this.logger.error(`Failed to sign JWT for user ${user.email}: ${error?.message ?? error}`);

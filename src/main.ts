@@ -63,7 +63,7 @@ async function bootstrap() {
   console.log(colors.green('🚀 Server successfully started!'));
   console.log(colors.cyan(`📍 Server running on: http://localhost:${port}`));
   console.log(colors.yellow(`📝 API Documentation: http://localhost:${port}/api`));
-  console.log(colors.blue(`💾 Database: ${configService.get<string>('database.database')}`));
+  console.log(colors.blue(`💾 Database: ${configService.get<string>('database.url')}`));
   console.log(colors.magenta(`🔗 API Base URL: http://localhost:${port}/api/v1`));
 }
 bootstrap();

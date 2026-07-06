@@ -57,7 +57,14 @@ export class EnrollOfficerDto {
   @IsOptional()
   designation?: string;
 
+  @ApiPropertyOptional({
+    description: 'ID of the assigned Local Government Area',
+    example: 'clh8x...',
+  })
+  @IsString()
+  @IsOptional()
+  lgaId?: string;
+
   // stateId is derived from the currently signed-in (enrolling) user on the server side
   // and should NOT be sent from the client.
 }
-

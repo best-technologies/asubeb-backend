@@ -212,6 +212,7 @@ export class EnrollmentService {
             address: dto.address || "",
             designation: dto.designation || "",
             stateId,
+            lgaId: dto.lgaId,
             enrolledBy: enrolledByUserId,
           },
         });

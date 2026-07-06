@@ -57,6 +57,14 @@ export class UpdateOfficerDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'ID of the assigned Local Government Area',
+    example: 'clh8x...',
+  })
+  @IsString()
+  @IsOptional()
+  lgaId?: string;
 }
 
 

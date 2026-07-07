@@ -16,6 +16,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditLogInterceptor } from './modules/admin/audit-log/audit-log.interceptor';
 import { UploadModule } from './modules/upload/upload.module';
 import { AuditLogModule } from './modules/admin/audit-log/audit-log.module';
+import { SchoolItModule } from './modules/school-it/school-it.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AuditLogModule } from './modules/admin/audit-log/audit-log.module';
     AcademicModule,
     UploadModule,
     AuditLogModule,
+    SchoolItModule,
   ],
   controllers: [AppController],
   providers: [

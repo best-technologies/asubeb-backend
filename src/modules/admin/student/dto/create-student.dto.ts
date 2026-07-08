@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsEmail, IsOptional, IsEnum, IsDateString, IsUUID } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsEnum, IsDateString } from 'class-validator';
 import { Gender } from '@prisma/client';
 
 export class CreateStudentDto {
@@ -40,16 +40,16 @@ export class CreateStudentDto {
   address?: string;
 
   @ApiProperty({ description: 'School ID where student is enrolled', example: 'school-uuid-123' })
-  @IsUUID()
+  @IsString()
   schoolId: string;
 
   @ApiProperty({ description: 'Class ID where student is enrolled', example: 'class-uuid-456' })
-  @IsUUID()
+  @IsString()
   classId: string;
 
   @ApiProperty({ description: 'Parent ID (if parent exists)', example: 'parent-uuid-789', required: false })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   parentId?: string;
 
   @ApiProperty({ description: 'Student enrollment date', example: '2024-09-01', required: false })

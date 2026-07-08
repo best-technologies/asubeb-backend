@@ -50,6 +50,67 @@ async function seedTestAccounts() {
       console.log('✅ Created School: Aba North Primary School');
     }
 
+    // 3.5. Create Classes for Aba North Primary School
+    let class1A = await prisma.class.findFirst({ where: { name: 'Primary 1A', schoolId: school.id } });
+    if (!class1A) {
+      class1A = await prisma.class.create({
+        data: {
+          name: 'Primary 1A',
+          grade: '1',
+          section: 'A',
+          schoolId: school.id,
+          academicYear: '2023-2024',
+        }
+      });
+      console.log('✅ Created Class: Primary 1A');
+    }
+
+    let class1B = await prisma.class.findFirst({ where: { name: 'Primary 1B', schoolId: school.id } });
+    if (!class1B) {
+      class1B = await prisma.class.create({
+        data: {
+          name: 'Primary 1B',
+          grade: '1',
+          section: 'B',
+          schoolId: school.id,
+          academicYear: '2023-2024',
+        }
+      });
+      console.log('✅ Created Class: Primary 1B');
+    }
+
+    // Dummy Schools in the same LGA for the Exam Officer
+    let dummySchool1 = await prisma.school.findFirst({ where: { code: 'ABA-N-DUM-01' } });
+    if (!dummySchool1) {
+      dummySchool1 = await prisma.school.create({
+        data: {
+          name: 'Aba North Dummy School 1',
+          code: 'ABA-N-DUM-01',
+          level: SchoolLevel.PRIMARY,
+          address: 'Dummy Address 1',
+          lgaId: lga.id,
+          stateId: state.id,
+        }
+      });
+      console.log('✅ Created Dummy School 1');
+    }
+
+    let dummySchool2 = await prisma.school.findFirst({ where: { code: 'ABA-N-DUM-02' } });
+    if (!dummySchool2) {
+      dummySchool2 = await prisma.school.create({
+        data: {
+          name: 'Aba North Dummy School 2',
+          code: 'ABA-N-DUM-02',
+          level: SchoolLevel.SECONDARY,
+          address: 'Dummy Address 2',
+          lgaId: lga.id,
+          stateId: state.id,
+        }
+      });
+      console.log('✅ Created Dummy School 2');
+    }
+
+
     const passwordHash = await bcrypt.hash('password123', 10);
 
     // 4. Create SUPER_ADMIN
@@ -132,6 +193,37 @@ async function seedTestAccounts() {
       console.log('✅ Created SCHOOL_IT user: it@school.com / password123');
     } else {
       console.log('ℹ️ SCHOOL_IT already exists: it@school.com');
+    }
+
+    // 7. Create another SCHOOL_IT (for Dummy School 1)
+    const itEmail2 = 'it2@school.com';
+    let itPerson2 = await prisma.user.findUnique({ where: { email: itEmail2 } });
+    if (!itPerson2) {
+      itPerson2 = await prisma.user.create({
+        data: {
+          email: itEmail2,
+          username: 'schoolit2',
+          password: passwordHash,
+          firstName: 'School',
+          lastName: 'IT 2',
+          role: UserRole.SCHOOL_IT,
+          stateId: state.id,
+          schoolIt: {
+            create: {
+              schoolItId: 'IT-002',
+              firstName: 'School',
+              lastName: 'IT 2',
+              email: itEmail2,
+              phone: '08000000003',
+              stateId: state.id,
+              schoolId: dummySchool1.id,
+            }
+          }
+        },
+      });
+      console.log('✅ Created SCHOOL_IT user 2: it2@school.com / password123');
+    } else {
+      console.log('ℹ️ SCHOOL_IT 2 already exists: it2@school.com');
     }
 
     console.log('\n✨ Seeding completed successfully!\n');

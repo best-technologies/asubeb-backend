@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber, Min, IsEnum, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsNumber, Min, IsEnum } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { TermType } from '@prisma/client';
 
@@ -56,7 +56,7 @@ export class DashboardQueryDto {
     example: 'clx1234567890abcdef',
   })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   schoolId?: string;
 
   @ApiPropertyOptional({
@@ -64,7 +64,7 @@ export class DashboardQueryDto {
     example: 'clx1234567890abcdef',
   })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   classId?: string;
 
   @ApiPropertyOptional({
@@ -90,7 +90,7 @@ export class DashboardQueryDto {
     example: 'clx1234567890abcdef',
   })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   lgaId?: string;
 
   @ApiPropertyOptional({

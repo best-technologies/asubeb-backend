@@ -26,6 +26,7 @@ export class SchoolItDashboardService {
       totalTeachers,
       totalClasses,
       recentStudents,
+      classes,
     ] = await Promise.all([
       this.prisma.student.count({ where: { schoolId } }),
       this.prisma.student.count({ where: { schoolId, gender: 'MALE' } }),
@@ -44,6 +45,11 @@ export class SchoolItDashboardService {
           createdAt: true,
         },
       }),
+      this.prisma.class.findMany({
+        where: { schoolId },
+        select: { id: true, name: true, grade: true },
+        orderBy: { grade: 'asc' }
+      }),
     ]);
 
     return {
@@ -59,6 +65,7 @@ export class SchoolItDashboardService {
         totalTeachers,
         totalClasses,
       },
+      classes,
       recentStudents,
     };
   }

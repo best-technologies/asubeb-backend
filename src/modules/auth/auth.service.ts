@@ -16,7 +16,7 @@ import { RegisterDto } from './dto/register.dto';
 import * as colors from 'colors';
 import { MailService } from '../../common/mailer/mail.service';
 
-export type SafeUser = { id: string; email: string; role: string; firstName?: string | null; lastName?: string | null; stateId?: string | null };
+export type SafeUser = { id: string; email: string; role: string; firstName?: string | null; lastName?: string | null; stateId?: string | null; schoolName?: string | null };
 
 @Injectable()
 export class AuthService {
@@ -39,7 +39,14 @@ export class AuthService {
     }
 
     try {
-      const user = await this.prisma.user.findUnique({ where: { email } });
+      const user = await this.prisma.user.findUnique({ 
+        where: { email },
+        include: {
+          schoolIt: {
+            include: { school: true }
+          }
+        }
+      });
       if (!user) {
         this.logger.warn(`Authentication attempt for non-existing user: ${email}`);
         return null;
@@ -58,6 +65,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         stateId: user.stateId,
+        schoolName: user.schoolIt?.school?.name || null,
       };
 
       this.logger.log(`User validated: ${email}`);
@@ -113,7 +121,7 @@ export class AuthService {
       const token = this.jwtService.sign(payload);
       return {
         access_token: token,
-        user: { sub: payload.sub, id: payload.id, email: payload.email, role: payload.role, stateId: payload.stateId },
+        user: { sub: payload.sub, id: payload.id, email: payload.email, role: payload.role, stateId: payload.stateId, schoolName: user.schoolName },
       };
     } catch (error) {
       this.logger.error(`Failed to sign JWT for user ${user.email}: ${error?.message ?? error}`);

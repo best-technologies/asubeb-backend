@@ -13,11 +13,20 @@ export class SchoolItResultService {
   private async getSchoolItProfile(userId: string) {
     const profile = await this.prisma.schoolIt.findUnique({
       where: { userId },
+      include: { school: true },
     });
     if (!profile) {
       throw new NotFoundException('School-IT profile not found for user');
     }
     return profile;
+  }
+
+  async getSubjects(userId: string) {
+    const profile = await this.getSchoolItProfile(userId);
+    return this.prisma.subject.findMany({
+      where: { stateId: profile.stateId, level: profile.school.level },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async getResults(userId: string, classId?: string, page: number = 1, limit: number = 20) {

@@ -27,6 +27,8 @@ export class SchoolItDashboardService {
       totalClasses,
       recentStudents,
       classes,
+      activeSession,
+      activeTerm,
     ] = await Promise.all([
       this.prisma.student.count({ where: { schoolId } }),
       this.prisma.student.count({ where: { schoolId, gender: 'MALE' } }),
@@ -50,6 +52,14 @@ export class SchoolItDashboardService {
         select: { id: true, name: true, grade: true },
         orderBy: { grade: 'asc' }
       }),
+      this.prisma.session.findFirst({
+        where: { isCurrent: true, stateId: schoolIt.stateId },
+        select: { id: true, name: true }
+      }),
+      this.prisma.term.findFirst({
+        where: { isCurrent: true, stateId: schoolIt.stateId },
+        select: { id: true, name: true }
+      })
     ]);
 
     return {
@@ -57,7 +67,10 @@ export class SchoolItDashboardService {
         id: schoolIt.school.id,
         name: schoolIt.school.name,
         code: schoolIt.school.code,
+        lgaId: schoolIt.school.lgaId,
       },
+      activeSession,
+      activeTerm,
       analytics: {
         totalStudents,
         maleStudents,

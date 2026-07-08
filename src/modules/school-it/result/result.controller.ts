@@ -15,6 +15,12 @@ import { UploadResultsDto } from '../../grading/dto/upload-results.dto';
 export class SchoolItResultController {
   constructor(private readonly resultService: SchoolItResultService) {}
 
+  @Get('subjects')
+  @ApiOperation({ summary: 'Get all subjects available for the School-IT assigned school level' })
+  async getSubjects(@Request() req) {
+    return this.resultService.getSubjects(req.user.id);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get paginated list of results for students in the School-IT assigned school' })
   async getResults(

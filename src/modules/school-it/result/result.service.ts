@@ -34,28 +34,29 @@ export class SchoolItResultService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      student: { schoolId: profile.schoolId },
-      type: 'EXAM', // or we can fetch all assessment types
+      schoolId: profile.schoolId,
     };
     if (classId) where.classId = classId;
 
-    const [assessments, total] = await Promise.all([
-      this.prisma.assessment.findMany({
+    const [students, total] = await Promise.all([
+      this.prisma.student.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { createdAt: 'desc' },
         include: {
-          student: true,
-          subject: true,
           class: true,
+          assessments: {
+            where: { type: 'EXAM' },
+            include: { subject: true },
+          },
         },
       }),
-      this.prisma.assessment.count({ where }),
+      this.prisma.student.count({ where }),
     ]);
 
     return {
-      data: assessments,
+      data: students,
       pagination: {
         page,
         limit,
@@ -63,6 +64,26 @@ export class SchoolItResultService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async getStudentResults(userId: string, studentId: string) {
+    const profile = await this.getSchoolItProfile(userId);
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, schoolId: profile.schoolId },
+      include: {
+        class: true,
+        assessments: {
+          where: { type: 'EXAM' },
+          include: { subject: true },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found or does not belong to your school');
+    }
+
+    return student;
   }
 
   async uploadResultsAtomic(userId: string, stateId: string, data: UploadResultsDto) {

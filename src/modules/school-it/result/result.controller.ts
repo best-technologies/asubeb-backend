@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -35,6 +35,15 @@ export class SchoolItResultController {
       parseInt(page, 10),
       parseInt(limit, 10),
     );
+  }
+
+  @Get(':studentId')
+  @ApiOperation({ summary: 'Get results for a specific student' })
+  async getStudentResults(
+    @Request() req,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.resultService.getStudentResults(req.user.id, studentId);
   }
 
   @Post('upload')

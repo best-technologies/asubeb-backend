@@ -94,6 +94,19 @@ export class SchoolItResultService {
       throw new BadRequestException('You can only upload results for your assigned school.');
     }
 
+    // Fetch active session and term to enforce data integrity
+    const activeTerm = await this.prisma.term.findFirst({
+      where: { isCurrent: true, stateId },
+      include: { session: true }
+    });
+
+    if (!activeTerm) {
+      throw new BadRequestException('No active academic term found for grading.');
+    }
+
+    const currentTermId = activeTerm.id;
+    // We ignore data.termId and data.sessionId and force use of current active terms
+
     // Atomic transaction: if any part fails, the whole transaction rolls back
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -115,7 +128,7 @@ export class SchoolItResultService {
                   studentId: student.id,
                   subjectId: subjectScore.subjectId,
                   classId: data.classId,
-                  termId: data.termId,
+                  termId: currentTermId,
                   type: 'EXAM',
                   title: 'Final Exam',
                 },
@@ -132,7 +145,7 @@ export class SchoolItResultService {
                 data: {
                   score: subjectScore.score,
                   percentage: subjectScore.score,
-                  status: 'AWAITING_APPROVAL', // Reset status on edit
+                  status: 'PENDING_SUBMISSION', // Reset status on edit
                   isSubmitted: true,
                 },
               });
@@ -142,7 +155,7 @@ export class SchoolItResultService {
                   studentId: student.id,
                   subjectId: subjectScore.subjectId,
                   classId: data.classId,
-                  termId: data.termId,
+                  termId: currentTermId,
                   type: 'EXAM',
                   title: 'Final Exam',
                   maxScore: 100,
@@ -150,7 +163,7 @@ export class SchoolItResultService {
                   percentage: subjectScore.score,
                   dateGiven: new Date(),
                   isSubmitted: true,
-                  status: 'AWAITING_APPROVAL',
+                  status: 'PENDING_SUBMISSION',
                 },
               });
             }
@@ -168,7 +181,73 @@ export class SchoolItResultService {
 
       return { success: true, message: `Successfully uploaded results for ${data.students.length} student(s).` };
     } catch (error) {
-      throw new BadRequestException(`Bulk upload failed. No results were saved. Error: ${error.message}`);
+      return { success: false, message: error.message };
     }
+  }
+
+  async checkMissingResults(userId: string, stateId: string) {
+    const profile = await this.getSchoolItProfile(userId);
+
+    const activeTerm = await this.prisma.term.findFirst({
+      where: { isCurrent: true, stateId },
+    });
+
+    if (!activeTerm) {
+      throw new BadRequestException('No active term found.');
+    }
+
+    const students = await this.prisma.student.findMany({
+      where: { schoolId: profile.schoolId },
+      include: {
+        assessments: {
+          where: { termId: activeTerm.id, type: 'EXAM' }
+        }
+      }
+    });
+
+    const totalExpectedSubjects = profile.school.level === 'PRIMARY' ? 10 : 15;
+
+    let missingCount = 0;
+    for (const student of students) {
+      if (student.assessments.length < totalExpectedSubjects) {
+        missingCount++;
+      }
+    }
+
+    return {
+      hasMissing: missingCount > 0,
+      missingCount,
+      message: missingCount > 0 
+        ? `${missingCount} student(s) have incomplete results for the current term.`
+        : 'All students have complete results.'
+    };
+  }
+
+  async submitResultsForApproval(userId: string, stateId: string) {
+    const profile = await this.getSchoolItProfile(userId);
+
+    const activeTerm = await this.prisma.term.findFirst({
+      where: { isCurrent: true, stateId },
+    });
+
+    if (!activeTerm) {
+      throw new BadRequestException('No active term found.');
+    }
+
+    const updateResult = await this.prisma.assessment.updateMany({
+      where: {
+        student: { schoolId: profile.schoolId },
+        termId: activeTerm.id,
+        status: 'PENDING_SUBMISSION',
+      },
+      data: {
+        status: 'AWAITING_APPROVAL',
+      },
+    });
+
+    return {
+      success: true,
+      message: `Successfully submitted ${updateResult.count} results for approval.`,
+    };
   }
 }

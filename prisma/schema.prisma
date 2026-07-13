@@ -54,6 +54,7 @@ enum UserRole {
 
 // Approval Status Enum
 enum ApprovalStatus {
+  PENDING_SUBMISSION
   AWAITING_APPROVAL
   APPROVED
   REJECTED
@@ -431,7 +432,7 @@ model Assessment {
   dateSubmitted DateTime?
   isSubmitted   Boolean        @default(false)
   isGraded      Boolean        @default(false)
-  status        ApprovalStatus @default(AWAITING_APPROVAL)
+  status        ApprovalStatus @default(PENDING_SUBMISSION)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 

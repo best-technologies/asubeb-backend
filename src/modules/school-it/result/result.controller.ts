@@ -46,6 +46,18 @@ export class SchoolItResultController {
     return this.resultService.getStudentResults(req.user.id, studentId);
   }
 
+  @Get('check/missing')
+  @ApiOperation({ summary: 'Check if there are missing results for the active term' })
+  async checkMissingResults(@Request() req) {
+    return this.resultService.checkMissingResults(req.user.id, req.user.stateId);
+  }
+
+  @Post('submit')
+  @ApiOperation({ summary: 'Submit all draft results for approval' })
+  async submitResultsForApproval(@Request() req) {
+    return this.resultService.submitResultsForApproval(req.user.id, req.user.stateId);
+  }
+
   @Post('upload')
   @ApiOperation({ summary: 'Atomically upload manual or bulk results for students' })
   async uploadResults(@Request() req, @Body() data: UploadResultsDto) {

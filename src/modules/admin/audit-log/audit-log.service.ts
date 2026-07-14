@@ -35,8 +35,24 @@ export class AuditLogService {
       this.prisma.auditLog.count(),
     ]);
 
+    const userIds = [...new Set(logs.map(l => l.userId))];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, firstName: true, lastName: true },
+    });
+
+    const userMap = users.reduce((acc, user) => {
+      acc[user.id] = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User';
+      return acc;
+    }, {} as Record<string, string>);
+
+    const enrichedLogs = logs.map(log => ({
+      ...log,
+      userName: userMap[log.userId] || 'System',
+    }));
+
     return {
-      data: logs,
+      data: enrichedLogs,
       pagination: {
         page,
         limit,

@@ -108,6 +108,10 @@ export class ExamOfficerService {
       });
       const approved = approvedStudents.length;
       
+      const totalStudents = await this.prisma.student.count({
+        where: { schoolId: school.id, isActive: true }
+      });
+
       let overallStatus = 'NO_RESULTS';
       if (awaiting > 0) overallStatus = 'AWAITING_APPROVAL';
       else if (approved > 0) overallStatus = 'APPROVED';
@@ -117,7 +121,8 @@ export class ExamOfficerService {
         stats: {
           awaitingApproval: awaiting,
           approved: approved,
-          total: awaiting + approved
+          total: awaiting + approved,
+          totalEnrolled: totalStudents
         },
         overallStatus
       };

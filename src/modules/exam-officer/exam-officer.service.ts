@@ -13,7 +13,7 @@ export class ExamOfficerService {
   private async getOfficer(userId: string) {
     const officer = await this.prisma.subebOfficer.findUnique({
       where: { userId },
-      include: { stateRef: true, lga: true }
+      include: { stateRef: true, lga: true, user: true }
     });
     if (!officer) {
       throw new NotFoundException('Exam Officer profile not found');

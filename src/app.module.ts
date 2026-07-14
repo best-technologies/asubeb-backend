@@ -17,6 +17,7 @@ import { AuditLogInterceptor } from './modules/admin/audit-log/audit-log.interce
 import { UploadModule } from './modules/upload/upload.module';
 import { AuditLogModule } from './modules/admin/audit-log/audit-log.module';
 import { SchoolItModule } from './modules/school-it/school-it.module';
+import { ExamOfficerModule } from './modules/exam-officer/exam-officer.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { SchoolItModule } from './modules/school-it/school-it.module';
     UploadModule,
     AuditLogModule,
     SchoolItModule,
+    ExamOfficerModule,
   ],
   controllers: [AppController],
   providers: [

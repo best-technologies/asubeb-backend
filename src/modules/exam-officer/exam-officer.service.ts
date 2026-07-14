@@ -303,11 +303,16 @@ export class ExamOfficerService {
       data: updateData
     });
 
-    // Update user profile picture if provided
-    if (data.profilePicture) {
+    // Update user profile picture and name if provided
+    const userUpdateData: any = {};
+    if (data.profilePicture !== undefined) userUpdateData.profilePicture = data.profilePicture;
+    if (data.firstName) userUpdateData.firstName = data.firstName;
+    if (data.lastName) userUpdateData.lastName = data.lastName;
+
+    if (Object.keys(userUpdateData).length > 0) {
       await this.prisma.user.update({
         where: { id: userId },
-        data: { profilePicture: data.profilePicture }
+        data: userUpdateData
       });
     }
 

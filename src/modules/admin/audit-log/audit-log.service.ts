@@ -38,11 +38,12 @@ export class AuditLogService {
     const userIds = [...new Set(logs.map(l => l.userId))];
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, firstName: true, lastName: true },
+      select: { id: true, firstName: true, lastName: true, email: true },
     });
 
     const userMap = users.reduce((acc, user) => {
-      acc[user.id] = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User';
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+      acc[user.id] = fullName ? `${fullName} (${user.email})` : user.email;
       return acc;
     }, {} as Record<string, string>);
 

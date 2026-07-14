@@ -198,6 +198,7 @@ export class EnrollmentService {
             lastName: dto.lastName,
             role: UserRole.SUBEB_OFFICER,
             stateId,
+            profilePicture: dto.profilePicture,
           },
         });
 

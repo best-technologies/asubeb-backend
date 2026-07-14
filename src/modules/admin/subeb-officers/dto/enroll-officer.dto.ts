@@ -65,6 +65,14 @@ export class EnrollOfficerDto {
   @IsOptional()
   lgaId?: string;
 
+  @ApiPropertyOptional({
+    description: 'URL of the officer profile picture',
+    example: 'https://...',
+  })
+  @IsString()
+  @IsOptional()
+  profilePicture?: string;
+
   // stateId is derived from the currently signed-in (enrolling) user on the server side
   // and should NOT be sent from the client.
 }

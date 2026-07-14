@@ -95,12 +95,15 @@ export class SchoolItStudentService {
       throw new NotFoundException('Student not found in your school');
     }
 
-    const updatedData: any = { ...data };
+    const updatedData: any = {};
+    if (data.firstName !== undefined) updatedData.firstName = data.firstName;
+    if (data.lastName !== undefined) updatedData.lastName = data.lastName;
+    if (data.gender !== undefined) updatedData.gender = data.gender;
+    if (data.classId !== undefined) updatedData.classId = data.classId;
+    if (data.studentId !== undefined) updatedData.studentId = data.studentId;
+    if (data.profilePicture !== undefined && !data.profilePicture.startsWith('blob:')) updatedData.profilePicture = data.profilePicture;
     if (data.dateOfBirth) updatedData.dateOfBirth = new Date(data.dateOfBirth);
     if (data.enrollmentDate) updatedData.enrollmentDate = new Date(data.enrollmentDate);
-    
-    // Prevent changing school via update
-    delete updatedData.schoolId;
 
     const student = await this.prisma.student.update({
       where: { id: studentId },

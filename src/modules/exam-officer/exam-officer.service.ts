@@ -201,6 +201,17 @@ export class ExamOfficerService {
     });
     if (!school) throw new ForbiddenException('School not found or not in your LGA');
 
+    const studentsWithAssessments = await this.prisma.assessment.findMany({
+      where: {
+        class: { schoolId: school.id },
+        termId: activeTerm.id,
+        status: ApprovalStatus.AWAITING_APPROVAL
+      },
+      distinct: ['studentId'],
+      select: { studentId: true }
+    });
+    const studentCount = studentsWithAssessments.length;
+
     const result = await this.prisma.assessment.updateMany({
       where: {
         class: { schoolId: school.id },
@@ -217,10 +228,10 @@ export class ExamOfficerService {
       schoolName: school.name,
       termId: activeTerm.id,
       action: 'APPROVED',
-      count: result.count
+      count: studentCount
     });
 
-    return { message: `Successfully approved ${result.count} results for ${school.name}` };
+    return { message: `Successfully approved results for ${studentCount} students in ${school.name}` };
   }
 
   async rejectSchoolResults(userId: string, schoolId: string) {
@@ -233,6 +244,17 @@ export class ExamOfficerService {
       where: { id: schoolId, lgaId: lgaId }
     });
     if (!school) throw new ForbiddenException('School not found or not in your LGA');
+
+    const studentsWithAssessments = await this.prisma.assessment.findMany({
+      where: {
+        class: { schoolId: school.id },
+        termId: activeTerm.id,
+        status: ApprovalStatus.AWAITING_APPROVAL
+      },
+      distinct: ['studentId'],
+      select: { studentId: true }
+    });
+    const studentCount = studentsWithAssessments.length;
 
     const result = await this.prisma.assessment.updateMany({
       where: {
@@ -250,10 +272,10 @@ export class ExamOfficerService {
       schoolName: school.name,
       termId: activeTerm.id,
       action: 'REJECTED',
-      count: result.count
+      count: studentCount
     });
 
-    return { message: `Successfully rejected ${result.count} results for ${school.name}` };
+    return { message: `Successfully rejected results for ${studentCount} students in ${school.name}` };
   }
 
   async getProfile(userId: string) {

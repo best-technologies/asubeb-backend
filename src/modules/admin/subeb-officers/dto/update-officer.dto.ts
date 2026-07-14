@@ -65,8 +65,15 @@ export class UpdateOfficerDto {
   @IsString()
   @IsOptional()
   lgaId?: string;
-}
 
+  @ApiPropertyOptional({
+    description: 'URL of the officer profile picture',
+    example: 'https://asubeb-bucket.s3.amazonaws.com/pic.jpg',
+  })
+  @IsString()
+  @IsOptional()
+  profilePicture?: string;
+}
 
 
 

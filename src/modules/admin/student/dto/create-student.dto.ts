@@ -56,4 +56,9 @@ export class CreateStudentDto {
   @IsOptional()
   @IsDateString()
   enrollmentDate?: string;
+
+  @ApiProperty({ description: 'Profile picture URL', example: 'https://asubeb-bucket.s3.amazonaws.com/xyz.jpg', required: false })
+  @IsOptional()
+  @IsString()
+  profilePicture?: string;
 }

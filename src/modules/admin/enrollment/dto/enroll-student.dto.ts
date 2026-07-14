@@ -70,6 +70,14 @@ export class EnrollStudentDto {
   })
   @IsString()
   classId: string;
+
+  @ApiPropertyOptional({
+    description: 'Profile picture URL',
+    example: 'https://asubeb-bucket.s3.amazonaws.com/xyz.jpg',
+  })
+  @IsOptional()
+  @IsString()
+  profilePicture?: string;
 }
 
 export class EnrollSingleOrBulkStudentsDto {

@@ -50,21 +50,27 @@ export class ExamOfficerService {
 
     const schoolIds = (await this.prisma.school.findMany({ where: { lgaId: lgaId }, select: { id: true } })).map(s => s.id);
 
-    const awaitingApprovalCount = await this.prisma.assessment.count({
+    const awaitingApprovalCountQuery = await this.prisma.assessment.findMany({
       where: {
         class: { schoolId: { in: schoolIds } },
         termId: activeTerm.id,
         status: ApprovalStatus.AWAITING_APPROVAL
-      }
+      },
+      distinct: ['studentId'],
+      select: { studentId: true }
     });
+    const awaitingApprovalCount = awaitingApprovalCountQuery.length;
 
-    const approvedCount = await this.prisma.assessment.count({
+    const approvedCountQuery = await this.prisma.assessment.findMany({
       where: {
         class: { schoolId: { in: schoolIds } },
         termId: activeTerm.id,
         status: ApprovalStatus.APPROVED
-      }
+      },
+      distinct: ['studentId'],
+      select: { studentId: true }
     });
+    const approvedCount = approvedCountQuery.length;
 
     return {
       activeSession: activeTerm.session,

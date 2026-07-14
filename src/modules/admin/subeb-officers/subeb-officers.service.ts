@@ -170,7 +170,7 @@ export class SubebOfficersService {
       if (data.address !== undefined) subebOfficerUpdateData.address = data.address;
       if (data.designation !== undefined) subebOfficerUpdateData.designation = data.designation;
       if (data.isActive !== undefined) subebOfficerUpdateData.isActive = data.isActive;
-      if (data.lgaId !== undefined) subebOfficerUpdateData.lgaId = data.lgaId;
+      if (data.lgaId !== undefined && data.lgaId !== '') subebOfficerUpdateData.lgaId = data.lgaId;
 
       // Build update data for User (only include fields that exist in User model)
       const userUpdateData: any = {};
@@ -180,6 +180,7 @@ export class SubebOfficersService {
         userUpdateData.email = data.email;
         userUpdateData.username = data.email; // Update username to match email
       }
+      if (data.profilePicture !== undefined) userUpdateData.profilePicture = data.profilePicture;
 
       // Use transaction to ensure atomicity
       const result = await this.prisma.$transaction(async (tx) => {

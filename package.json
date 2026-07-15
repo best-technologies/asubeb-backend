@@ -71,7 +71,6 @@
     "@prisma/client": "^6.12.0",
     "@sendgrid/mail": "^8.1.0",
     "@types/multer": "^2.0.0",
-    "@types/uuid": "^10.0.0",
     "@types/xlsx": "^0.0.35",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
@@ -88,7 +87,6 @@
     "resend": "^4.0.0",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
-    "uuid": "^14.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

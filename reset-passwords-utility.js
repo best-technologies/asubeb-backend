@@ -11,7 +11,7 @@ async function main() {
   const admins = await prisma.user.findMany({
     where: {
       email: {
-        in: ['admin@asubeb.com', 'bernardmayowaa@gmail.com']
+        in: ['admin@asubeb.com', 'bernardmayowaa@gmail.com', 'developerr.besttech@gmail.com']
       }
     }
   });

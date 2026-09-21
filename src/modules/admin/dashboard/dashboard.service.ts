@@ -278,6 +278,7 @@ export class DashboardService {
         id: string;
         studentName: string;
         examNumber: string;
+        lga: string;
         school: string;
         class: string;
         gender: any;
@@ -326,11 +327,13 @@ export class DashboardService {
               s."lastName",
               s."studentId" AS "examNumber",
               s.gender,
+              COALESCE(lga.name, 'N/A') AS "lga",
               sch.name AS "school",
               c.name AS "class",
               COALESCE(SUM(a.score), 0)::int AS "totalScore"
             FROM students s
             JOIN schools sch ON s."schoolId" = sch.id
+            LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
             LEFT JOIN classes c ON s."classId" = c.id
             JOIN assessments a ON a."studentId" = s.id
             JOIN terms t ON a."termId" = t.id AND t.id = ${termData.id}
@@ -341,7 +344,7 @@ export class DashboardService {
             ${gender ? Prisma.sql`AND s.gender = ${gender}::"Gender"` : Prisma.empty}
             ${lgaId ? Prisma.sql`AND sch."lgaId" = ${lgaId}` : Prisma.empty}
             ${search ? Prisma.sql`AND (s."firstName" ILIKE ${`%${search}%`} OR s."lastName" ILIKE ${`%${search}%`} OR s."studentId" ILIKE ${`%${search}%`})` : Prisma.empty}
-            GROUP BY s.id, s."firstName", s."lastName", s."studentId", s.gender, sch.name, c.name
+            GROUP BY s.id, s."firstName", s."lastName", s."studentId", s.gender, lga.name, sch.name, c.name
             ORDER BY "totalScore" DESC
             OFFSET ${topSkip}
             LIMIT ${topLimit};
@@ -352,6 +355,7 @@ export class DashboardService {
             id: student.id,
             studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
             examNumber: student.examNumber || 'N/A',
+            lga: student.lga || 'N/A',
             school: student.school || 'N/A',
             class: student.class || 'N/A',
             gender: student.gender || 'N/A',
@@ -548,11 +552,13 @@ export class DashboardService {
           s."lastName",
           s."studentId" AS "examNumber",
           s.gender,
+          COALESCE(lga.name, 'N/A') AS "lga",
           sch.name AS "school",
           c.name AS "class",
           COALESCE(SUM(a.score), 0)::int AS "totalScore"
         FROM students s
         JOIN schools sch ON s."schoolId" = sch.id
+        LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
         LEFT JOIN classes c ON s."classId" = c.id
         JOIN assessments a ON a."studentId" = s.id
         JOIN terms t ON a."termId" = t.id AND t.id = ${termData.id}
@@ -563,7 +569,7 @@ export class DashboardService {
         ${gender ? Prisma.sql`AND s.gender = ${gender}::"Gender"` : Prisma.empty}
         ${lgaId ? Prisma.sql`AND sch."lgaId" = ${lgaId}` : Prisma.empty}
         ${search ? Prisma.sql`AND (s."firstName" ILIKE ${`%${search}%`} OR s."lastName" ILIKE ${`%${search}%`} OR s."studentId" ILIKE ${`%${search}%`})` : Prisma.empty}
-        GROUP BY s.id, s."firstName", s."lastName", s."studentId", s.gender, sch.name, c.name
+        GROUP BY s.id, s."firstName", s."lastName", s."studentId", s.gender, lga.name, sch.name, c.name
         ORDER BY "totalScore" DESC
         OFFSET ${topSkip}
         LIMIT ${topLimit};
@@ -574,6 +580,7 @@ export class DashboardService {
         id: student.id,
         studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
         examNumber: student.examNumber || 'N/A',
+        lga: student.lga || 'N/A',
         school: student.school || 'N/A',
         class: student.class || 'N/A',
         gender: student.gender || 'N/A',

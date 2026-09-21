@@ -111,7 +111,7 @@ export class StudentController {
   async getStudentDetails(
     @Param('id') studentId: string,
     @Query('session') session?: string,
-    @Query('term') term?: TermType,
+    @Query('term') term?: string,
   ) {
     return this.studentService.getStudentDetails(studentId, { session, term });
   }

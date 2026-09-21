@@ -1747,33 +1747,78 @@ export class StudentService {
 
   async getStudentDetails(studentId: string, filters?: {
     session?: string;
-    term?: TermType;
+    term?: TermType | string;
   }) {
     this.logger.log(`Fetching student details for ID: ${studentId}`, filters);
 
     try {
-      // Get current active session and term if not specified
-      let currentSession = filters?.session;
-      let currentTerm = filters?.term;
+      // Resolve session and term safely (accepting either IDs or names/enums)
+      const currentSession = filters?.session;
+      const currentTerm = filters?.term;
 
-      if (!currentSession || !currentTerm) {
-        const activeSession = await this.prisma.session.findFirst({
-          where: { isActive: true },
-          include: {
-            terms: {
-              where: { isActive: true },
-              orderBy: { createdAt: 'desc' },
-              take: 1,
+      let sessionData: any = currentSession
+        ? await this.prisma.session.findFirst({
+            where: {
+              OR: [{ id: currentSession }, { name: currentSession }],
             },
+          })
+        : null;
+
+      if (!sessionData) {
+        sessionData = await this.prisma.session.findFirst({
+          where: { isCurrent: true, isActive: true },
+        });
+        if (!sessionData) {
+          sessionData = await this.prisma.session.findFirst({
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' },
+          });
+        }
+      }
+
+      let termData: any = null;
+      if (currentTerm) {
+        const isTermType = Object.values(TermType).includes(currentTerm as TermType);
+        if (sessionData) {
+          termData = await this.prisma.term.findFirst({
+            where: {
+              sessionId: sessionData.id,
+              OR: [
+                { id: currentTerm },
+                ...(isTermType ? [{ name: currentTerm as TermType }] : []),
+              ],
+            },
+          });
+        }
+        if (!termData) {
+          termData = await this.prisma.term.findFirst({
+            where: {
+              OR: [
+                { id: currentTerm },
+                ...(isTermType ? [{ name: currentTerm as TermType }] : []),
+              ],
+            },
+          });
+        }
+      }
+
+      if (!termData && sessionData) {
+        termData = await this.prisma.term.findFirst({
+          where: {
+            sessionId: sessionData.id,
+            isCurrent: true,
+            isActive: true,
           },
         });
-
-        if (!activeSession) {
-          throw new Error('No active session found');
+        if (!termData) {
+          termData = await this.prisma.term.findFirst({
+            where: {
+              sessionId: sessionData.id,
+              isActive: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          });
         }
-
-        currentSession = currentSession || activeSession.name;
-        currentTerm = currentTerm || activeSession.terms[0]?.name as TermType;
       }
 
       // Get student details with school and class information
@@ -1859,53 +1904,50 @@ export class StudentService {
       }
 
       // Get assessments for the specified session and term
-      const assessments = await this.prisma.assessment.findMany({
-        where: {
-          studentId: studentId,
-          term: {
-            name: currentTerm,
-            session: {
-              name: currentSession,
+      const assessments = termData
+        ? await this.prisma.assessment.findMany({
+            where: {
+              studentId: studentId,
+              termId: termData.id,
             },
-          },
-        },
-        select: {
-          id: true,
-          type: true,
-          title: true,
-          description: true,
-          maxScore: true,
-          score: true,
-          percentage: true,
-          remarks: true,
-          dateGiven: true,
-          dateSubmitted: true,
-          isSubmitted: true,
-          isGraded: true,
-          createdAt: true,
-          subject: {
             select: {
               id: true,
-              name: true,
-              code: true,
-              level: true,
-            }
-          },
-          teacher: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            }
-          }
-        },
-        orderBy: [
-          { subject: { name: 'asc' } },
-          { type: 'asc' },
-          { dateGiven: 'desc' }
-        ]
-      });
+              type: true,
+              title: true,
+              description: true,
+              maxScore: true,
+              score: true,
+              percentage: true,
+              remarks: true,
+              dateGiven: true,
+              dateSubmitted: true,
+              isSubmitted: true,
+              isGraded: true,
+              createdAt: true,
+              subject: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                  level: true,
+                },
+              },
+              teacher: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: [
+              { subject: { name: 'asc' } },
+              { type: 'asc' },
+              { dateGiven: 'desc' }
+            ]
+          })
+        : [];
 
       // Calculate performance summary
       const totalAssessments = assessments.length;
@@ -1982,14 +2024,14 @@ export class StudentService {
       };
 
       const performanceSummary = {
-        session: currentSession,
-        term: currentTerm,
+        session: sessionData?.name || currentSession || 'N/A',
+        term: termData?.name || currentTerm || 'N/A',
         totalAssessments,
         totalScore: Math.round(totalScore * 100) / 100,
         totalMaxScore: Math.round(totalMaxScore * 100) / 100,
         averageScore: Math.round(averageScore * 100) / 100,
         overallPercentage: Math.round(overallPercentage * 100) / 100,
-        grade: getGradeClassification(overallPercentage),
+        grade: totalAssessments > 0 ? getGradeClassification(overallPercentage) : 'N/A',
         subjectBreakdown: Object.values(subjectBreakdown).map((subject: any) => ({
           ...subject,
           totalScore: Math.round(subject.totalScore * 100) / 100,

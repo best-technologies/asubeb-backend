@@ -41,8 +41,8 @@ export class DashboardService {
       lgaId,
       sortBy = 'name',
       sortOrder = 'asc',
-      includeStats = false,
-      includePerformance = false,
+      includeStats = true,
+      includePerformance = true,
     } = query;
 
     // Log only the filters that are actually passed from frontend
@@ -108,9 +108,13 @@ export class DashboardService {
       // Get current term if no term specified
       let termData;
       if (term) {
+        const isTermType = Object.values(TermType).includes(term as TermType);
         termData = await this.prisma.term.findFirst({
           where: { 
-            OR: [{ id: term }, { name: term as any }],
+            OR: [
+              { id: term },
+              ...(isTermType ? [{ name: term as TermType }] : []),
+            ],
             sessionId: sessionData.id,
             isActive: true 
           },
@@ -239,206 +243,36 @@ export class DashboardService {
       const totalMale = genderDistribution.find(g => g.gender === 'MALE')?._count.gender || 0;
       const totalFemale = genderDistribution.find(g => g.gender === 'FEMALE')?._count.gender || 0;
 
-      // Get schools with pagination and filters
+      // Get schools for dropdown filtering (lightweight)
       const schools = await this.prisma.school.findMany({
         where: schoolWhereConditions,
         select: {
           id: true,
           name: true,
-          code: true,
-          level: true,
-          address: true,
-          lga: {
-            select: {
-              name: true,
-            },
-          },
-          _count: {
-            select: {
-              students: {
-                where: { isActive: true },
-              },
-              teachers: {
-                where: { isActive: true },
-              },
-            },
-          },
         },
-        skip,
-        take: limit,
         orderBy: {
-          name: sortOrder, // Schools have a 'name' field
+          name: 'asc',
         },
       });
 
-      const schoolsWithCounts = schools.map(school => ({
-        id: school.id,
-        name: school.name,
-        code: school.code,
-        level: school.level,
-        address: school.address,
-        lga: school.lga?.name || 'N/A',
-        totalStudents: school._count.students,
-        totalTeachers: school._count.teachers,
-      }));
-
-      // Get LGAs
+      // Get LGAs for dropdown filtering (lightweight)
       const lgas = await this.prisma.localGovernmentArea.findMany({
         where: { isActive: true },
         select: {
           id: true,
           name: true,
-          code: true,
-          state: true,
         },
         orderBy: {
           name: 'asc',
         },
       });
 
-      // Get classes with pagination and filters
-      const classes = await this.prisma.class.findMany({
-        where: classWhereConditions,
-        select: {
-          id: true,
-          name: true,
-          grade: true,
-          section: true,
-          capacity: true,
-          school: {
-            select: {
-              name: true,
-              code: true,
-            },
-          },
-          _count: {
-            select: {
-              students: {
-                where: { isActive: true },
-              },
-            },
-          },
-        },
-        skip,
-        take: limit,
-        orderBy: {
-          name: sortOrder, // Classes have a 'name' field
-        },
-      });
+      // Performance section: Top Ranked Students with backend-driven pagination (capped at top 100)
+      const maxTopRanked = 100;
+      const topPage = Math.max(1, Number(page) || 1);
+      const topLimit = Math.max(1, Math.min(100, Number(limit) || 10));
+      const topSkip = (topPage - 1) * topLimit;
 
-      const classesWithEnrollment = classes.map(cls => ({
-        id: cls.id,
-        name: cls.name,
-        grade: cls.grade,
-        section: cls.section,
-        capacity: cls.capacity,
-        currentEnrollment: cls._count.students,
-        school: {
-          name: cls.school.name,
-          code: cls.school.code,
-        },
-      }));
-
-      // Get subjects
-      const subjects = await this.prisma.subject.findMany({
-        where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          level: true,
-        },
-        orderBy: {
-          name: 'asc',
-        },
-      });
-
-      // Get students with pagination and filters
-      const students = await this.prisma.student.findMany({
-        where: studentWhereConditions,
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          studentId: true,
-          gender: true,
-          school: {
-            select: {
-              name: true,
-              code: true,
-            },
-          },
-          class: {
-            select: {
-              name: true,
-            },
-          },
-          assessments: {
-            where: {
-              term: {
-                name: termData.name,
-                session: {
-                  name: sessionData.name,
-                },
-              },
-            },
-            select: {
-              score: true,
-              maxScore: true,
-              subject: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-        skip,
-        take: limit,
-        orderBy: this.getOrderByClause(sortBy, sortOrder),
-      });
-
-      // Process students data and sort by total score
-      const studentsWithScores = students.map(student => {
-        const totalScore = student.assessments.reduce((sum, assessment) => sum + assessment.score, 0);
-        
-        const baseData = {
-          id: student.id,
-          studentName: `${student.firstName} ${student.lastName}`,
-          examNumber: student.studentId,
-          school: student.school?.name || 'N/A',
-          schoolCode: student.school?.code || 'N/A',
-          class: student.class?.name || 'N/A',
-          gender: student.gender,
-          totalScore,
-        };
-
-        if (includePerformance && student.assessments) {
-          const totalMaxScore = student.assessments.reduce((sum, assessment) => sum + assessment.maxScore, 0);
-          const average = student.assessments.length > 0 ? totalScore / student.assessments.length : 0;
-          const percentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
-
-          return {
-            ...baseData,
-            average: Math.round(average * 100) / 100,
-            percentage: Math.round(percentage * 100) / 100,
-            assessmentCount: student.assessments.length,
-          };
-        }
-
-        return baseData;
-      });
-
-      // Sort students by total score in descending order
-      studentsWithScores.sort((a, b) => b.totalScore - a.totalScore);
-
-      // Add position to each student
-      const studentsData = studentsWithScores.map((student, index) => ({
-        ...student,
-        position: skip + index + 1,
-      }));
-
-      // Get top students for performance section (if requested)
       let topStudentsWithPositions: Array<{
         position: number;
         id: string;
@@ -450,8 +284,41 @@ export class DashboardService {
         totalScore: number;
       }> = [];
 
-      if (includePerformance) {
+      let topPagination = {
+        page: topPage,
+        limit: topLimit,
+        total: 0,
+        totalPages: 1,
+      };
+
+      if (includePerformance && sessionData && termData) {
         try {
+          // Count total qualifying students with assessments in this session & term
+          const countResult: any[] = await this.prisma.$queryRaw`
+            SELECT COUNT(DISTINCT s.id)::int AS "count"
+            FROM students s
+            JOIN schools sch ON s."schoolId" = sch.id
+            JOIN assessments a ON a."studentId" = s.id
+            JOIN terms t ON a."termId" = t.id AND t.id = ${termData.id}
+            JOIN sessions sess ON t."sessionId" = sess.id AND sess.id = ${sessionData.id}
+            WHERE s."isActive" = true
+            ${schoolId ? Prisma.sql`AND s."schoolId" = ${schoolId}` : Prisma.empty}
+            ${classId ? Prisma.sql`AND s."classId" = ${classId}` : Prisma.empty}
+            ${gender ? Prisma.sql`AND s.gender = ${gender}::"Gender"` : Prisma.empty}
+            ${lgaId ? Prisma.sql`AND sch."lgaId" = ${lgaId}` : Prisma.empty}
+            ${search ? Prisma.sql`AND (s."firstName" ILIKE ${`%${search}%`} OR s."lastName" ILIKE ${`%${search}%`} OR s."studentId" ILIKE ${`%${search}%`})` : Prisma.empty};
+          `;
+
+          const rawTotal = countResult[0]?.count || 0;
+          const totalRanked = Math.min(maxTopRanked, rawTotal);
+          topPagination = {
+            page: topPage,
+            limit: topLimit,
+            total: totalRanked,
+            totalPages: Math.max(1, Math.ceil(totalRanked / topLimit)),
+          };
+
+          // Fetch only the requested page of top scorers (e.g. 10 students)
           const topScorers: any[] = await this.prisma.$queryRaw`
             SELECT 
               s.id,
@@ -476,11 +343,12 @@ export class DashboardService {
             ${search ? Prisma.sql`AND (s."firstName" ILIKE ${`%${search}%`} OR s."lastName" ILIKE ${`%${search}%`} OR s."studentId" ILIKE ${`%${search}%`})` : Prisma.empty}
             GROUP BY s.id, s."firstName", s."lastName", s."studentId", s.gender, sch.name, c.name
             ORDER BY "totalScore" DESC
-            LIMIT 100;
+            OFFSET ${topSkip}
+            LIMIT ${topLimit};
           `;
 
           topStudentsWithPositions = topScorers.map((student, index) => ({
-            position: index + 1,
+            position: topSkip + index + 1,
             id: student.id,
             studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
             examNumber: student.examNumber || 'N/A',
@@ -513,18 +381,7 @@ export class DashboardService {
         },
         availableSessions,
         availableTerms,
-        pagination: {
-          page,
-          limit,
-          total: totalStudents,
-          totalPages: Math.ceil(totalStudents / limit),
-          hasNextPage: page < Math.ceil(totalStudents / limit),
-          hasPreviousPage: page > 1,
-          nextPage: page < Math.ceil(totalStudents / limit) ? page + 1 : null,
-          previousPage: page > 1 ? page - 1 : null,
-          startIndex: (page - 1) * limit + 1,
-          endIndex: Math.min(page * limit, totalStudents),
-        },
+        pagination: topPagination,
         summary: {
           totalStudents,
           totalMale,
@@ -542,11 +399,8 @@ export class DashboardService {
           lgaId,
         },
         data: {
-          schools: schoolsWithCounts,
-          lgas,
-          classes: classesWithEnrollment,
-          students: studentsData,
-          subjects,
+          schools: schools.map((s) => ({ id: s.id, name: s.name })),
+          lgas: lgas.map((l) => ({ id: l.id, name: l.name })),
         },
         lastUpdated: new Date().toISOString(),
       };
@@ -555,20 +409,6 @@ export class DashboardService {
       if (includeStats) {
         responseData.statistics = {
           genderDistribution,
-          schoolLevelDistribution: await this.prisma.school.groupBy({
-            by: ['level'],
-            where: { isActive: true },
-            _count: {
-              level: true,
-            },
-          }),
-          classGradeDistribution: await this.prisma.class.groupBy({
-            by: ['grade'],
-            where: { isActive: true },
-            _count: {
-              grade: true,
-            },
-          }),
         };
       }
 
@@ -576,6 +416,7 @@ export class DashboardService {
       if (includePerformance) {
         responseData.performance = {
           topStudents: topStudentsWithPositions,
+          pagination: topPagination,
         };
       }
 
@@ -587,137 +428,166 @@ export class DashboardService {
   }
 
   async fetchDashboardPerformanceTable(
-    session: string,
-    term: TermType,
+    session?: string,
+    term?: string,
     page: number = 1,
     limit: number = 10,
     search?: string,
     schoolId?: string,
     classId?: string,
     gender?: string,
+    lgaId?: string,
   ) {
-    this.logger.log(`Fetching performance table for session: ${session}, term: ${term}`);
+    this.logger.log(`Fetching performance table for session: ${session || 'current'}, term: ${term || 'current'}`);
 
     try {
-      const skip = (page - 1) * limit;
-
-      // Build where conditions
-      const whereConditions: any = {
-        isActive: true,
-        assessments: {
-          some: {
-            term: {
-              name: term,
-              session: {
-                name: session,
-              },
-            },
+      // Get session
+      let sessionData;
+      if (session) {
+        sessionData = await this.prisma.session.findFirst({
+          where: {
+            OR: [{ id: session }, { name: session }],
+            isActive: true,
           },
-        },
-      };
-
-      if (schoolId) {
-        whereConditions.schoolId = schoolId;
+        });
+      } else {
+        sessionData = await this.prisma.session.findFirst({
+          where: { isCurrent: true, isActive: true },
+          orderBy: [
+            { status: 'asc' },
+            { updatedAt: 'desc' },
+          ],
+        });
+        if (!sessionData) {
+          sessionData = await this.prisma.session.findFirst({
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' },
+          });
+        }
       }
 
-      if (classId) {
-        whereConditions.classId = classId;
+      if (!sessionData) {
+        return ResponseHelper.success('No active session found', {
+          topStudents: [],
+          pagination: { page, limit, total: 0, totalPages: 1 },
+        });
       }
 
-      if (gender) {
-        whereConditions.gender = gender;
-      }
-
-      if (search) {
-        whereConditions.OR = [
-          { firstName: { contains: search, mode: 'insensitive' } },
-          { lastName: { contains: search, mode: 'insensitive' } },
-          { studentId: { contains: search, mode: 'insensitive' } },
-        ];
-      }
-
-      // Get students with their assessment scores
-      const students = await this.prisma.student.findMany({
-        where: whereConditions,
-        include: {
-          school: {
-            select: {
-              name: true,
-              code: true,
-            },
+      // Get term
+      let termData;
+      if (term) {
+        const isTermType = Object.values(TermType).includes(term as TermType);
+        termData = await this.prisma.term.findFirst({
+          where: {
+            OR: [
+              { id: term },
+              ...(isTermType ? [{ name: term as TermType }] : []),
+            ],
+            sessionId: sessionData.id,
+            isActive: true,
           },
-          class: {
-            select: {
-              name: true,
-            },
+        });
+      } else {
+        termData = await this.prisma.term.findFirst({
+          where: {
+            sessionId: sessionData.id,
+            isCurrent: true,
+            isActive: true,
           },
-          assessments: {
+          orderBy: [
+            { status: 'asc' },
+            { updatedAt: 'desc' },
+          ],
+        });
+        if (!termData) {
+          termData = await this.prisma.term.findFirst({
             where: {
-              term: {
-                name: term,
-                session: {
-                  name: session,
-                },
-              },
+              sessionId: sessionData.id,
+              isActive: true,
             },
-            select: {
-              score: true,
-              maxScore: true,
-              subject: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-        skip,
-        take: limit,
-        orderBy: {
-          firstName: 'asc',
-        },
-      });
+            orderBy: { createdAt: 'desc' },
+          });
+        }
+      }
 
-      // Calculate performance metrics for each student
-      const performanceData = students.map(student => {
-        const totalScore = student.assessments.reduce((sum, assessment) => sum + assessment.score, 0);
-        const totalMaxScore = student.assessments.reduce((sum, assessment) => sum + assessment.maxScore, 0);
-        const average = student.assessments.length > 0 ? totalScore / student.assessments.length : 0;
-        const percentage = totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : 0;
+      if (!termData) {
+        return ResponseHelper.success('No active term found', {
+          topStudents: [],
+          pagination: { page, limit, total: 0, totalPages: 1 },
+        });
+      }
 
-        return {
-          id: student.id,
-          studentName: `${student.firstName} ${student.lastName}`,
-          examNumber: student.studentId,
-          school: student.school?.name || 'N/A',
-          class: student.class?.name || 'N/A',
-          totalScore,
-          average: Math.round(average * 100) / 100,
-          percentage: Math.round(percentage * 100) / 100,
-          assessmentCount: student.assessments.length,
-        };
-      });
+      const maxTopRanked = 100;
+      const topPage = Math.max(1, Number(page) || 1);
+      const topLimit = Math.max(1, Math.min(100, Number(limit) || 10));
+      const topSkip = (topPage - 1) * topLimit;
 
-      // Sort by total score in descending order
-      performanceData.sort((a, b) => b.totalScore - a.totalScore);
+      const countResult: any[] = await this.prisma.$queryRaw`
+        SELECT COUNT(DISTINCT s.id)::int AS "count"
+        FROM students s
+        JOIN schools sch ON s."schoolId" = sch.id
+        JOIN assessments a ON a."studentId" = s.id
+        JOIN terms t ON a."termId" = t.id AND t.id = ${termData.id}
+        JOIN sessions sess ON t."sessionId" = sess.id AND sess.id = ${sessionData.id}
+        WHERE s."isActive" = true
+        ${schoolId ? Prisma.sql`AND s."schoolId" = ${schoolId}` : Prisma.empty}
+        ${classId ? Prisma.sql`AND s."classId" = ${classId}` : Prisma.empty}
+        ${gender ? Prisma.sql`AND s.gender = ${gender}::"Gender"` : Prisma.empty}
+        ${lgaId ? Prisma.sql`AND sch."lgaId" = ${lgaId}` : Prisma.empty}
+        ${search ? Prisma.sql`AND (s."firstName" ILIKE ${`%${search}%`} OR s."lastName" ILIKE ${`%${search}%`} OR s."studentId" ILIKE ${`%${search}%`})` : Prisma.empty};
+      `;
 
-      // Add position
-      const performanceTable = performanceData.map((student, index) => ({
-        position: skip + index + 1,
-        ...student,
+      const rawTotal = countResult[0]?.count || 0;
+      const totalRanked = Math.min(maxTopRanked, rawTotal);
+      const totalPages = Math.max(1, Math.ceil(totalRanked / topLimit));
+
+      const topScorers: any[] = await this.prisma.$queryRaw`
+        SELECT 
+          s.id,
+          s."firstName",
+          s."lastName",
+          s."studentId" AS "examNumber",
+          s.gender,
+          sch.name AS "school",
+          c.name AS "class",
+          COALESCE(SUM(a.score), 0)::int AS "totalScore"
+        FROM students s
+        JOIN schools sch ON s."schoolId" = sch.id
+        LEFT JOIN classes c ON s."classId" = c.id
+        JOIN assessments a ON a."studentId" = s.id
+        JOIN terms t ON a."termId" = t.id AND t.id = ${termData.id}
+        JOIN sessions sess ON t."sessionId" = sess.id AND sess.id = ${sessionData.id}
+        WHERE s."isActive" = true
+        ${schoolId ? Prisma.sql`AND s."schoolId" = ${schoolId}` : Prisma.empty}
+        ${classId ? Prisma.sql`AND s."classId" = ${classId}` : Prisma.empty}
+        ${gender ? Prisma.sql`AND s.gender = ${gender}::"Gender"` : Prisma.empty}
+        ${lgaId ? Prisma.sql`AND sch."lgaId" = ${lgaId}` : Prisma.empty}
+        ${search ? Prisma.sql`AND (s."firstName" ILIKE ${`%${search}%`} OR s."lastName" ILIKE ${`%${search}%`} OR s."studentId" ILIKE ${`%${search}%`})` : Prisma.empty}
+        GROUP BY s.id, s."firstName", s."lastName", s."studentId", s.gender, sch.name, c.name
+        ORDER BY "totalScore" DESC
+        OFFSET ${topSkip}
+        LIMIT ${topLimit};
+      `;
+
+      const topStudentsWithPositions = topScorers.map((student, index) => ({
+        position: topSkip + index + 1,
+        id: student.id,
+        studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
+        examNumber: student.examNumber || 'N/A',
+        school: student.school || 'N/A',
+        class: student.class || 'N/A',
+        gender: student.gender || 'N/A',
+        totalScore: student.totalScore || 0,
       }));
 
-      // Get total count for pagination
-      const total = await this.prisma.student.count({ where: whereConditions });
-
       return ResponseHelper.success('Performance table retrieved successfully', {
+        topStudents: topStudentsWithPositions,
         pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
+          page: topPage,
+          limit: topLimit,
+          total: totalRanked,
+          totalPages,
         },
-        data: performanceTable,
       });
     } catch (error) {
       this.logger.error(`Error fetching performance table: ${error.message}`, error.stack);

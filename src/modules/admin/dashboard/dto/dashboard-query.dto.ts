@@ -114,18 +114,24 @@ export class DashboardQueryDto {
   @ApiPropertyOptional({
     description: 'Include detailed statistics',
     example: true,
-    default: false,
+    default: true,
   })
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  includeStats?: boolean = false;
+  @Transform(({ value }) => {
+    if (value === 'false' || value === false) return false;
+    return true;
+  })
+  includeStats?: boolean = true;
 
   @ApiPropertyOptional({
     description: 'Include performance data',
     example: true,
-    default: false,
+    default: true,
   })
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  includePerformance?: boolean = false;
+  @Transform(({ value }) => {
+    if (value === 'false' || value === false) return false;
+    return true;
+  })
+  includePerformance?: boolean = true;
 }

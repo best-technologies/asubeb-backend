@@ -131,11 +131,18 @@ export class SessionService {
         throw new BadRequestException(`Session with name ${createSessionDto.name} already exists`);
       }
 
-      // If this session is being set as current, deactivate other sessions for this state
-      if (createSessionDto.isCurrent) {
+      // If this session is being set as current, deactivate other sessions and terms for this state
+      const isCurrent = createSessionDto.isCurrent || (createSessionDto as any).status === 'OPEN';
+
+      if (isCurrent) {
         await this.prisma.session.updateMany({
-          where: { isCurrent: true, stateId: stateId },
-          data: { isCurrent: false },
+          where: { stateId: stateId },
+          data: { isCurrent: false, status: 'CLOSED' as any },
+        });
+
+        await this.prisma.term.updateMany({
+          where: { stateId: stateId },
+          data: { isCurrent: false, status: 'CLOSED' as any },
         });
       }
 
@@ -145,7 +152,8 @@ export class SessionService {
           startDate: new Date(createSessionDto.startDate),
           endDate: new Date(createSessionDto.endDate),
           isActive: createSessionDto.isActive ?? true,
-          isCurrent: createSessionDto.isCurrent ?? false,
+          isCurrent: isCurrent,
+          status: (isCurrent ? 'OPEN' : 'CLOSED') as any,
           stateId: stateId,
         },
       });
@@ -259,19 +267,59 @@ export class SessionService {
         throw new NotFoundException(`Session with ID ${id} not found`);
       }
 
-      // Deactivate other sessions
-      await this.prisma.session.updateMany({
-        where: { isCurrent: true },
-        data: { isCurrent: false },
-      });
+      return await this.prisma.$transaction(async (tx) => {
+        // 1. Close and de-current all other sessions
+        await tx.session.updateMany({
+          where: { id: { not: id } },
+          data: { isCurrent: false, status: 'CLOSED' as any },
+        });
 
-      const activatedSession = await this.prisma.session.update({
-        where: { id },
-        data: { isCurrent: true, isActive: true },
-      });
+        // 2. Close and de-current all terms belonging to other sessions
+        await tx.term.updateMany({
+          where: { sessionId: { not: id } },
+          data: { isCurrent: false, status: 'CLOSED' as any },
+        });
 
-      this.logger.log(`Successfully activated session: ${activatedSession.name}`);
-      return activatedSession;
+        // 3. Mark target session as Current, Active, and OPEN
+        const activatedSession = await tx.session.update({
+          where: { id },
+          data: { isCurrent: true, isActive: true, status: 'OPEN' as any },
+        });
+
+        // 4. Ensure target session has exactly one OPEN & Current term
+        const openTerm = await tx.term.findFirst({
+          where: { sessionId: id, status: 'OPEN' as any },
+        });
+
+        if (openTerm) {
+          await tx.term.updateMany({
+            where: { sessionId: id, id: { not: openTerm.id } },
+            data: { isCurrent: false, status: 'CLOSED' as any },
+          });
+          await tx.term.update({
+            where: { id: openTerm.id },
+            data: { isCurrent: true, isActive: true, status: 'OPEN' as any },
+          });
+        } else {
+          const firstTerm = await tx.term.findFirst({
+            where: { sessionId: id },
+            orderBy: { name: 'asc' },
+          });
+          if (firstTerm) {
+            await tx.term.updateMany({
+              where: { sessionId: id, id: { not: firstTerm.id } },
+              data: { isCurrent: false, status: 'CLOSED' as any },
+            });
+            await tx.term.update({
+              where: { id: firstTerm.id },
+              data: { isCurrent: true, isActive: true, status: 'OPEN' as any },
+            });
+          }
+        }
+
+        this.logger.log(`Successfully activated session: ${activatedSession.name}`);
+        return activatedSession;
+      });
     } catch (error) {
       this.logger.error(`Error activating session: ${error.message}`, error.stack);
       throw error;
@@ -291,9 +339,15 @@ export class SessionService {
         throw new NotFoundException(`Session with ID ${id} not found`);
       }
 
+      if (session.isCurrent) {
+        throw new BadRequestException(
+          'Cannot deactivate the currently active session. At least one session must remain active. To switch, activate another session.'
+        );
+      }
+
       const deactivatedSession = await this.prisma.session.update({
         where: { id },
-        data: { isCurrent: false, isActive: false },
+        data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
       });
 
       this.logger.log(`Successfully deactivated session: ${deactivatedSession.name}`);
@@ -304,7 +358,7 @@ export class SessionService {
     }
   }
 
-  async updateSessionStatus(id: string, status: any) { // using any for enum type since Prisma client is out of date
+  async updateSessionStatus(id: string, status: any) {
     this.logger.log(`Updating session status to ${status} for session: ${id}`);
     
     try {
@@ -315,6 +369,23 @@ export class SessionService {
       if (!session) {
         this.logger.warn(`Session with ID ${id} not found`);
         throw new NotFoundException(`Session with ID ${id} not found`);
+      }
+
+      if (status === 'OPEN') {
+        return await this.activateSession(id);
+      }
+
+      if (status === 'CLOSED') {
+        if (session.isCurrent || (session as any).status === 'OPEN') {
+          throw new BadRequestException(
+            'Cannot close the active academic session. At least one session must remain open and active. To switch, activate another session.'
+          );
+        }
+
+        return await this.prisma.session.update({
+          where: { id },
+          data: { status: 'CLOSED' as any, isCurrent: false },
+        });
       }
 
       const updatedSession = await this.prisma.session.update({

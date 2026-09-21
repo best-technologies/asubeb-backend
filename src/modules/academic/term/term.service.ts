@@ -157,11 +157,22 @@ export class TermService {
         throw new BadRequestException(`Term with name ${createTermDto.name} already exists for this session`);
       }
 
-      // If this term is being set as current, deactivate other terms in the session
-      if (createTermDto.isCurrent) {
+      // If this term is being set as current, deactivate all other terms in the database
+      const isCurrent = createTermDto.isCurrent || (createTermDto as any).status === 'OPEN';
+
+      if (isCurrent) {
+        // Ensure parent session is active and other sessions closed
+        await this.prisma.session.updateMany({
+          where: { id: { not: createTermDto.sessionId } },
+          data: { isCurrent: false, status: 'CLOSED' as any },
+        });
+        await this.prisma.session.update({
+          where: { id: createTermDto.sessionId },
+          data: { isCurrent: true, isActive: true, status: 'OPEN' as any },
+        });
+
         await this.prisma.term.updateMany({
-          where: { sessionId: createTermDto.sessionId, isCurrent: true },
-          data: { isCurrent: false },
+          data: { isCurrent: false, status: 'CLOSED' as any },
         });
       }
 
@@ -172,7 +183,8 @@ export class TermService {
           startDate: new Date(createTermDto.startDate),
           endDate: new Date(createTermDto.endDate),
           isActive: createTermDto.isActive ?? true,
-          isCurrent: createTermDto.isCurrent ?? false,
+          isCurrent: isCurrent,
+          status: (isCurrent ? 'OPEN' : 'CLOSED') as any,
           stateId: stateId,
         },
         include: {
@@ -306,27 +318,41 @@ export class TermService {
         throw new NotFoundException(`Term with ID ${id} not found`);
       }
 
-      // Deactivate other terms in the same session
-      await this.prisma.term.updateMany({
-        where: { sessionId: term.sessionId, isCurrent: true },
-        data: { isCurrent: false },
-      });
+      return await this.prisma.$transaction(async (tx) => {
+        // 1. Ensure the parent session is also active & open, and close other sessions
+        await tx.session.updateMany({
+          where: { id: { not: term.sessionId } },
+          data: { isCurrent: false, status: 'CLOSED' as any },
+        });
 
-      const activatedTerm = await this.prisma.term.update({
-        where: { id },
-        data: { isCurrent: true, isActive: true },
-        include: {
-          session: {
-            select: {
-              id: true,
-              name: true,
+        await tx.session.update({
+          where: { id: term.sessionId },
+          data: { isCurrent: true, isActive: true, status: 'OPEN' as any },
+        });
+
+        // 2. Close and de-current ALL other terms across the entire database
+        await tx.term.updateMany({
+          where: { id: { not: id } },
+          data: { isCurrent: false, status: 'CLOSED' as any },
+        });
+
+        // 3. Mark target term as Current, Active, and OPEN
+        const activatedTerm = await tx.term.update({
+          where: { id },
+          data: { isCurrent: true, isActive: true, status: 'OPEN' as any },
+          include: {
+            session: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      this.logger.log(`Successfully activated term: ${activatedTerm.name}`);
-      return activatedTerm;
+        this.logger.log(`Successfully activated term: ${activatedTerm.name} for session: ${term.session?.name}`);
+        return activatedTerm;
+      });
     } catch (error) {
       this.logger.error(`Error activating term: ${error.message}`, error.stack);
       throw error;
@@ -346,9 +372,15 @@ export class TermService {
         throw new NotFoundException(`Term with ID ${id} not found`);
       }
 
+      if (term.isCurrent) {
+        throw new BadRequestException(
+          'Cannot deactivate the currently active term. At least one term must remain active. To switch, activate another term.'
+        );
+      }
+
       const deactivatedTerm = await this.prisma.term.update({
         where: { id },
-        data: { isCurrent: false, isActive: false },
+        data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         include: {
           session: {
             select: {
@@ -367,7 +399,7 @@ export class TermService {
     }
   }
 
-  async updateTermStatus(id: string, status: any) { // any for enum type before generation
+  async updateTermStatus(id: string, status: any) {
     this.logger.log(`Updating term status to ${status} for term: ${id}`);
     
     try {
@@ -378,6 +410,23 @@ export class TermService {
       if (!term) {
         this.logger.warn(`Term with ID ${id} not found`);
         throw new NotFoundException(`Term with ID ${id} not found`);
+      }
+
+      if (status === 'OPEN') {
+        return await this.activateTerm(id);
+      }
+
+      if (status === 'CLOSED') {
+        if (term.isCurrent || (term as any).status === 'OPEN') {
+          throw new BadRequestException(
+            'Cannot close the active academic term. At least one term must remain open and active. To switch, activate another term.'
+          );
+        }
+
+        return await this.prisma.term.update({
+          where: { id },
+          data: { status: 'CLOSED' as any, isCurrent: false },
+        });
       }
 
       const updatedTerm = await this.prisma.term.update({

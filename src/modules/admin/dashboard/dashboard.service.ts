@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ResponseHelper } from '../../../common/helpers/response.helper';
-import { TermType } from '@prisma/client';
+import { TermType, Prisma } from '@prisma/client';
 import { DashboardQueryDto } from './dto';
 
 @Injectable()
@@ -78,7 +78,10 @@ export class DashboardService {
       let sessionData;
       if (session) {
         sessionData = await this.prisma.session.findFirst({
-          where: { name: session, isActive: true },
+          where: { 
+            OR: [{ id: session }, { name: session }],
+            isActive: true 
+          },
         });
         if (!sessionData) {
           throw new Error(`Session '${session}' not found or not active`);
@@ -86,9 +89,19 @@ export class DashboardService {
       } else {
         sessionData = await this.prisma.session.findFirst({
           where: { isCurrent: true, isActive: true },
+          orderBy: [
+            { status: 'asc' }, // 'OPEN' comes before 'CLOSED' alphabetically
+            { updatedAt: 'desc' },
+          ],
         });
         if (!sessionData) {
-          throw new Error('No current session found');
+          sessionData = await this.prisma.session.findFirst({
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' },
+          });
+        }
+        if (!sessionData) {
+          throw new Error('No active session found');
         }
       }
 
@@ -97,7 +110,7 @@ export class DashboardService {
       if (term) {
         termData = await this.prisma.term.findFirst({
           where: { 
-            name: term, 
+            OR: [{ id: term }, { name: term as any }],
             sessionId: sessionData.id,
             isActive: true 
           },
@@ -112,9 +125,22 @@ export class DashboardService {
             isCurrent: true,
             isActive: true 
           },
+          orderBy: [
+            { status: 'asc' },
+            { updatedAt: 'desc' },
+          ],
         });
         if (!termData) {
-          throw new Error(`No current term found for session '${sessionData.name}'`);
+          termData = await this.prisma.term.findFirst({
+            where: {
+              sessionId: sessionData.id,
+              isActive: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+        }
+        if (!termData) {
+          throw new Error(`No active term found for session '${sessionData.name}'`);
         }
       }
 
@@ -423,72 +449,50 @@ export class DashboardService {
         gender: any;
         totalScore: number;
       }> = [];
+
       if (includePerformance) {
-        const topStudents = await this.prisma.student.findMany({
-          where: {
-            ...studentWhereConditions,
-            assessments: {
-              some: {
-                term: {
-                  name: termData.name,
-                  session: {
-                    name: sessionData.name,
-                  },
-                },
-              },
-            },
-          },
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            studentId: true,
-            gender: true,
-            school: {
-              select: {
-                name: true,
-              },
-            },
-            class: {
-              select: {
-                name: true,
-              },
-            },
-            assessments: {
-              where: {
-                term: {
-                  name: termData.name,
-                  session: {
-                    name: sessionData.name,
-                  },
-                },
-              },
-              select: {
-                score: true,
-              },
-            },
-          },
-          take: 10,
-        });
+        try {
+          const topScorers: any[] = await this.prisma.$queryRaw`
+            SELECT 
+              s.id,
+              s."firstName",
+              s."lastName",
+              s."studentId" AS "examNumber",
+              s.gender,
+              sch.name AS "school",
+              c.name AS "class",
+              COALESCE(SUM(a.score), 0)::int AS "totalScore"
+            FROM students s
+            JOIN schools sch ON s."schoolId" = sch.id
+            LEFT JOIN classes c ON s."classId" = c.id
+            JOIN assessments a ON a."studentId" = s.id
+            JOIN terms t ON a."termId" = t.id AND t.id = ${termData.id}
+            JOIN sessions sess ON t."sessionId" = sess.id AND sess.id = ${sessionData.id}
+            WHERE s."isActive" = true
+            ${schoolId ? Prisma.sql`AND s."schoolId" = ${schoolId}` : Prisma.empty}
+            ${classId ? Prisma.sql`AND s."classId" = ${classId}` : Prisma.empty}
+            ${gender ? Prisma.sql`AND s.gender = ${gender}::"Gender"` : Prisma.empty}
+            ${lgaId ? Prisma.sql`AND sch."lgaId" = ${lgaId}` : Prisma.empty}
+            ${search ? Prisma.sql`AND (s."firstName" ILIKE ${`%${search}%`} OR s."lastName" ILIKE ${`%${search}%`} OR s."studentId" ILIKE ${`%${search}%`})` : Prisma.empty}
+            GROUP BY s.id, s."firstName", s."lastName", s."studentId", s.gender, sch.name, c.name
+            ORDER BY "totalScore" DESC
+            LIMIT 100;
+          `;
 
-        const studentsWithScores = topStudents.map(student => {
-          const totalScore = student.assessments.reduce((sum, assessment) => sum + assessment.score, 0);
-          return {
+          topStudentsWithPositions = topScorers.map((student, index) => ({
+            position: index + 1,
             id: student.id,
-            studentName: `${student.firstName} ${student.lastName}`,
-            examNumber: student.studentId,
-            school: student.school?.name || 'N/A',
-            class: student.class?.name || 'N/A',
-            gender: student.gender,
-            totalScore,
-          };
-        });
-
-        studentsWithScores.sort((a, b) => b.totalScore - a.totalScore);
-        topStudentsWithPositions = studentsWithScores.map((student, index) => ({
-          position: index + 1,
-          ...student,
-        }));
+            studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
+            examNumber: student.examNumber || 'N/A',
+            school: student.school || 'N/A',
+            class: student.class || 'N/A',
+            gender: student.gender || 'N/A',
+            totalScore: student.totalScore || 0,
+          }));
+        } catch (err) {
+          this.logger.error(`Error calculating top scorers: ${err.message}`, err.stack);
+          topStudentsWithPositions = [];
+        }
       }
 
       // Prepare response data

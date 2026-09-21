@@ -30,7 +30,7 @@ export class SessionService {
           },
           skip: (page - 1) * limit,
           take: limit,
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ name: 'desc' }, { createdAt: 'desc' }],
         }),
         this.prisma.session.count({ where: whereConditions }),
       ]);

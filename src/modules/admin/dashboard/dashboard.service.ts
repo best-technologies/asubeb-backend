@@ -283,6 +283,7 @@ export class DashboardService {
         class: string;
         gender: any;
         totalScore: number;
+        totalMaxScore: number;
       }> = [];
 
       let topPagination = {
@@ -330,7 +331,8 @@ export class DashboardService {
               COALESCE(lga.name, 'N/A') AS "lga",
               sch.name AS "school",
               c.name AS "class",
-              COALESCE(SUM(a.score), 0)::int AS "totalScore"
+              COALESCE(SUM(a.score), 0)::int AS "totalScore",
+              COALESCE(SUM(a."maxScore"), 0)::int AS "totalMaxScore"
             FROM students s
             JOIN schools sch ON s."schoolId" = sch.id
             LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
@@ -360,6 +362,7 @@ export class DashboardService {
             class: student.class || 'N/A',
             gender: student.gender || 'N/A',
             totalScore: student.totalScore || 0,
+            totalMaxScore: student.totalMaxScore || 1000,
           }));
         } catch (err) {
           this.logger.error(`Error calculating top scorers: ${err.message}`, err.stack);
@@ -558,7 +561,8 @@ export class DashboardService {
           COALESCE(lga.name, 'N/A') AS "lga",
           sch.name AS "school",
           c.name AS "class",
-          COALESCE(SUM(a.score), 0)::int AS "totalScore"
+          COALESCE(SUM(a.score), 0)::int AS "totalScore",
+          COALESCE(SUM(a."maxScore"), 0)::int AS "totalMaxScore"
         FROM students s
         JOIN schools sch ON s."schoolId" = sch.id
         LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
@@ -588,6 +592,7 @@ export class DashboardService {
         class: student.class || 'N/A',
         gender: student.gender || 'N/A',
         totalScore: student.totalScore || 0,
+        totalMaxScore: student.totalMaxScore || (isCombined ? 3000 : 1000),
       }));
 
       return ResponseHelper.success('Performance table retrieved successfully', {

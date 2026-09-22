@@ -1776,48 +1776,51 @@ export class StudentService {
         }
       }
 
+      const isCombined = Boolean(currentTerm && currentTerm.toUpperCase() === 'COMBINED');
       let termData: any = null;
-      if (currentTerm) {
-        const isTermType = Object.values(TermType).includes(currentTerm as TermType);
-        if (sessionData) {
-          termData = await this.prisma.term.findFirst({
-            where: {
-              sessionId: sessionData.id,
-              OR: [
-                { id: currentTerm },
-                ...(isTermType ? [{ name: currentTerm as TermType }] : []),
-              ],
-            },
-          });
+      if (!isCombined) {
+        if (currentTerm) {
+          const isTermType = Object.values(TermType).includes(currentTerm as TermType);
+          if (sessionData) {
+            termData = await this.prisma.term.findFirst({
+              where: {
+                sessionId: sessionData.id,
+                OR: [
+                  { id: currentTerm },
+                  ...(isTermType ? [{ name: currentTerm as TermType }] : []),
+                ],
+              },
+            });
+          }
+          if (!termData) {
+            termData = await this.prisma.term.findFirst({
+              where: {
+                OR: [
+                  { id: currentTerm },
+                  ...(isTermType ? [{ name: currentTerm as TermType }] : []),
+                ],
+              },
+            });
+          }
         }
-        if (!termData) {
-          termData = await this.prisma.term.findFirst({
-            where: {
-              OR: [
-                { id: currentTerm },
-                ...(isTermType ? [{ name: currentTerm as TermType }] : []),
-              ],
-            },
-          });
-        }
-      }
 
-      if (!termData && sessionData) {
-        termData = await this.prisma.term.findFirst({
-          where: {
-            sessionId: sessionData.id,
-            isCurrent: true,
-            isActive: true,
-          },
-        });
-        if (!termData) {
+        if (!termData && sessionData) {
           termData = await this.prisma.term.findFirst({
             where: {
               sessionId: sessionData.id,
+              isCurrent: true,
               isActive: true,
             },
-            orderBy: { createdAt: 'desc' },
           });
+          if (!termData) {
+            termData = await this.prisma.term.findFirst({
+              where: {
+                sessionId: sessionData.id,
+                isActive: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            });
+          }
         }
       }
 
@@ -1904,50 +1907,97 @@ export class StudentService {
       }
 
       // Get assessments for the specified session and term
-      const assessments = termData
-        ? await this.prisma.assessment.findMany({
-            where: {
-              studentId: studentId,
-              termId: termData.id,
-            },
-            select: {
-              id: true,
-              type: true,
-              title: true,
-              description: true,
-              maxScore: true,
-              score: true,
-              percentage: true,
-              remarks: true,
-              dateGiven: true,
-              dateSubmitted: true,
-              isSubmitted: true,
-              isGraded: true,
-              createdAt: true,
-              subject: {
+      const assessments = isCombined
+        ? (sessionData
+            ? await this.prisma.assessment.findMany({
+                where: {
+                  studentId: studentId,
+                  term: {
+                    sessionId: sessionData.id,
+                  },
+                },
                 select: {
                   id: true,
-                  name: true,
-                  code: true,
-                  level: true,
+                  type: true,
+                  title: true,
+                  description: true,
+                  maxScore: true,
+                  score: true,
+                  percentage: true,
+                  remarks: true,
+                  dateGiven: true,
+                  dateSubmitted: true,
+                  isSubmitted: true,
+                  isGraded: true,
+                  createdAt: true,
+                  subject: {
+                    select: {
+                      id: true,
+                      name: true,
+                      code: true,
+                      level: true,
+                    },
+                  },
+                  teacher: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                    },
+                  },
                 },
-              },
-              teacher: {
+                orderBy: [
+                  { subject: { name: 'asc' } },
+                  { type: 'asc' },
+                  { dateGiven: 'desc' },
+                ],
+              })
+            : [])
+        : (termData
+            ? await this.prisma.assessment.findMany({
+                where: {
+                  studentId: studentId,
+                  termId: termData.id,
+                },
                 select: {
                   id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
+                  type: true,
+                  title: true,
+                  description: true,
+                  maxScore: true,
+                  score: true,
+                  percentage: true,
+                  remarks: true,
+                  dateGiven: true,
+                  dateSubmitted: true,
+                  isSubmitted: true,
+                  isGraded: true,
+                  createdAt: true,
+                  subject: {
+                    select: {
+                      id: true,
+                      name: true,
+                      code: true,
+                      level: true,
+                    },
+                  },
+                  teacher: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                    },
+                  },
                 },
-              },
-            },
-            orderBy: [
-              { subject: { name: 'asc' } },
-              { type: 'asc' },
-              { dateGiven: 'desc' }
-            ]
-          })
-        : [];
+                orderBy: [
+                  { subject: { name: 'asc' } },
+                  { type: 'asc' },
+                  { dateGiven: 'desc' },
+                ],
+              })
+            : []);
 
       // Calculate performance summary
       const totalAssessments = assessments.length;
@@ -2025,7 +2075,7 @@ export class StudentService {
 
       const performanceSummary = {
         session: sessionData?.name || currentSession || 'N/A',
-        term: termData?.name || currentTerm || 'N/A',
+        term: isCombined ? 'Combined (All Terms)' : (termData?.name || currentTerm || 'N/A'),
         totalAssessments,
         totalScore: Math.round(totalScore * 100) / 100,
         totalMaxScore: Math.round(totalMaxScore * 100) / 100,

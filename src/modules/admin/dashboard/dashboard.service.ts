@@ -332,7 +332,10 @@ export class DashboardService {
               sch.name AS "school",
               c.name AS "class",
               COALESCE(SUM(a.score), 0)::int AS "totalScore",
-              COALESCE(SUM(a."maxScore"), 0)::int AS "totalMaxScore"
+              COALESCE(
+                SUM(CASE WHEN a."maxScore" IS NOT NULL AND a."maxScore" > 0 THEN a."maxScore" ELSE 100 END), 
+                0
+              )::int AS "totalMaxScore"
             FROM students s
             JOIN schools sch ON s."schoolId" = sch.id
             LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
@@ -352,18 +355,27 @@ export class DashboardService {
             LIMIT ${topLimit};
           `;
 
-          topStudentsWithPositions = topScorers.map((student, index) => ({
-            position: topSkip + index + 1,
-            id: student.id,
-            studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
-            examNumber: student.examNumber || 'N/A',
-            lga: student.lga || 'N/A',
-            school: student.school || 'N/A',
-            class: student.class || 'N/A',
-            gender: student.gender || 'N/A',
-            totalScore: student.totalScore || 0,
-            totalMaxScore: student.totalMaxScore || 1000,
-          }));
+          topStudentsWithPositions = topScorers.map((student, index) => {
+            const totalScore = Number(student.totalScore ?? student.totalscore ?? 0);
+            const rawMaxScore = Number(student.totalMaxScore ?? student.totalmaxscore ?? 0);
+            const totalMaxScore = Math.max(
+              rawMaxScore,
+              totalScore > 0 ? Math.ceil(totalScore / 100) * 100 : 1000
+            );
+
+            return {
+              position: topSkip + index + 1,
+              id: student.id,
+              studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
+              examNumber: student.examNumber || 'N/A',
+              lga: student.lga || 'N/A',
+              school: student.school || 'N/A',
+              class: student.class || 'N/A',
+              gender: student.gender || 'N/A',
+              totalScore,
+              totalMaxScore,
+            };
+          });
         } catch (err) {
           this.logger.error(`Error calculating top scorers: ${err.message}`, err.stack);
           topStudentsWithPositions = [];
@@ -562,7 +574,10 @@ export class DashboardService {
           sch.name AS "school",
           c.name AS "class",
           COALESCE(SUM(a.score), 0)::int AS "totalScore",
-          COALESCE(SUM(a."maxScore"), 0)::int AS "totalMaxScore"
+          COALESCE(
+            SUM(CASE WHEN a."maxScore" IS NOT NULL AND a."maxScore" > 0 THEN a."maxScore" ELSE 100 END), 
+            0
+          )::int AS "totalMaxScore"
         FROM students s
         JOIN schools sch ON s."schoolId" = sch.id
         LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
@@ -582,18 +597,28 @@ export class DashboardService {
         LIMIT ${topLimit};
       `;
 
-      const topStudentsWithPositions = topScorers.map((student, index) => ({
-        position: topSkip + index + 1,
-        id: student.id,
-        studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
-        examNumber: student.examNumber || 'N/A',
-        lga: student.lga || 'N/A',
-        school: student.school || 'N/A',
-        class: student.class || 'N/A',
-        gender: student.gender || 'N/A',
-        totalScore: student.totalScore || 0,
-        totalMaxScore: student.totalMaxScore || (isCombined ? 3000 : 1000),
-      }));
+      const topStudentsWithPositions = topScorers.map((student, index) => {
+        const totalScore = Number(student.totalScore ?? student.totalscore ?? 0);
+        const rawMaxScore = Number(student.totalMaxScore ?? student.totalmaxscore ?? 0);
+        const defaultFallback = isCombined ? 3000 : 1000;
+        const totalMaxScore = Math.max(
+          rawMaxScore,
+          totalScore > 0 ? Math.ceil(totalScore / 100) * 100 : defaultFallback
+        );
+
+        return {
+          position: topSkip + index + 1,
+          id: student.id,
+          studentName: `${student.firstName || ''} ${student.lastName || ''}`.trim(),
+          examNumber: student.examNumber || 'N/A',
+          lga: student.lga || 'N/A',
+          school: student.school || 'N/A',
+          class: student.class || 'N/A',
+          gender: student.gender || 'N/A',
+          totalScore,
+          totalMaxScore,
+        };
+      });
 
       return ResponseHelper.success('Performance table retrieved successfully', {
         topStudents: topStudentsWithPositions,

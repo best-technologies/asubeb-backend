@@ -27,6 +27,9 @@ export class StudentService {
 
     try {
       // Get current active session and term if not specified
+      const hasSearch = Boolean(filters?.search && filters.search.trim().length > 0);
+
+      // Get current active session and term if not specified
       let currentSession = filters?.session;
       let currentTerm = filters?.term;
 
@@ -43,44 +46,44 @@ export class StudentService {
         });
 
         if (!activeSession) {
-          this.logger.log("Error loading session")
+          this.logger.log("Error loading session");
           throw new Error('No active session found');
         }
 
         currentSession = currentSession || activeSession.name;
-        currentTerm = currentTerm || activeSession.terms[0]?.name as TermType;
-
-        // Return just session and term info if no LGA filter provided
-        if (!filters?.lgaId) {
-          this.logger.log("No Lga Id provided, returning a list of all lgas")
-          const lgas = await this.prisma.localGovernmentArea.findMany({
-            where: { isActive: true },
-            select: {
-              id: true,
-              name: true,
-              code: true,
-              state: true,
-            },
-            orderBy: { name: 'asc' },
-          });
-
-          this.logger.log("All Lga lists retrieved successfully")
-          return ResponseHelper.success('Basic dashboard data retrieved successfully', {
-            session: currentSession,
-            term: currentTerm,
-            lgas,
-            totalLgas: lgas.length
-          });
-        }
+        currentTerm = currentTerm || (activeSession.terms[0]?.name as TermType);
       }
 
-      // If LGA ID is provided but no school ID, return schools in that LGA
-      if (filters?.lgaId && !filters?.schoolId) {
-        this.logger.log("retirveing list of all schools")
+      // Return just session and term info if no LGA filter provided and no search query
+      if (!filters?.lgaId && !hasSearch) {
+        this.logger.log("No Lga Id provided and no search, returning a list of all lgas");
+        const lgas = await this.prisma.localGovernmentArea.findMany({
+          where: { isActive: true },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            state: true,
+          },
+          orderBy: { name: 'asc' },
+        });
+
+        this.logger.log("All Lga lists retrieved successfully");
+        return ResponseHelper.success('Basic dashboard data retrieved successfully', {
+          session: currentSession,
+          term: currentTerm,
+          lgas,
+          totalLgas: lgas.length,
+        });
+      }
+
+      // If LGA ID is provided but no school ID, return schools in that LGA (unless searching)
+      if (filters?.lgaId && !filters?.schoolId && !hasSearch) {
+        this.logger.log("Retrieving list of all schools in LGA");
         const schools = await this.prisma.school.findMany({
           where: { 
             isActive: true,
-            lgaId: filters.lgaId
+            lgaId: filters.lgaId,
           },
           select: {
             id: true,
@@ -91,17 +94,17 @@ export class StudentService {
           orderBy: { name: 'asc' },
         });
 
-        this.logger.log("All school lists retrieved successfully")
+        this.logger.log("All school lists retrieved successfully");
         return ResponseHelper.success('Schools in LGA retrieved successfully', {
           session: currentSession,
           term: currentTerm,
           schools,
-          totalSchools: schools.length
+          totalSchools: schools.length,
         });
       }
 
-      // If school ID is provided but no class ID, return all classes in the database with school stats
-      if (filters?.schoolId && !filters?.classId) {
+      // If school ID is provided but no class ID, return all classes in the database with school stats (unless searching)
+      if (filters?.schoolId && !filters?.classId && !hasSearch) {
         // Get school information and statistics
         const school = await this.prisma.school.findUnique({
           where: { id: filters.schoolId },
@@ -119,9 +122,9 @@ export class StudentService {
                 id: true,
                 name: true,
                 code: true,
-              }
-            }
-          }
+              },
+            },
+          },
         });
 
         if (!school) {
@@ -150,7 +153,7 @@ export class StudentService {
         const classes = await this.prisma.class.findMany({
           where: { 
             isActive: true,
-            schoolId: filters.schoolId  // ✅ Only classes for this school
+            schoolId: filters.schoolId,
           },
           select: {
             id: true,
@@ -162,16 +165,16 @@ export class StudentService {
                 id: true,
                 name: true,
                 code: true,
-              }
-            }
+              },
+            },
           },
           orderBy: [
             { grade: 'asc' },
-            { section: 'asc' }
+            { section: 'asc' },
           ],
         });
 
-        this.logger.log("Classes and school stats retrieved successfully")
+        this.logger.log("Classes and school stats retrieved successfully");
         return ResponseHelper.success('Classes and school stats retrieved successfully', {
           session: currentSession,
           term: currentTerm,
@@ -190,52 +193,101 @@ export class StudentService {
               male: maleCount,
               female: femaleCount,
               other: otherCount,
-            }
+            },
           },
           classes,
-          totalClasses: classes.length
+          totalClasses: classes.length,
         });
       }
 
-      const termQueryCondition = {
-        ...(currentTerm.includes('_') ? { name: currentTerm as TermType } : { id: currentTerm }),
-        session: {
-          ...(currentSession.includes('/') ? { name: currentSession } : { id: currentSession }),
-        },
-      };
+      const isTermName = currentTerm && typeof currentTerm === 'string' && (currentTerm.includes('_') || Object.values(TermType).includes(currentTerm as TermType));
+      const termQueryCondition: any = {};
+      if (currentTerm) {
+        if (isTermName) {
+          termQueryCondition.name = currentTerm as TermType;
+        } else {
+          termQueryCondition.id = currentTerm;
+        }
+      }
+      if (currentSession) {
+        termQueryCondition.session = currentSession.includes('/')
+          ? { name: currentSession }
+          : { id: currentSession };
+      }
 
       // Build student where conditions for pagination
       const studentWhereConditions: any = {
         isActive: true,
-        assessments: {
+      };
+
+      // Require assessments for the specified session & term so search and table results are strictly scoped to that academic period
+      if (Object.keys(termQueryCondition).length > 0) {
+        studentWhereConditions.assessments = {
           some: {
             term: termQueryCondition,
           },
-        },
-      };
-
-      // Apply existing filters
-      // Only apply schoolId filter if classId is not provided
-      // When classId is provided, the class already determines the school
-      if (filters?.schoolId && !filters?.classId) {
-        studentWhereConditions.schoolId = filters.schoolId;
+        };
       }
 
+      // Apply existing cascade filters
       if (filters?.classId) {
         studentWhereConditions.classId = filters.classId;
+      } else if (filters?.schoolId) {
+        studentWhereConditions.schoolId = filters.schoolId;
+      } else if (filters?.lgaId) {
+        studentWhereConditions.school = {
+          lgaId: filters.lgaId,
+        };
       }
 
       if (filters?.gender) {
         studentWhereConditions.gender = filters.gender;
       }
 
-      if (filters?.search) {
-        studentWhereConditions.OR = [
-          { firstName: { contains: filters.search, mode: 'insensitive' } },
-          { lastName: { contains: filters.search, mode: 'insensitive' } },
-          { studentId: { contains: filters.search, mode: 'insensitive' } },
-          { school: { name: { contains: filters.search, mode: 'insensitive' } } },
+      if (hasSearch && filters?.search) {
+        const searchTerm = filters.search.trim();
+        const searchWords = searchTerm.split(/\s+/).filter(Boolean);
+
+        const searchConditions: any[] = [
+          { firstName: { contains: searchTerm, mode: 'insensitive' } },
+          { lastName: { contains: searchTerm, mode: 'insensitive' } },
+          { studentId: { contains: searchTerm, mode: 'insensitive' } },
+          { school: { name: { contains: searchTerm, mode: 'insensitive' } } },
+          { class: { name: { contains: searchTerm, mode: 'insensitive' } } },
         ];
+
+        if (searchWords.length > 1) {
+          const firstWord = searchWords[0];
+          const restWords = searchWords.slice(1).join(' ');
+
+          searchConditions.push(
+            {
+              AND: [
+                { firstName: { contains: firstWord, mode: 'insensitive' } },
+                { lastName: { contains: restWords, mode: 'insensitive' } },
+              ],
+            },
+            {
+              AND: [
+                { firstName: { contains: restWords, mode: 'insensitive' } },
+                { lastName: { contains: firstWord, mode: 'insensitive' } },
+              ],
+            },
+            {
+              AND: searchWords.map((word) => ({
+                OR: [
+                  { firstName: { contains: word, mode: 'insensitive' } },
+                  { lastName: { contains: word, mode: 'insensitive' } },
+                  { studentId: { contains: word, mode: 'insensitive' } },
+                  { school: { name: { contains: word, mode: 'insensitive' } } },
+                  { class: { name: { contains: word, mode: 'insensitive' } } },
+                ],
+              })),
+            }
+          );
+        }
+
+        studentWhereConditions.OR = searchConditions;
       }
 
       // Setup pagination
@@ -261,7 +313,9 @@ export class StudentService {
           class: { select: { name: true } },
           assessments: {
             where: {
-              term: termQueryCondition,
+              ...(Object.keys(termQueryCondition).length > 0 && {
+                term: termQueryCondition,
+              }),
               ...(filters?.subject && {
                 subject: { name: { contains: filters.subject, mode: 'insensitive' } },
               }),

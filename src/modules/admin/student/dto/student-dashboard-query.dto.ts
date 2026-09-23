@@ -29,6 +29,21 @@ export class StudentDashboardQueryDto {
   @IsString()
   classId?: string;
 
+  @ApiPropertyOptional({ description: 'Search by student name, ID, or school' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Gender (MALE, FEMALE, OTHER)' })
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @ApiPropertyOptional({ description: 'Subject' })
+  @IsOptional()
+  @IsString()
+  subject?: string;
+
   @ApiPropertyOptional({ description: 'Page number (default: 1)', minimum: 1, default: 1 })
   @Type(() => Number)
   @IsInt()

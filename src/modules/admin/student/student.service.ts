@@ -2222,15 +2222,84 @@ export class StudentService {
         ? Prisma.sql`AND s."schoolId" = ${schoolId}`
         : Prisma.empty;
 
-      const [
-        classResults,
-        schoolResults,
-        lgaResults,
-        prevLgaResults,
-        genderResults,
-        ageResults,
-        totalEnrollment,
-      ] = await Promise.all([
+      const LGA_CODES: Record<string, string> = {
+        'Aba North': 'ABA-N',
+        'Aba South': 'ABA-S',
+        'Arochukwu': 'ARO',
+        'Bende': 'BEN',
+        'Ikwuano': 'IKW',
+        'Isiala Ngwa North': 'ISI-N',
+        'Isiala Ngwa South': 'ISI-S',
+        'Isuikwuato': 'ISU',
+        'Obi Ngwa': 'OBI-N',
+        'Ohafia': 'OHA',
+        'Osisioma Ngwa': 'OSI',
+        'Ugwunagbo': 'UGW',
+        'Ukwa East': 'UKW-E',
+        'Ukwa West': 'UKW-W',
+        'Umuahia North': 'UMU-N',
+        'Umuahia South': 'UMU-S',
+        'Umunneochi': 'UMN',
+      };
+
+      // 1. Get total enrollment first
+      const totalEnrollment = await this.prisma.student.count({
+        where: {
+          isActive: true,
+          ...(schoolId ? { schoolId } : {}),
+          ...(lgaId ? { school: { lgaId } } : {}),
+        },
+      });
+
+      // 2. Pre-check if any assessments exist for this session/term
+      let hasAssessments = false;
+      if (termCondition !== Prisma.empty) {
+        const check = await this.prisma.$queryRaw<any[]>`
+          SELECT 1 FROM assessments a WHERE 1=1 ${termCondition} LIMIT 1;
+        `;
+        hasAssessments = Boolean(check && check.length > 0);
+      }
+
+      // If no assessments exist for this period, return empty analytics cleanly & instantly
+      if (!hasAssessments) {
+        const emptyLgas = (
+          await this.prisma.localGovernmentArea.findMany({
+            orderBy: { name: 'asc' },
+            include: { _count: { select: { schools: true } } },
+          })
+        ).map((lga) => ({
+          lgaId: lga.id,
+          lgaName: lga.name,
+          lgaCode: LGA_CODES[lga.name] || lga.code || lga.name.substring(0, 4).toUpperCase(),
+          schoolCount: lga._count?.schools || 0,
+          studentCount: 0,
+          averagePercentage: 0,
+          passRate: 0,
+          previousAverage: null,
+          change: null,
+        }));
+
+        return ResponseHelper.success('Student analytics retrieved successfully', {
+          session: sessionData.name,
+          term: isAllTerms ? 'ALL_TERMS' : (termData?.name || 'N/A'),
+          summary: {
+            overallAverage: 0,
+            totalStudentsAssessed: 0,
+            totalEnrollment,
+            topPerformingLga: 'N/A',
+            topPerformingClass: 'N/A',
+            genderParityIndex: 1.0,
+          },
+          byClass: [],
+          bySchool: [],
+          byLga: emptyLgas,
+          byGender: [],
+          byAgeRange: [],
+        });
+      }
+
+      // 3. Run queries in controlled batches of max 2-4 concurrent connections
+      const [classResults, schoolResults] = await Promise.all([
         // 1. By Class
         this.prisma.$queryRaw<any[]>`
           SELECT 
@@ -2274,7 +2343,9 @@ export class StudentService {
           ORDER BY "averagePercentage" DESC
           LIMIT 8;
         `,
+      ]);
 
+      const [lgaResults, prevLgaResults, genderResults, ageResults] = await Promise.all([
         // 3. By LGA (All 17 LGAs)
         this.prisma.$queryRaw<any[]>`
           SELECT 
@@ -2362,15 +2433,6 @@ export class StudentService {
               ELSE 6
             END;
         `,
-
-        // Total enrollment
-        this.prisma.student.count({
-          where: {
-            isActive: true,
-            ...(schoolId ? { schoolId } : {}),
-            ...(lgaId ? { school: { lgaId } } : {}),
-          },
-        }),
       ]);
 
       const totalAssessed = genderResults.reduce((sum, g) => sum + (g.studentCount || 0), 0);
@@ -2393,26 +2455,6 @@ export class StudentService {
         overallCount += g.studentCount;
       });
       const overallAverage = overallCount > 0 ? Math.round((overallSum / overallCount) * 10) / 10 : 0;
-
-      const LGA_CODES: Record<string, string> = {
-        'Aba North': 'ABA-N',
-        'Aba South': 'ABA-S',
-        'Arochukwu': 'ARO',
-        'Bende': 'BEN',
-        'Ikwuano': 'IKW',
-        'Isiala Ngwa North': 'ISI-N',
-        'Isiala Ngwa South': 'ISI-S',
-        'Isuikwuato': 'ISU',
-        'Obi Ngwa': 'OBI-N',
-        'Ohafia': 'OHA',
-        'Osisioma Ngwa': 'OSI',
-        'Ugwunagbo': 'UGW',
-        'Ukwa East': 'UKW-E',
-        'Ukwa West': 'UKW-W',
-        'Umuahia North': 'UMU-N',
-        'Umuahia South': 'UMU-S',
-        'Umunneochi': 'UMN',
-      };
 
       const prevMap = new Map<string, number>();
       if (Array.isArray(prevLgaResults)) {

@@ -8,10 +8,10 @@ export class StudentAnalyticsQueryDto {
   @IsString()
   session?: string;
 
-  @ApiPropertyOptional({ description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM)' })
+  @ApiPropertyOptional({ description: 'Academic term (FIRST_TERM, SECOND_TERM, THIRD_TERM, ALL_TERMS)' })
   @IsOptional()
   @IsString()
-  term?: TermType;
+  term?: string;
 
   @ApiPropertyOptional({ description: 'Optional LGA filter' })
   @IsOptional()
@@ -45,9 +45,13 @@ export interface SchoolPerformanceItem {
 export interface LgaPerformanceItem {
   lgaId: string;
   lgaName: string;
+  lgaCode: string;
+  schoolCount: number;
   studentCount: number;
   averagePercentage: number;
   passRate: number;
+  previousAverage?: number | null;
+  change?: number | null;
 }
 
 export interface GenderPerformanceItem {

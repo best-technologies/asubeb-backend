@@ -2140,35 +2140,81 @@ export class StudentService {
         });
       }
 
-      let termData = termName
-        ? await this.prisma.term.findFirst({
-            where: {
-              sessionId: sessionData.id,
-              OR: [{ id: termName }, { name: termName as TermType }],
-              isActive: true,
-            },
-          })
-        : await this.prisma.term.findFirst({
+      const isAllTerms = !termName || termName === 'ALL_TERMS' || termName === 'all' || termName === 'ALL';
+
+      let termData: any = null;
+      let termCondition = Prisma.empty;
+      let prevCondition = Prisma.empty;
+
+      if (!isAllTerms) {
+        termData = await this.prisma.term.findFirst({
+          where: {
+            sessionId: sessionData.id,
+            OR: [{ id: termName }, { name: termName as TermType }],
+            isActive: true,
+          },
+        });
+
+        if (!termData) {
+          termData = await this.prisma.term.findFirst({
             where: {
               sessionId: sessionData.id,
               isCurrent: true,
               isActive: true,
             },
           });
+        }
 
-      if (!termData) {
-        termData = await this.prisma.term.findFirst({
-          where: { sessionId: sessionData.id, isActive: true },
-          orderBy: { createdAt: 'desc' },
+        if (termData) {
+          termCondition = Prisma.sql`AND a."termId" = ${termData.id}`;
+
+          // Find immediate previous term for comparison
+          const sessionTerms = await this.prisma.term.findMany({
+            where: { sessionId: sessionData.id },
+            orderBy: { startDate: 'asc' },
+          });
+
+          const currentTermIndex = sessionTerms.findIndex((t) => t.id === termData.id);
+          if (currentTermIndex > 0) {
+            const prevTermId = sessionTerms[currentTermIndex - 1].id;
+            prevCondition = Prisma.sql`AND a."termId" = ${prevTermId}`;
+          } else {
+            // Check previous session's last term
+            const prevSession = await this.prisma.session.findFirst({
+              where: { startDate: { lt: sessionData.startDate } },
+              orderBy: { startDate: 'desc' },
+              include: { terms: { orderBy: { startDate: 'desc' }, take: 1 } },
+            });
+            if (prevSession?.terms?.[0]) {
+              prevCondition = Prisma.sql`AND a."termId" = ${prevSession.terms[0].id}`;
+            }
+          }
+        }
+      } else {
+        // Combined terms for overall overview of session
+        const sessionTerms = await this.prisma.term.findMany({
+          where: { sessionId: sessionData.id },
         });
+        const sessionTermIds = sessionTerms.map((t) => t.id);
+        if (sessionTermIds.length > 0) {
+          termCondition = Prisma.sql`AND a."termId" IN (${Prisma.join(sessionTermIds)})`;
+        }
+
+        // Previous session for comparison
+        const prevSession = await this.prisma.session.findFirst({
+          where: { startDate: { lt: sessionData.startDate } },
+          orderBy: { startDate: 'desc' },
+          include: { terms: true },
+        });
+        const prevSessionTermIds = prevSession?.terms?.map((t) => t.id) || [];
+        if (prevSessionTermIds.length > 0) {
+          prevCondition = Prisma.sql`AND a."termId" IN (${Prisma.join(prevSessionTermIds)})`;
+        }
       }
 
       const lgaId = query?.lgaId;
       const schoolId = query?.schoolId;
 
-      const termCondition = termData
-        ? Prisma.sql`AND a."termId" = ${termData.id}`
-        : Prisma.empty;
       const lgaCondition = lgaId
         ? Prisma.sql`AND sch."lgaId" = ${lgaId}`
         : Prisma.empty;
@@ -2180,6 +2226,7 @@ export class StudentService {
         classResults,
         schoolResults,
         lgaResults,
+        prevLgaResults,
         genderResults,
         ageResults,
         totalEnrollment,
@@ -2228,25 +2275,37 @@ export class StudentService {
           LIMIT 8;
         `,
 
-        // 3. By LGA
+        // 3. By LGA (All 17 LGAs)
         this.prisma.$queryRaw<any[]>`
           SELECT 
             lga.id AS "lgaId",
             lga.name AS "lgaName",
-            COUNT(DISTINCT s.id)::int AS "studentCount",
-            ROUND(AVG((a.score::float / NULLIF(a."maxScore", 0)) * 100)::numeric, 1)::float AS "averagePercentage",
-            ROUND((COUNT(DISTINCT CASE WHEN (a.score::float / NULLIF(a."maxScore", 0)) >= 0.5 THEN s.id END)::float / NULLIF(COUNT(DISTINCT s.id), 0) * 100)::numeric, 1)::float AS "passRate"
-          FROM assessments a
-          JOIN students s ON a."studentId" = s.id
-          JOIN schools sch ON s."schoolId" = sch.id
-          JOIN local_government_areas lga ON sch."lgaId" = lga.id
-          WHERE s."isActive" = true
-          ${termCondition}
-          ${lgaCondition}
-          ${schoolCondition}
-          GROUP BY lga.id, lga.name
+            COALESCE(lga.code, '') AS "rawCode",
+            COUNT(DISTINCT sch.id)::int AS "schoolCount",
+            COUNT(DISTINCT CASE WHEN a.id IS NOT NULL THEN s.id END)::int AS "studentCount",
+            ROUND(COALESCE(AVG((a.score::float / NULLIF(a."maxScore", 0)) * 100), 0)::numeric, 1)::float AS "averagePercentage",
+            ROUND(COALESCE(COUNT(DISTINCT CASE WHEN (a.score::float / NULLIF(a."maxScore", 0)) >= 0.5 THEN s.id END)::float / NULLIF(COUNT(DISTINCT CASE WHEN a.id IS NOT NULL THEN s.id END), 0) * 100, 0)::numeric, 1)::float AS "passRate"
+          FROM local_government_areas lga
+          LEFT JOIN schools sch ON sch."lgaId" = lga.id
+          LEFT JOIN students s ON s."schoolId" = sch.id AND s."isActive" = true
+          LEFT JOIN assessments a ON a."studentId" = s.id ${termCondition}
+          GROUP BY lga.id, lga.name, lga.code
           ORDER BY lga.name ASC;
         `,
+
+        // 3b. Previous period LGA averages (for rise/fall trend)
+        prevCondition !== Prisma.empty
+          ? this.prisma.$queryRaw<any[]>`
+              SELECT 
+                lga.id AS "lgaId",
+                ROUND(COALESCE(AVG((a.score::float / NULLIF(a."maxScore", 0)) * 100), 0)::numeric, 1)::float AS "prevAverage"
+              FROM local_government_areas lga
+              JOIN schools sch ON sch."lgaId" = lga.id
+              JOIN students s ON s."schoolId" = sch.id AND s."isActive" = true
+              JOIN assessments a ON a."studentId" = s.id ${prevCondition}
+              GROUP BY lga.id;
+            `
+          : Promise.resolve([]),
 
         // 4. By Gender
         this.prisma.$queryRaw<any[]>`
@@ -2335,15 +2394,65 @@ export class StudentService {
       });
       const overallAverage = overallCount > 0 ? Math.round((overallSum / overallCount) * 10) / 10 : 0;
 
-      const topPerformingLga = lgaResults.length > 0
-        ? [...lgaResults].sort((a, b) => (b.averagePercentage || 0) - (a.averagePercentage || 0))[0]?.lgaName || 'N/A'
+      const LGA_CODES: Record<string, string> = {
+        'Aba North': 'ABA-N',
+        'Aba South': 'ABA-S',
+        'Arochukwu': 'ARO',
+        'Bende': 'BEN',
+        'Ikwuano': 'IKW',
+        'Isiala Ngwa North': 'ISI-N',
+        'Isiala Ngwa South': 'ISI-S',
+        'Isuikwuato': 'ISU',
+        'Obi Ngwa': 'OBI-N',
+        'Ohafia': 'OHA',
+        'Osisioma Ngwa': 'OSI',
+        'Ugwunagbo': 'UGW',
+        'Ukwa East': 'UKW-E',
+        'Ukwa West': 'UKW-W',
+        'Umuahia North': 'UMU-N',
+        'Umuahia South': 'UMU-S',
+        'Umunneochi': 'UMN',
+      };
+
+      const prevMap = new Map<string, number>();
+      if (Array.isArray(prevLgaResults)) {
+        prevLgaResults.forEach((p) => {
+          if (p.lgaId && p.prevAverage !== undefined && p.prevAverage !== null) {
+            prevMap.set(p.lgaId, Number(p.prevAverage));
+          }
+        });
+      }
+
+      const formattedLgaResults = lgaResults.map((item) => {
+        const lgaCode = LGA_CODES[item.lgaName] || item.rawCode || item.lgaName.substring(0, 4).toUpperCase();
+        const prevAvg = prevMap.get(item.lgaId);
+        const hasPrev = prevAvg !== undefined && prevAvg !== null && prevAvg > 0;
+        const currentAvg = Number(item.averagePercentage || 0);
+        const change = hasPrev ? Number((currentAvg - prevAvg).toFixed(1)) : null;
+
+        return {
+          lgaId: item.lgaId,
+          lgaName: item.lgaName,
+          lgaCode,
+          schoolCount: Number(item.schoolCount || 0),
+          studentCount: Number(item.studentCount || 0),
+          averagePercentage: currentAvg,
+          passRate: Number(item.passRate || 0),
+          previousAverage: hasPrev ? prevAvg : null,
+          change,
+        };
+      });
+
+      const activeLgas = formattedLgaResults.filter((l) => l.studentCount > 0);
+      const topPerformingLga = activeLgas.length > 0
+        ? [...activeLgas].sort((a, b) => b.averagePercentage - a.averagePercentage)[0]?.lgaName || 'N/A'
         : 'N/A';
 
       const topPerformingClass = classResults.length > 0 ? classResults[0]?.className || 'N/A' : 'N/A';
 
       return ResponseHelper.success('Student analytics retrieved successfully', {
         session: sessionData.name,
-        term: termData?.name || 'N/A',
+        term: isAllTerms ? 'ALL_TERMS' : (termData?.name || 'N/A'),
         summary: {
           overallAverage,
           totalStudentsAssessed: totalAssessed,
@@ -2361,7 +2470,7 @@ export class StudentService {
           femaleAverage: c.femaleAverage ?? c.averagePercentage ?? 0,
         })),
         bySchool: schoolResults,
-        byLga: lgaResults,
+        byLga: formattedLgaResults,
         byGender: byGenderWithShare,
         byAgeRange: ageResults,
       });

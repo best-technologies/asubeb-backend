@@ -58,4 +58,14 @@ export class StudentDashboardQueryDto {
   @Max(100)
   @IsOptional()
   limit?: number;
+
+  @ApiPropertyOptional({ description: 'Field to sort by (e.g., studentName, firstName)', default: 'studentName' })
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @ApiPropertyOptional({ description: 'Sort direction (asc or desc)', enum: ['asc', 'desc'], default: 'asc' })
+  @IsOptional()
+  @IsString()
+  sortOrder?: 'asc' | 'desc';
 }

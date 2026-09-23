@@ -54,10 +54,16 @@ export class StudentService {
         currentTerm = currentTerm || (activeSession.terms[0]?.name as TermType);
       }
 
-      // Return just session and term info if no LGA filter provided and no search query
-      if (!filters?.lgaId && !hasSearch) {
-        this.logger.log("No Lga Id provided and no search, returning a list of all lgas");
-        const lgas = await this.prisma.localGovernmentArea.findMany({
+      // Prepare cascading options for frontend filters
+      let lgasList: any = null;
+      let schoolsList: any = null;
+      let classesList: any = null;
+      let schoolInfo: any = null;
+
+      // If no LGA ID is provided, query all active LGAs for the dropdown
+      if (!filters?.lgaId) {
+        this.logger.log("Querying list of all LGAs");
+        lgasList = await this.prisma.localGovernmentArea.findMany({
           where: { isActive: true },
           select: {
             id: true,
@@ -67,20 +73,12 @@ export class StudentService {
           },
           orderBy: { name: 'asc' },
         });
-
-        this.logger.log("All Lga lists retrieved successfully");
-        return ResponseHelper.success('Basic dashboard data retrieved successfully', {
-          session: currentSession,
-          term: currentTerm,
-          lgas,
-          totalLgas: lgas.length,
-        });
       }
 
-      // If LGA ID is provided but no school ID, return schools in that LGA (unless searching)
-      if (filters?.lgaId && !filters?.schoolId && !hasSearch) {
-        this.logger.log("Retrieving list of all schools in LGA");
-        const schools = await this.prisma.school.findMany({
+      // If LGA ID is provided, query schools in that LGA for the dropdown
+      if (filters?.lgaId) {
+        this.logger.log("Querying schools in LGA");
+        schoolsList = await this.prisma.school.findMany({
           where: { 
             isActive: true,
             lgaId: filters.lgaId,
@@ -93,19 +91,10 @@ export class StudentService {
           },
           orderBy: { name: 'asc' },
         });
-
-        this.logger.log("All school lists retrieved successfully");
-        return ResponseHelper.success('Schools in LGA retrieved successfully', {
-          session: currentSession,
-          term: currentTerm,
-          schools,
-          totalSchools: schools.length,
-        });
       }
 
-      // If school ID is provided but no class ID, return all classes in the database with school stats (unless searching)
-      if (filters?.schoolId && !filters?.classId && !hasSearch) {
-        // Get school information and statistics
+      // If school ID is provided, query classes and school stats for that school
+      if (filters?.schoolId) {
         const school = await this.prisma.school.findUnique({
           where: { id: filters.schoolId },
           select: {
@@ -127,58 +116,48 @@ export class StudentService {
           },
         });
 
-        if (!school) {
-          throw new Error('School not found');
-        }
+        if (school) {
+          const studentStats = await this.prisma.student.groupBy({
+            by: ['gender'],
+            where: {
+              schoolId: filters.schoolId,
+              isActive: true,
+            },
+            _count: {
+              gender: true,
+            },
+          });
 
-        // Get detailed student statistics for the school
-        const studentStats = await this.prisma.student.groupBy({
-          by: ['gender'],
-          where: {
-            schoolId: filters.schoolId,
-            isActive: true,
-          },
-          _count: {
-            gender: true,
-          },
-        });
+          const totalStudents = studentStats.reduce((sum, stat) => sum + stat._count.gender, 0);
+          const maleCount = studentStats.find(stat => stat.gender === 'MALE')?._count.gender || 0;
+          const femaleCount = studentStats.find(stat => stat.gender === 'FEMALE')?._count.gender || 0;
+          const otherCount = studentStats.find(stat => stat.gender === 'OTHER')?._count.gender || 0;
 
-        // Calculate gender breakdown
-        const totalStudents = studentStats.reduce((sum, stat) => sum + stat._count.gender, 0);
-        const maleCount = studentStats.find(stat => stat.gender === 'MALE')?._count.gender || 0;
-        const femaleCount = studentStats.find(stat => stat.gender === 'FEMALE')?._count.gender || 0;
-        const otherCount = studentStats.find(stat => stat.gender === 'OTHER')?._count.gender || 0;
-
-        // Get classes for this specific school
-        const classes = await this.prisma.class.findMany({
-          where: { 
-            isActive: true,
-            schoolId: filters.schoolId,
-          },
-          select: {
-            id: true,
-            name: true,
-            grade: true,
-            section: true,
-            school: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
+          classesList = await this.prisma.class.findMany({
+            where: { 
+              isActive: true,
+              schoolId: filters.schoolId,
+            },
+            select: {
+              id: true,
+              name: true,
+              grade: true,
+              section: true,
+              school: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                },
               },
             },
-          },
-          orderBy: [
-            { grade: 'asc' },
-            { section: 'asc' },
-          ],
-        });
+            orderBy: [
+              { grade: 'asc' },
+              { section: 'asc' },
+            ],
+          });
 
-        this.logger.log("Classes and school stats retrieved successfully");
-        return ResponseHelper.success('Classes and school stats retrieved successfully', {
-          session: currentSession,
-          term: currentTerm,
-          school: {
+          schoolInfo = {
             id: school.id,
             name: school.name,
             code: school.code,
@@ -194,10 +173,8 @@ export class StudentService {
               female: femaleCount,
               other: otherCount,
             },
-          },
-          classes,
-          totalClasses: classes.length,
-        });
+          };
+        }
       }
 
       const isTermName = currentTerm && typeof currentTerm === 'string' && (currentTerm.includes('_') || Object.values(TermType).includes(currentTerm as TermType));
@@ -290,10 +267,15 @@ export class StudentService {
         studentWhereConditions.OR = searchConditions;
       }
 
-      // Setup pagination
+      // Setup pagination and sorting (alphabetical A-Z)
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
       const skip = (page - 1) * limit;
+
+      const orderByClause: any = [
+        { firstName: 'asc' },
+        { lastName: 'asc' },
+      ];
 
       // Get total count first
       const totalStudents = await this.prisma.student.count({
@@ -309,7 +291,16 @@ export class StudentService {
           lastName: true,
           studentId: true,
           gender: true,
-          school: { select: { name: true } },
+          school: {
+            select: {
+              name: true,
+              lga: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
           class: { select: { name: true } },
           assessments: {
             where: {
@@ -323,13 +314,13 @@ export class StudentService {
             select: { score: true, maxScore: true, subject: { select: { name: true } } },
           },
         },
-        orderBy: { firstName: 'asc' },
+        orderBy: orderByClause,
         skip,
         take: limit,
       });
 
-      // Calculate performance metrics
-      const performanceData = students.map(student => {
+      // Calculate performance metrics (maintaining alphabetical database sorting)
+      const performanceTable = students.map((student, index) => {
         const totalScore = student.assessments.reduce((sum, a) => sum + a.score, 0);
         const totalMaxScore = student.assessments.reduce((sum, a) => sum + a.maxScore, 0);
         const average = student.assessments.length > 0 ? totalScore / student.assessments.length : 0;
@@ -337,97 +328,23 @@ export class StudentService {
 
         return {
           id: student.id,
+          position: skip + index + 1,
           studentName: `${student.firstName} ${student.lastName}`,
           examNo: student.studentId,
+          lga: student.school?.lga?.name || 'N/A',
           school: student.school?.name || 'N/A',
           class: student.class?.name || 'N/A',
           total: totalScore,
+          totalMaxScore,
           average: Math.round(average * 100) / 100,
           percentage: Math.round(percentage * 100) / 100,
           gender: student.gender,
         };
       });
 
-      // Sort by total score in descending order and add positions
-      performanceData.sort((a, b) => b.total - a.total);
-      const performanceTable = performanceData.map((student, index) => ({
-        position: index + 1,
-        ...student,
-      }));
-
       // Calculate pagination info
       const totalPages = Math.ceil(totalStudents / limit);
       const hasMore = page < totalPages;
-
-      // Get school information if classId is provided
-      let schoolInfo: any = null;
-      if (filters?.classId) {
-        const classWithSchool = await this.prisma.class.findUnique({
-          where: { id: filters.classId },
-          select: {
-            id: true,
-            name: true,
-            grade: true,
-            section: true,
-            school: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
-                level: true,
-                address: true,
-                totalStudents: true,
-                totalTeachers: true,
-                capacity: true,
-                lga: {
-                  select: {
-                    id: true,
-                    name: true,
-                    code: true,
-                  }
-                }
-              }
-            }
-          }
-        });
-
-        if (classWithSchool?.school) {
-          // Get student statistics for this school
-          const studentStats = await this.prisma.student.groupBy({
-            by: ['gender'],
-            where: {
-              schoolId: classWithSchool.school.id,
-              isActive: true,
-            },
-            _count: {
-              gender: true,
-            },
-          });
-
-          const totalSchoolStudents = studentStats.reduce((sum, stat) => sum + stat._count.gender, 0);
-          const maleCount = studentStats.find(stat => stat.gender === 'MALE')?._count.gender || 0;
-          const femaleCount = studentStats.find(stat => stat.gender === 'FEMALE')?._count.gender || 0;
-          const otherCount = studentStats.find(stat => stat.gender === 'OTHER')?._count.gender || 0;
-
-          schoolInfo = {
-            id: classWithSchool.school.id,
-            name: classWithSchool.school.name,
-            code: classWithSchool.school.code,
-            level: classWithSchool.school.level,
-            address: classWithSchool.school.address,
-            lga: classWithSchool.school.lga,
-            totalStudents: classWithSchool.school.totalStudents,
-            totalTeachers: classWithSchool.school.totalTeachers,
-            capacity: classWithSchool.school.capacity,
-            studentStats: {
-              total: totalSchoolStudents,
-              male: maleCount,
-              female: femaleCount,
-              other: otherCount,
-            }
-          };
-        }
-      }
 
       const responseData: any = {
         session: currentSession,
@@ -437,16 +354,27 @@ export class StudentService {
           totalPages,
           totalItems: totalStudents,
           itemsPerPage: limit,
-          hasMore
+          hasMore,
         },
         lastUpdated: new Date().toISOString(),
+        performanceTable,
       };
 
+      if (lgasList) {
+        responseData.lgas = lgasList;
+        responseData.totalLgas = lgasList.length;
+      }
+      if (schoolsList) {
+        responseData.schools = schoolsList;
+        responseData.totalSchools = schoolsList.length;
+      }
+      if (classesList) {
+        responseData.classes = classesList;
+        responseData.totalClasses = classesList.length;
+      }
       if (schoolInfo) {
         responseData.school = schoolInfo;
       }
-
-      responseData.performanceTable = performanceTable;
 
       return ResponseHelper.success('Students retrieved successfully', responseData);
 

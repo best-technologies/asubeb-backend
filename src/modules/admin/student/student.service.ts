@@ -1,9 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ResponseHelper } from '../../../common/helpers/response.helper';
-import { TermType } from '@prisma/client';
+import { TermType, Prisma } from '@prisma/client';
 import { generateStudentResultPdf } from '../../../common/helpers/pdf.helper';
 import { generateClassResultsPdf } from '../../../common/helpers/pdf-class.helper';
+import { StudentAnalyticsQueryDto } from './dto';
 
 @Injectable()
 export class StudentService {
@@ -2096,6 +2097,278 @@ export class StudentService {
       throw new Error(`Error fetching student details: ${error.message}`);
     }
   }
-  
-  
-} 
+
+  async getStudentAnalytics(query?: StudentAnalyticsQueryDto) {
+    this.logger.log(`Fetching student analytics with query:`, query);
+
+    try {
+      const sessionName = query?.session;
+      const termName = query?.term;
+
+      let sessionData = sessionName
+        ? await this.prisma.session.findFirst({
+            where: { OR: [{ id: sessionName }, { name: sessionName }], isActive: true },
+          })
+        : await this.prisma.session.findFirst({
+            where: { isCurrent: true, isActive: true },
+          });
+
+      if (!sessionData) {
+        sessionData = await this.prisma.session.findFirst({
+          where: { isActive: true },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+
+      if (!sessionData) {
+        return ResponseHelper.success('No active session found', {
+          session: 'N/A',
+          term: 'N/A',
+          summary: {
+            overallAverage: 0,
+            totalStudentsAssessed: 0,
+            totalEnrollment: 0,
+            topPerformingLga: 'N/A',
+            topPerformingClass: 'N/A',
+            genderParityIndex: 1.0,
+          },
+          byClass: [],
+          bySchool: [],
+          byLga: [],
+          byGender: [],
+          byAgeRange: [],
+        });
+      }
+
+      let termData = termName
+        ? await this.prisma.term.findFirst({
+            where: {
+              sessionId: sessionData.id,
+              OR: [{ id: termName }, { name: termName as TermType }],
+              isActive: true,
+            },
+          })
+        : await this.prisma.term.findFirst({
+            where: {
+              sessionId: sessionData.id,
+              isCurrent: true,
+              isActive: true,
+            },
+          });
+
+      if (!termData) {
+        termData = await this.prisma.term.findFirst({
+          where: { sessionId: sessionData.id, isActive: true },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+
+      const lgaId = query?.lgaId;
+      const schoolId = query?.schoolId;
+
+      const termCondition = termData
+        ? Prisma.sql`AND a."termId" = ${termData.id}`
+        : Prisma.empty;
+      const lgaCondition = lgaId
+        ? Prisma.sql`AND sch."lgaId" = ${lgaId}`
+        : Prisma.empty;
+      const schoolCondition = schoolId
+        ? Prisma.sql`AND s."schoolId" = ${schoolId}`
+        : Prisma.empty;
+
+      const [
+        classResults,
+        schoolResults,
+        lgaResults,
+        genderResults,
+        ageResults,
+        totalEnrollment,
+      ] = await Promise.all([
+        // 1. By Class
+        this.prisma.$queryRaw<any[]>`
+          SELECT 
+            c.name AS "className",
+            COUNT(DISTINCT s.id)::int AS "studentCount",
+            ROUND(AVG((a.score::float / NULLIF(a."maxScore", 0)) * 100)::numeric, 1)::float AS "averagePercentage",
+            ROUND(AVG(a.score)::numeric, 1)::float AS "averageScore",
+            ROUND(AVG(CASE WHEN s.gender = 'MALE' THEN (a.score::float / NULLIF(a."maxScore", 0)) * 100 END)::numeric, 1)::float AS "maleAverage",
+            ROUND(AVG(CASE WHEN s.gender = 'FEMALE' THEN (a.score::float / NULLIF(a."maxScore", 0)) * 100 END)::numeric, 1)::float AS "femaleAverage"
+          FROM assessments a
+          JOIN students s ON a."studentId" = s.id
+          JOIN classes c ON s."classId" = c.id
+          JOIN schools sch ON s."schoolId" = sch.id
+          WHERE s."isActive" = true
+          ${termCondition}
+          ${lgaCondition}
+          ${schoolCondition}
+          GROUP BY c.name
+          ORDER BY "averagePercentage" DESC;
+        `,
+
+        // 2. By School (Top 8)
+        this.prisma.$queryRaw<any[]>`
+          SELECT 
+            sch.id AS "schoolId",
+            sch.name AS "schoolName",
+            COALESCE(lga.name, 'N/A') AS "lgaName",
+            COUNT(DISTINCT s.id)::int AS "studentCount",
+            ROUND(AVG((a.score::float / NULLIF(a."maxScore", 0)) * 100)::numeric, 1)::float AS "averagePercentage",
+            ROUND(AVG(a.score)::numeric, 0)::int AS "totalScore"
+          FROM assessments a
+          JOIN students s ON a."studentId" = s.id
+          JOIN schools sch ON s."schoolId" = sch.id
+          LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
+          WHERE s."isActive" = true
+          ${termCondition}
+          ${lgaCondition}
+          ${schoolCondition}
+          GROUP BY sch.id, sch.name, lga.name
+          HAVING COUNT(DISTINCT s.id) > 0
+          ORDER BY "averagePercentage" DESC
+          LIMIT 8;
+        `,
+
+        // 3. By LGA
+        this.prisma.$queryRaw<any[]>`
+          SELECT 
+            lga.id AS "lgaId",
+            lga.name AS "lgaName",
+            COUNT(DISTINCT s.id)::int AS "studentCount",
+            ROUND(AVG((a.score::float / NULLIF(a."maxScore", 0)) * 100)::numeric, 1)::float AS "averagePercentage",
+            ROUND((COUNT(DISTINCT CASE WHEN (a.score::float / NULLIF(a."maxScore", 0)) >= 0.5 THEN s.id END)::float / NULLIF(COUNT(DISTINCT s.id), 0) * 100)::numeric, 1)::float AS "passRate"
+          FROM assessments a
+          JOIN students s ON a."studentId" = s.id
+          JOIN schools sch ON s."schoolId" = sch.id
+          JOIN local_government_areas lga ON sch."lgaId" = lga.id
+          WHERE s."isActive" = true
+          ${termCondition}
+          ${lgaCondition}
+          ${schoolCondition}
+          GROUP BY lga.id, lga.name
+          ORDER BY lga.name ASC;
+        `,
+
+        // 4. By Gender
+        this.prisma.$queryRaw<any[]>`
+          SELECT 
+            s.gender::text AS "gender",
+            COUNT(DISTINCT s.id)::int AS "studentCount",
+            ROUND(AVG((a.score::float / NULLIF(a."maxScore", 0)) * 100)::numeric, 1)::float AS "averagePercentage",
+            ROUND((COUNT(DISTINCT CASE WHEN (a.score::float / NULLIF(a."maxScore", 0)) >= 0.5 THEN s.id END)::float / NULLIF(COUNT(DISTINCT s.id), 0) * 100)::numeric, 1)::float AS "passRate"
+          FROM assessments a
+          JOIN students s ON a."studentId" = s.id
+          JOIN schools sch ON s."schoolId" = sch.id
+          WHERE s."isActive" = true
+          ${termCondition}
+          ${lgaCondition}
+          ${schoolCondition}
+          GROUP BY s.gender;
+        `,
+
+        // 5. By Age Range
+        this.prisma.$queryRaw<any[]>`
+          SELECT 
+            t."range",
+            COUNT(DISTINCT t."studentId")::int AS "studentCount",
+            ROUND(AVG(t.pct)::numeric, 1)::float AS "averagePercentage",
+            ROUND((COUNT(DISTINCT CASE WHEN t.pct >= 50 THEN t."studentId" END)::float / NULLIF(COUNT(DISTINCT t."studentId"), 0) * 100)::numeric, 1)::float AS "passRate"
+          FROM (
+            SELECT 
+              s.id AS "studentId",
+              (a.score::float / NULLIF(a."maxScore", 0)) * 100 AS pct,
+              CASE 
+                WHEN s."dateOfBirth" IS NULL THEN 'Unknown'
+                WHEN EXTRACT(YEAR FROM AGE(NOW(), s."dateOfBirth")) < 6 THEN 'Under 6'
+                WHEN EXTRACT(YEAR FROM AGE(NOW(), s."dateOfBirth")) BETWEEN 6 AND 7 THEN '6 - 7 yrs'
+                WHEN EXTRACT(YEAR FROM AGE(NOW(), s."dateOfBirth")) BETWEEN 8 AND 9 THEN '8 - 9 yrs'
+                WHEN EXTRACT(YEAR FROM AGE(NOW(), s."dateOfBirth")) BETWEEN 10 AND 11 THEN '10 - 11 yrs'
+                ELSE '12+ yrs'
+              END AS "range"
+            FROM assessments a
+            JOIN students s ON a."studentId" = s.id
+            JOIN schools sch ON s."schoolId" = sch.id
+            WHERE s."isActive" = true
+            ${termCondition}
+            ${lgaCondition}
+            ${schoolCondition}
+          ) t
+          GROUP BY t."range"
+          ORDER BY 
+            CASE t."range"
+              WHEN 'Under 6' THEN 1
+              WHEN '6 - 7 yrs' THEN 2
+              WHEN '8 - 9 yrs' THEN 3
+              WHEN '10 - 11 yrs' THEN 4
+              WHEN '12+ yrs' THEN 5
+              ELSE 6
+            END;
+        `,
+
+        // Total enrollment
+        this.prisma.student.count({
+          where: {
+            isActive: true,
+            ...(schoolId ? { schoolId } : {}),
+            ...(lgaId ? { school: { lgaId } } : {}),
+          },
+        }),
+      ]);
+
+      const totalAssessed = genderResults.reduce((sum, g) => sum + (g.studentCount || 0), 0);
+      const byGenderWithShare = genderResults.map((g) => ({
+        gender: g.gender,
+        studentCount: g.studentCount,
+        averagePercentage: g.averagePercentage || 0,
+        passRate: g.passRate || 0,
+        sharePercentage: totalAssessed > 0 ? Math.round((g.studentCount / totalAssessed) * 100) : 0,
+      }));
+
+      const maleAvg = byGenderWithShare.find((g) => g.gender === 'MALE')?.averagePercentage || 0;
+      const femaleAvg = byGenderWithShare.find((g) => g.gender === 'FEMALE')?.averagePercentage || 0;
+      const genderParityIndex = maleAvg > 0 ? Math.round((femaleAvg / maleAvg) * 100) / 100 : 1.0;
+
+      let overallSum = 0;
+      let overallCount = 0;
+      byGenderWithShare.forEach((g) => {
+        overallSum += (g.averagePercentage || 0) * g.studentCount;
+        overallCount += g.studentCount;
+      });
+      const overallAverage = overallCount > 0 ? Math.round((overallSum / overallCount) * 10) / 10 : 0;
+
+      const topPerformingLga = lgaResults.length > 0
+        ? [...lgaResults].sort((a, b) => (b.averagePercentage || 0) - (a.averagePercentage || 0))[0]?.lgaName || 'N/A'
+        : 'N/A';
+
+      const topPerformingClass = classResults.length > 0 ? classResults[0]?.className || 'N/A' : 'N/A';
+
+      return ResponseHelper.success('Student analytics retrieved successfully', {
+        session: sessionData.name,
+        term: termData?.name || 'N/A',
+        summary: {
+          overallAverage,
+          totalStudentsAssessed: totalAssessed,
+          totalEnrollment,
+          topPerformingLga,
+          topPerformingClass,
+          genderParityIndex,
+        },
+        byClass: classResults.map((c) => ({
+          className: c.className,
+          studentCount: c.studentCount,
+          averageScore: c.averageScore || 0,
+          averagePercentage: c.averagePercentage || 0,
+          maleAverage: c.maleAverage ?? c.averagePercentage ?? 0,
+          femaleAverage: c.femaleAverage ?? c.averagePercentage ?? 0,
+        })),
+        bySchool: schoolResults,
+        byLga: lgaResults,
+        byGender: byGenderWithShare,
+        byAgeRange: ageResults,
+      });
+    } catch (error) {
+      this.logger.error('Error in getStudentAnalytics:', error);
+      throw new Error(`Error fetching student analytics: ${error.message}`);
+    }
+  }
+}
+ 

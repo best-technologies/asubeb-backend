@@ -10,7 +10,8 @@ import {
   StudentDashboardResponseDto,
   StudentListResponseDto,
   StudentDashboardQueryDto,
-  StudentDetailsResponseDto
+  StudentDetailsResponseDto,
+  StudentAnalyticsQueryDto
 } from './dto';
 import { TermType } from '@prisma/client';
 
@@ -95,6 +96,18 @@ export class StudentController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getStudentDashboard(@Query() query: StudentDashboardQueryDto) {
     return this.studentService.getStudentDashboard(query);
+  }
+
+  @Get('analytics')
+  @ApiOperation({ 
+    summary: 'Get student demographic and performance analytics',
+    description: 'Retrieves statistical aggregates across classes, top schools, LGAs, gender, and age ranges for student performance charts.'
+  })
+  @ApiResponse({ status: 200, description: 'Student analytics retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid parameters' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getStudentAnalytics(@Query() query: StudentAnalyticsQueryDto) {
+    return this.studentService.getStudentAnalytics(query);
   }
 
   @Get(':id/details')

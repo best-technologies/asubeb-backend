@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Body, Logger, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { SchoolService } from './school.service';
-import { CreateSchoolDto } from './dto';
+import { CreateSchoolDto, SchoolAnalyticsQueryDto, SchoolQueryDto } from './dto';
 import * as colors from 'colors';
 
 @ApiTags('admin-school')
@@ -34,17 +34,20 @@ export class SchoolController {
     return this.schoolService.createSchool(createSchoolDto);
   }
 
+  @Get('analytics')
+  @ApiOperation({ summary: 'Get comprehensive school performance and demographic analytics' })
+  @ApiResponse({ status: 200, description: 'School analytics retrieved successfully' })
+  async getSchoolAnalytics(@Query() query: SchoolAnalyticsQueryDto) {
+    this.logger.log(colors.cyan(`Received request to fetch school analytics - session: ${query.session}, term: ${query.term}, lgaId: ${query.lgaId}`));
+    return this.schoolService.getSchoolAnalytics(query);
+  }
+
   @Get()
-  @ApiOperation({ summary: 'Get all schools with pagination' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)', example: 1 })
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of items per page (default: 10)', example: 10 })
+  @ApiOperation({ summary: 'Get all schools with pagination, search, and academic scores' })
   @ApiResponse({ status: 200, description: 'Schools retrieved successfully' })
-  async getAllSchools(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
-  ) {
-    this.logger.log(colors.cyan(`Received request to fetch schools - page: ${page}, limit: ${limit}`));
-    return this.schoolService.getAllSchools(page, limit);
+  async getAllSchools(@Query() query: SchoolQueryDto) {
+    this.logger.log(colors.cyan(`Received request to fetch schools - page: ${query.page}, limit: ${query.limit}, search: ${query.search}, lgaId: ${query.lgaId}`));
+    return this.schoolService.getAllSchools(query);
   }
 
   @Get('classes')

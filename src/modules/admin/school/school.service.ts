@@ -220,7 +220,7 @@ export class SchoolService {
       }
 
       // Get total school & student counts from DB
-      const [totalSchools, totalStudents, lgaSchoolsList] = await Promise.all([
+      const [totalSchools, totalStudents, lgaSchoolsList, primarySchoolsCount, secondarySchoolsCount] = await Promise.all([
         this.prisma.school.count({
           where: { isActive: true, ...(lgaId ? { lgaId } : {}) },
         }),
@@ -230,6 +230,12 @@ export class SchoolService {
         this.prisma.localGovernmentArea.findMany({
           orderBy: { name: 'asc' },
           include: { _count: { select: { schools: { where: { isActive: true } } } } },
+        }),
+        this.prisma.school.count({
+          where: { isActive: true, level: 'PRIMARY', ...(lgaId ? { lgaId } : {}) },
+        }),
+        this.prisma.school.count({
+          where: { isActive: true, level: 'SECONDARY', ...(lgaId ? { lgaId } : {}) },
         }),
       ]);
 
@@ -254,6 +260,8 @@ export class SchoolService {
           term: isAllTerms ? 'ALL_TERMS' : (termData?.name || 'N/A'),
           summary: {
             totalSchools,
+            primarySchoolsCount,
+            secondarySchoolsCount,
             statewideSchoolAverage: 0,
             totalStudents,
             totalAssessedStudents: 0,
@@ -537,6 +545,8 @@ export class SchoolService {
         term: isAllTerms ? 'ALL_TERMS' : (termData?.name || 'N/A'),
         summary: {
           totalSchools,
+          primarySchoolsCount,
+          secondarySchoolsCount,
           statewideSchoolAverage,
           totalStudents,
           totalAssessedStudents,

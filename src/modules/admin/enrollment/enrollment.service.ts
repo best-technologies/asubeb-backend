@@ -27,6 +27,21 @@ export class EnrollmentService {
     private readonly mailService: MailService,
   ) {}
 
+  private async resolveStateIds(stateId: string): Promise<string[]> {
+    if (!stateId) return [];
+    const stateRecords = await this.prisma.state.findMany({
+      where: {
+        OR: [
+          { id: stateId },
+          { stateId: stateId },
+          { code: stateId },
+        ],
+      },
+      select: { id: true },
+    });
+    return stateRecords.length > 0 ? stateRecords.map(s => s.id) : [stateId];
+  }
+
   /**
    * Placeholder method – we will flesh this out with real enrollment logic later.
    */
@@ -357,8 +372,15 @@ export class EnrollmentService {
       const stateId = enrollingUser.stateId;
 
       // Ensure school belongs to the state
+      const validStateIds = await this.resolveStateIds(stateId);
       const school = await this.prisma.school.findFirst({
-        where: { id: dto.schoolId, stateId }
+        where: {
+          id: dto.schoolId,
+          OR: [
+            { stateId: { in: validStateIds } },
+            { lga: { stateId: { in: validStateIds } } },
+          ],
+        },
       });
       if (!school) {
         throw new BadRequestException('School not found or does not belong to your state');
@@ -485,13 +507,18 @@ export class EnrollmentService {
     const studentLabel = dto.email ?? `${dto.firstName} ${dto.lastName}`;
 
     try {
+      const validStateIds = await this.resolveStateIds(stateId);
+
       // Ensure class belongs to the given school and state
       const targetClass = await this.prisma.class.findFirst({
         where: {
           id: dto.classId,
           schoolId: dto.schoolId,
           school: {
-            stateId,
+            OR: [
+              { stateId: { in: validStateIds } },
+              { lga: { stateId: { in: validStateIds } } },
+            ],
           },
         },
         select: {
@@ -682,14 +709,19 @@ export class EnrollmentService {
     );
 
     // Ensure school and class belong to this state and are linked
+    const validStateIds = await this.resolveStateIds(stateId);
     const school = await this.prisma.school.findFirst({
       where: {
         id: schoolId,
-        stateId,
+        OR: [
+          { stateId: { in: validStateIds } },
+          { lga: { stateId: { in: validStateIds } } },
+        ],
       },
       select: {
         id: true,
         code: true,
+        stateId: true,
         stateRef: {
           select: {
             stateName: true,
@@ -708,7 +740,10 @@ export class EnrollmentService {
         id: classId,
         schoolId,
         school: {
-          stateId,
+          OR: [
+            { stateId: { in: validStateIds } },
+            { lga: { stateId: { in: validStateIds } } },
+          ],
         },
       },
       select: {

@@ -7,13 +7,29 @@ export class AcademicContextService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  private async resolveStateIds(stateId: string): Promise<string[]> {
+    if (!stateId) return [];
+    const stateRecords = await this.prisma.state.findMany({
+      where: {
+        OR: [
+          { id: stateId },
+          { stateId: stateId },
+          { code: stateId },
+        ],
+      },
+      select: { id: true },
+    });
+    return stateRecords.length > 0 ? stateRecords.map(s => s.id) : [stateId];
+  }
+
   async getCurrentSessionAndTerm(stateId: string) {
+    const validStateIds = await this.resolveStateIds(stateId);
     const [currentSession, currentTerm] = await this.prisma.$transaction([
       this.prisma.session.findFirst({
-        where: { stateId, isCurrent: true },
+        where: { stateId: { in: validStateIds }, isCurrent: true },
       }),
       this.prisma.term.findFirst({
-        where: { stateId, isCurrent: true },
+        where: { stateId: { in: validStateIds }, isCurrent: true },
       }),
     ]);
 
@@ -21,8 +37,9 @@ export class AcademicContextService {
   }
 
   async getLgasWithSchoolCounts(stateId: string) {
+    const validStateIds = await this.resolveStateIds(stateId);
     const lgas = await this.prisma.localGovernmentArea.findMany({
-      where: { stateId, isActive: true },
+      where: { stateId: { in: validStateIds }, isActive: true },
       orderBy: { name: 'asc' },
       include: {
         _count: {
@@ -43,11 +60,15 @@ export class AcademicContextService {
   }
 
   async getSchoolsWithClassCounts(stateId: string, lgaId: string) {
+    const validStateIds = await this.resolveStateIds(stateId);
     const schools = await this.prisma.school.findMany({
       where: {
-        stateId,
         lgaId,
         isActive: true,
+        OR: [
+          { stateId: { in: validStateIds } },
+          { lga: { stateId: { in: validStateIds } } },
+        ],
       },
       select: {
         id: true,
@@ -75,12 +96,16 @@ export class AcademicContextService {
   }
 
   async getClassesWithStudentCounts(stateId: string, schoolId: string) {
+    const validStateIds = await this.resolveStateIds(stateId);
     const classes = await this.prisma.class.findMany({
       where: {
         schoolId,
         isActive: true,
         school: {
-          stateId,
+          OR: [
+            { stateId: { in: validStateIds } },
+            { lga: { stateId: { in: validStateIds } } },
+          ],
         },
       },
       select: {

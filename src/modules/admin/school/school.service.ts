@@ -58,11 +58,16 @@ export class SchoolService {
       throw new ConflictException('School with this name already exists');
     }
 
-    const abiaState = await this.prisma.state.findFirst({
-      where: { stateId: 'ABIA' },
-    });
-    if (!abiaState) {
-      throw new BadRequestException('Abia State not found. Please run the migration first.');
+    let stateId = lga.stateId;
+    if (!stateId) {
+      const abiaState = await this.prisma.state.findFirst({
+        where: { stateId: 'ABIA' },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (!abiaState) {
+        throw new BadRequestException('Abia State not found. Please run the migration first.');
+      }
+      stateId = abiaState.id;
     }
 
     const code = await this.generateUniqueCode(createSchoolDto.name);
@@ -84,7 +89,7 @@ export class SchoolService {
         totalTeachers: createSchoolDto.totalTeachers || 0,
         capacity: createSchoolDto.capacity,
         lgaId: createSchoolDto.lgaId,
-        stateId: abiaState.id,
+        stateId: stateId,
         isActive: true,
       },
       include: {
@@ -129,6 +134,7 @@ export class SchoolService {
       throw new NotFoundException('School not found');
     }
 
+    let newLgaStateId: string | undefined;
     if (updateSchoolDto.lgaId) {
       const lga = await this.prisma.localGovernmentArea.findUnique({
         where: { id: updateSchoolDto.lgaId },
@@ -136,6 +142,7 @@ export class SchoolService {
       if (!lga) {
         throw new NotFoundException('Local Government Area not found');
       }
+      newLgaStateId = lga.stateId;
     }
 
     if (updateSchoolDto.name && updateSchoolDto.name !== existingSchool.name) {
@@ -166,7 +173,10 @@ export class SchoolService {
         ...(updateSchoolDto.capacity !== undefined && { capacity: updateSchoolDto.capacity }),
         ...(updateSchoolDto.totalStudents !== undefined && { totalStudents: updateSchoolDto.totalStudents }),
         ...(updateSchoolDto.totalTeachers !== undefined && { totalTeachers: updateSchoolDto.totalTeachers }),
-        ...(updateSchoolDto.lgaId && { lgaId: updateSchoolDto.lgaId }),
+        ...(updateSchoolDto.lgaId && {
+          lgaId: updateSchoolDto.lgaId,
+          ...(newLgaStateId ? { stateId: newLgaStateId } : {}),
+        }),
       },
       include: {
         lga: true,

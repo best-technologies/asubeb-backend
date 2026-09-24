@@ -1,7 +1,7 @@
-import { Controller, Post, Get, Body, Logger, Query } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Logger, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { SchoolService } from './school.service';
-import { CreateSchoolDto, SchoolAnalyticsQueryDto, SchoolQueryDto } from './dto';
+import { CreateSchoolDto, UpdateSchoolDto, SchoolAnalyticsQueryDto, SchoolQueryDto } from './dto';
 import * as colors from 'colors';
 
 @ApiTags('admin-school')
@@ -70,4 +70,27 @@ export class SchoolController {
     this.logger.log(colors.cyan('Received request to update all school student counts'));
     return this.schoolService.updateAllSchoolsStudentCounts();
   }
-} 
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get school details by ID' })
+  @ApiResponse({ status: 200, description: 'School retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'School not found' })
+  async getSchoolById(@Param('id') id: string) {
+    this.logger.log(colors.cyan(`Received request to fetch school details for ID: ${id}`));
+    return this.schoolService.getSchoolById(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update school details' })
+  @ApiResponse({ status: 200, description: 'School updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 404, description: 'School or Local Government Area not found' })
+  @ApiResponse({ status: 409, description: 'School with this name already exists' })
+  async updateSchool(
+    @Param('id') id: string,
+    @Body() updateSchoolDto: UpdateSchoolDto,
+  ) {
+    this.logger.log(colors.cyan(`Received request to update school ID: ${id}`));
+    return this.schoolService.updateSchool(id, updateSchoolDto);
+  }
+}

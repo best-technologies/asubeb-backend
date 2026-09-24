@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma, TermType } from '@prisma/client';
 import {
   CreateSchoolDto,
+  UpdateSchoolDto,
   SchoolAnalyticsQueryDto,
   SchoolQueryDto,
   SchoolAnalyticsResponse,
@@ -93,6 +94,86 @@ export class SchoolService {
 
     this.logger.log(colors.america('School created successfully'));
     return ResponseHelper.created('School created successfully', school);
+  }
+
+  async getSchoolById(id: string) {
+    const school = await this.prisma.school.findUnique({
+      where: { id },
+      include: {
+        lga: true,
+        _count: {
+          select: {
+            students: { where: { isActive: true } },
+            classes: { where: { isActive: true } },
+            teachers: { where: { isActive: true } },
+          },
+        },
+      },
+    });
+
+    if (!school) {
+      throw new NotFoundException('School not found');
+    }
+
+    return ResponseHelper.success('School retrieved successfully', school);
+  }
+
+  async updateSchool(id: string, updateSchoolDto: UpdateSchoolDto) {
+    this.logger.log(colors.magenta(`Updating school with ID: ${id}`));
+
+    const existingSchool = await this.prisma.school.findUnique({
+      where: { id },
+    });
+
+    if (!existingSchool) {
+      throw new NotFoundException('School not found');
+    }
+
+    if (updateSchoolDto.lgaId) {
+      const lga = await this.prisma.localGovernmentArea.findUnique({
+        where: { id: updateSchoolDto.lgaId },
+      });
+      if (!lga) {
+        throw new NotFoundException('Local Government Area not found');
+      }
+    }
+
+    if (updateSchoolDto.name && updateSchoolDto.name !== existingSchool.name) {
+      const duplicate = await this.prisma.school.findFirst({
+        where: {
+          name: updateSchoolDto.name,
+          id: { not: id },
+        },
+      });
+      if (duplicate) {
+        throw new ConflictException('A school with this name already exists');
+      }
+    }
+
+    const updatedSchool = await this.prisma.school.update({
+      where: { id },
+      data: {
+        ...(updateSchoolDto.name && { name: updateSchoolDto.name }),
+        ...(updateSchoolDto.level && { level: updateSchoolDto.level }),
+        ...(updateSchoolDto.address !== undefined && { address: updateSchoolDto.address }),
+        ...(updateSchoolDto.phone !== undefined && { phone: updateSchoolDto.phone }),
+        ...(updateSchoolDto.email !== undefined && { email: updateSchoolDto.email }),
+        ...(updateSchoolDto.website !== undefined && { website: updateSchoolDto.website }),
+        ...(updateSchoolDto.principalName !== undefined && { principalName: updateSchoolDto.principalName }),
+        ...(updateSchoolDto.principalPhone !== undefined && { principalPhone: updateSchoolDto.principalPhone }),
+        ...(updateSchoolDto.principalEmail !== undefined && { principalEmail: updateSchoolDto.principalEmail }),
+        ...(updateSchoolDto.establishedYear !== undefined && { establishedYear: updateSchoolDto.establishedYear }),
+        ...(updateSchoolDto.capacity !== undefined && { capacity: updateSchoolDto.capacity }),
+        ...(updateSchoolDto.totalStudents !== undefined && { totalStudents: updateSchoolDto.totalStudents }),
+        ...(updateSchoolDto.totalTeachers !== undefined && { totalTeachers: updateSchoolDto.totalTeachers }),
+        ...(updateSchoolDto.lgaId && { lgaId: updateSchoolDto.lgaId }),
+      },
+      include: {
+        lga: true,
+      },
+    });
+
+    return ResponseHelper.success('School updated successfully', updatedSchool);
   }
 
   async updateSchoolStudentCount(schoolId: string): Promise<void> {
@@ -660,9 +741,13 @@ export class SchoolService {
           address: true,
           phone: true,
           email: true,
+          website: true,
           principalName: true,
+          principalPhone: true,
+          principalEmail: true,
           establishedYear: true,
           capacity: true,
+          totalTeachers: true,
           lga: {
             select: {
               id: true,
@@ -722,9 +807,13 @@ export class SchoolService {
         address: school.address,
         phone: school.phone,
         email: school.email,
+        website: school.website,
         principalName: school.principalName,
+        principalPhone: school.principalPhone,
+        principalEmail: school.principalEmail,
         establishedYear: school.establishedYear,
         capacity: school.capacity,
+        totalTeachers: school.totalTeachers,
         lga: school.lga,
         totalClasses: school._count.classes,
         totalStudents: school._count.students,

@@ -10,6 +10,7 @@ import {
 } from './dto';
 import { ResponseHelper } from '../../../common/helpers';
 import * as colors from 'colors';
+import { DataCacheService } from '../../../common/cache/data-cache.service';
 
 const LGA_CODES: Record<string, string> = {
   'Aba North': 'ABA-N',
@@ -35,7 +36,10 @@ const LGA_CODES: Record<string, string> = {
 export class SchoolService {
   private readonly logger = new Logger(SchoolService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly dataCacheService: DataCacheService,
+  ) {}
 
   async createSchool(createSchoolDto: CreateSchoolDto) {
     this.logger.log(colors.magenta('Creating new school...'));
@@ -98,6 +102,9 @@ export class SchoolService {
     });
 
     this.logger.log(colors.america('School created successfully'));
+    this.dataCacheService.invalidatePrefix('school-analytics:');
+    this.dataCacheService.invalidatePrefix('schools-list:');
+    this.dataCacheService.invalidatePrefix('admin-dashboard:');
     return ResponseHelper.created('School created successfully', school);
   }
 
@@ -183,6 +190,9 @@ export class SchoolService {
       },
     });
 
+    this.dataCacheService.invalidatePrefix('school-analytics:');
+    this.dataCacheService.invalidatePrefix('schools-list:');
+    this.dataCacheService.invalidatePrefix('admin-dashboard:');
     return ResponseHelper.success('School updated successfully', updatedSchool);
   }
 
@@ -222,6 +232,14 @@ export class SchoolService {
    * Comprehensive School Performance & Demographic Analytics
    */
   async getSchoolAnalytics(query: SchoolAnalyticsQueryDto) {
+    const cacheKey = this.dataCacheService.buildKey('school-analytics', query);
+    if (cacheKey) {
+      const cached = this.dataCacheService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     const { session, term, lgaId } = query;
     this.logger.log(colors.cyan(`Fetching school analytics: session=${session || 'current'}, term=${term || 'current'}, lgaId=${lgaId || 'all'}`));
 
@@ -631,7 +649,7 @@ export class SchoolService {
         },
       ];
 
-      return ResponseHelper.success('School analytics retrieved successfully', {
+      const analyticsResult = ResponseHelper.success('School analytics retrieved successfully', {
         session: sessionData.name,
         term: isAllTerms ? 'ALL_TERMS' : (termData?.name || 'N/A'),
         summary: {
@@ -650,6 +668,12 @@ export class SchoolService {
         performanceBands,
         sizeDistribution,
       } as SchoolAnalyticsResponse);
+
+      if (cacheKey) {
+        this.dataCacheService.set(cacheKey, analyticsResult);
+      }
+
+      return analyticsResult;
     } catch (error) {
       this.logger.error(`Error in getSchoolAnalytics: ${error.message}`, error.stack);
       throw error;
@@ -660,6 +684,14 @@ export class SchoolService {
    * Get all schools with pagination, filters, and real-time academic score aggregation
    */
   async getAllSchools(query: SchoolQueryDto) {
+    const cacheKey = this.dataCacheService.buildKey('schools-list', query);
+    if (cacheKey) {
+      const cached = this.dataCacheService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     const {
       page = 1,
       limit = 10,
@@ -832,7 +864,7 @@ export class SchoolService {
       };
     });
 
-    return ResponseHelper.success('Schools retrieved successfully', {
+    const schoolsResponse = ResponseHelper.success('Schools retrieved successfully', {
       pagination: {
         page,
         limit,
@@ -847,6 +879,12 @@ export class SchoolService {
       },
       data: schoolsWithScores,
     });
+
+    if (cacheKey) {
+      this.dataCacheService.set(cacheKey, schoolsResponse);
+    }
+
+    return schoolsResponse;
   }
 
   async getAllClasses(page: number = 1, limit: number = 10) {

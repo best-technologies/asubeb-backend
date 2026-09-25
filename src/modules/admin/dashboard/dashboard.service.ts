@@ -3,12 +3,16 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ResponseHelper } from '../../../common/helpers/response.helper';
 import { TermType, Prisma } from '@prisma/client';
 import { DashboardQueryDto } from './dto';
+import { DataCacheService } from '../../../common/cache/data-cache.service';
 
 @Injectable()
 export class DashboardService {
   private readonly logger = new Logger(DashboardService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly dataCacheService: DataCacheService,
+  ) {}
 
   private getOrderByClause(sortBy: string, sortOrder: 'asc' | 'desc') {
     // Map frontend sort fields to actual database fields
@@ -28,6 +32,14 @@ export class DashboardService {
   }
 
   async getAdminDashboard(query: DashboardQueryDto) {
+    const cacheKey = this.dataCacheService.buildKey('admin-dashboard', query);
+    if (cacheKey) {
+      const cached = this.dataCacheService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     const {
       session,
       term,
@@ -439,7 +451,11 @@ export class DashboardService {
         };
       }
 
-      return ResponseHelper.success('Admin Dashboard Data retrieved successfully', responseData);
+      const result = ResponseHelper.success('Admin Dashboard Data retrieved successfully', responseData);
+      if (cacheKey) {
+        this.dataCacheService.set(cacheKey, result);
+      }
+      return result;
     } catch (error) {
       this.logger.error(`Error fetching admin dashboard: ${error.message}`, error.stack);
       throw error;
@@ -457,6 +473,24 @@ export class DashboardService {
     gender?: string,
     lgaId?: string,
   ) {
+    const perfCacheKey = this.dataCacheService.buildKey('dashboard-performance', {
+      session,
+      term,
+      page,
+      limit,
+      search,
+      schoolId,
+      classId,
+      gender,
+      lgaId,
+    });
+    if (perfCacheKey) {
+      const cached = this.dataCacheService.get(perfCacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     this.logger.log(`Fetching performance table for session: ${session || 'current'}, term: ${term || 'current'}`);
 
     try {
@@ -620,7 +654,7 @@ export class DashboardService {
         };
       });
 
-      return ResponseHelper.success('Performance table retrieved successfully', {
+      const perfResponse = ResponseHelper.success('Performance table retrieved successfully', {
         topStudents: topStudentsWithPositions,
         pagination: {
           page: topPage,
@@ -629,6 +663,12 @@ export class DashboardService {
           totalPages,
         },
       });
+
+      if (perfCacheKey) {
+        this.dataCacheService.set(perfCacheKey, perfResponse);
+      }
+
+      return perfResponse;
     } catch (error) {
       this.logger.error(`Error fetching performance table: ${error.message}`, error.stack);
       throw error;

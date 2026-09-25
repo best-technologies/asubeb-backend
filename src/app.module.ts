@@ -18,9 +18,11 @@ import { UploadModule } from './modules/upload/upload.module';
 import { AuditLogModule } from './modules/admin/audit-log/audit-log.module';
 import { SchoolItModule } from './modules/school-it/school-it.module';
 import { ExamOfficerModule } from './modules/exam-officer/exam-officer.module';
+import { DataCacheModule } from './common/cache/data-cache.module';
 
 @Module({
   imports: [
+    DataCacheModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig, appConfig],

@@ -5,12 +5,16 @@ import { TermType, Prisma } from '@prisma/client';
 import { generateStudentResultPdf } from '../../../common/helpers/pdf.helper';
 import { generateClassResultsPdf } from '../../../common/helpers/pdf-class.helper';
 import { StudentAnalyticsQueryDto } from './dto';
+import { DataCacheService } from '../../../common/cache/data-cache.service';
 
 @Injectable()
 export class StudentService {
   private readonly logger = new Logger(StudentService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly dataCacheService: DataCacheService,
+  ) {}
 
   async getStudentDashboard(filters?: {
     session?: string;
@@ -24,6 +28,14 @@ export class StudentService {
     page?: number;
     limit?: number;
   }) {
+    const cacheKey = this.dataCacheService.buildKey('students-dashboard', filters);
+    if (cacheKey) {
+      const cached = this.dataCacheService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     this.logger.log(`Fetching student dashboard data with filters bulala:`, filters);
 
     try {
@@ -377,7 +389,11 @@ export class StudentService {
         responseData.school = schoolInfo;
       }
 
-      return ResponseHelper.success('Students retrieved successfully', responseData);
+      const dashboardResult = ResponseHelper.success('Students retrieved successfully', responseData);
+      if (cacheKey) {
+        this.dataCacheService.set(cacheKey, dashboardResult);
+      }
+      return dashboardResult;
 
     } catch (error) {
       this.logger.error('Error in getStudentDashboard:', error);
@@ -919,6 +935,9 @@ export class StudentService {
       await this.updateSchoolStudentCount(student.schoolId);
     }
 
+    this.dataCacheService.invalidatePrefix('students-dashboard:');
+    this.dataCacheService.invalidatePrefix('students-analytics:');
+    this.dataCacheService.invalidatePrefix('admin-dashboard:');
     return ResponseHelper.success('Student updated successfully', student);
   }
 
@@ -940,6 +959,9 @@ export class StudentService {
     // Update school student count
     await this.updateSchoolStudentCount(student.schoolId);
 
+    this.dataCacheService.invalidatePrefix('students-dashboard:');
+    this.dataCacheService.invalidatePrefix('students-analytics:');
+    this.dataCacheService.invalidatePrefix('admin-dashboard:');
     return ResponseHelper.success('Student deleted successfully');
   }
 
@@ -2099,6 +2121,14 @@ export class StudentService {
   }
 
   async getStudentAnalytics(query?: StudentAnalyticsQueryDto) {
+    const cacheKey = this.dataCacheService.buildKey('students-analytics', query);
+    if (cacheKey) {
+      const cached = this.dataCacheService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     this.logger.log(`Fetching student analytics with query:`, query);
 
     try {
@@ -2492,7 +2522,7 @@ export class StudentService {
 
       const topPerformingClass = classResults.length > 0 ? classResults[0]?.className || 'N/A' : 'N/A';
 
-      return ResponseHelper.success('Student analytics retrieved successfully', {
+      const analyticsResult = ResponseHelper.success('Student analytics retrieved successfully', {
         session: sessionData.name,
         term: isAllTerms ? 'ALL_TERMS' : (termData?.name || 'N/A'),
         summary: {
@@ -2516,6 +2546,12 @@ export class StudentService {
         byGender: byGenderWithShare,
         byAgeRange: ageResults,
       });
+
+      if (cacheKey) {
+        this.dataCacheService.set(cacheKey, analyticsResult);
+      }
+
+      return analyticsResult;
     } catch (error) {
       this.logger.error('Error in getStudentAnalytics:', error);
       throw new Error(`Error fetching student analytics: ${error.message}`);

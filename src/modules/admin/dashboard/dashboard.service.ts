@@ -71,7 +71,7 @@ export class DashboardService {
       const skip = (page - 1) * limit;
 
       // Get all available sessions
-      const availableSessions = await this.prisma.session.findMany({
+      let availableSessions = await this.prisma.session.findMany({
         where: { isActive: true },
         select: {
           id: true,
@@ -85,20 +85,52 @@ export class DashboardService {
           name: 'desc',
         },
       });
+      if (availableSessions.length === 0) {
+        availableSessions = await this.prisma.session.findMany({
+          select: {
+            id: true,
+            name: true,
+            startDate: true,
+            endDate: true,
+            isCurrent: true,
+            isActive: true,
+          },
+          orderBy: {
+            name: 'desc',
+          },
+        });
+      }
 
-      // Get current session if no session specified
+      // Get session
       let sessionData;
       if (session) {
+        const hyphenSession = session.replace('/', '-');
+        const slashSession = session.replace('-', '/');
         sessionData = await this.prisma.session.findFirst({
           where: { 
-            OR: [{ id: session }, { name: session }],
+            OR: [
+              { id: session },
+              { name: session },
+              { name: hyphenSession },
+              { name: slashSession },
+            ],
             isActive: true 
           },
         });
         if (!sessionData) {
-          throw new Error(`Session '${session}' not found or not active`);
+          sessionData = await this.prisma.session.findFirst({
+            where: {
+              OR: [
+                { id: session },
+                { name: session },
+                { name: hyphenSession },
+                { name: slashSession },
+              ],
+            },
+          });
         }
-      } else {
+      }
+      if (!sessionData) {
         sessionData = await this.prisma.session.findFirst({
           where: { isCurrent: true, isActive: true },
           orderBy: [
@@ -108,60 +140,118 @@ export class DashboardService {
         });
         if (!sessionData) {
           sessionData = await this.prisma.session.findFirst({
+            where: { isCurrent: true },
+            orderBy: [
+              { status: 'asc' },
+              { updatedAt: 'desc' },
+            ],
+          });
+        }
+        if (!sessionData) {
+          sessionData = await this.prisma.session.findFirst({
             where: { isActive: true },
             orderBy: { createdAt: 'desc' },
           });
         }
         if (!sessionData) {
-          throw new Error('No active session found');
-        }
-      }
-
-      // Get current term if no term specified
-      let termData;
-      if (term) {
-        const isTermType = Object.values(TermType).includes(term as TermType);
-        termData = await this.prisma.term.findFirst({
-          where: { 
-            OR: [
-              { id: term },
-              ...(isTermType ? [{ name: term as TermType }] : []),
-            ],
-            sessionId: sessionData.id,
-            isActive: true 
-          },
-        });
-        if (!termData) {
-          throw new Error(`Term '${term}' not found for session '${sessionData.name}'`);
-        }
-      } else {
-        termData = await this.prisma.term.findFirst({
-          where: { 
-            sessionId: sessionData.id,
-            isCurrent: true,
-            isActive: true 
-          },
-          orderBy: [
-            { status: 'asc' },
-            { updatedAt: 'desc' },
-          ],
-        });
-        if (!termData) {
-          termData = await this.prisma.term.findFirst({
-            where: {
-              sessionId: sessionData.id,
-              isActive: true,
-            },
+          sessionData = await this.prisma.session.findFirst({
             orderBy: { createdAt: 'desc' },
           });
         }
+        if (!sessionData) {
+          throw new Error('No academic session found');
+        }
+      }
+
+      // Get term
+      const isCombined = Boolean(term && term.toUpperCase() === 'COMBINED');
+      let termData: any = null;
+      if (!isCombined) {
+        if (term) {
+          const isTermType = Object.values(TermType).includes(term as TermType);
+          termData = await this.prisma.term.findFirst({
+            where: { 
+              OR: [
+                { id: term },
+                ...(isTermType ? [{ name: term as TermType }] : []),
+              ],
+              sessionId: sessionData.id,
+              isActive: true 
+            },
+          });
+          if (!termData) {
+            termData = await this.prisma.term.findFirst({
+              where: { 
+                OR: [
+                  { id: term },
+                  ...(isTermType ? [{ name: term as TermType }] : []),
+                ],
+                sessionId: sessionData.id,
+              },
+            });
+          }
+        }
         if (!termData) {
-          throw new Error(`No active term found for session '${sessionData.name}'`);
+          termData = await this.prisma.term.findFirst({
+            where: { 
+              sessionId: sessionData.id,
+              isCurrent: true,
+              isActive: true 
+            },
+            orderBy: [
+              { status: 'asc' },
+              { updatedAt: 'desc' },
+            ],
+          });
+          if (!termData) {
+            termData = await this.prisma.term.findFirst({
+              where: { 
+                sessionId: sessionData.id,
+                isCurrent: true,
+              },
+              orderBy: [
+                { status: 'asc' },
+                { updatedAt: 'desc' },
+              ],
+            });
+          }
+          if (!termData) {
+            termData = await this.prisma.term.findFirst({
+              where: {
+                sessionId: sessionData.id,
+                isActive: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            });
+          }
+          if (!termData) {
+            termData = await this.prisma.term.findFirst({
+              where: {
+                sessionId: sessionData.id,
+              },
+              orderBy: { createdAt: 'desc' },
+            });
+          }
+          if (!termData) {
+            termData = (await this.prisma.term.findFirst({
+              where: { isCurrent: true },
+            })) || (await this.prisma.term.findFirst());
+          }
+        }
+
+        // If termData belongs to a different session, sync sessionData to match
+        if (termData?.sessionId && termData.sessionId !== sessionData.id) {
+          const matchingSession = await this.prisma.session.findUnique({
+            where: { id: termData.sessionId },
+          });
+          if (matchingSession) {
+            sessionData = matchingSession;
+          }
         }
       }
 
       // Get available terms for the selected session
-      const availableTerms = await this.prisma.term.findMany({
+      let availableTerms = await this.prisma.term.findMany({
         where: { 
           sessionId: sessionData.id,
           isActive: true 
@@ -178,6 +268,24 @@ export class DashboardService {
           name: 'asc',
         },
       });
+      if (availableTerms.length === 0) {
+        availableTerms = await this.prisma.term.findMany({
+          where: { 
+            sessionId: sessionData.id,
+          },
+          select: {
+            id: true,
+            name: true,
+            startDate: true,
+            endDate: true,
+            isCurrent: true,
+            isActive: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        });
+      }
 
       // Build where conditions for schools
       const schoolWhereConditions: any = { isActive: true };
@@ -305,7 +413,7 @@ export class DashboardService {
         totalPages: 1,
       };
 
-      if (includePerformance && sessionData && termData) {
+      if (includePerformance && sessionData && (termData || isCombined)) {
         try {
           // Count total qualifying students with assessments in this session & term
           const countResult: any[] = await this.prisma.$queryRaw`
@@ -313,8 +421,8 @@ export class DashboardService {
             FROM students s
             JOIN schools sch ON s."schoolId" = sch.id
             JOIN assessments a ON a."studentId" = s.id
-            JOIN terms t ON a."termId" = t.id AND t.id = ${termData.id}
-            JOIN sessions sess ON t."sessionId" = sess.id AND sess.id = ${sessionData.id}
+            JOIN terms t ON a."termId" = t.id ${isCombined || !termData ? Prisma.empty : Prisma.sql`AND t.id = ${termData.id}`}
+            JOIN sessions sess ON t."sessionId" = sess.id AND (sess.id = ${sessionData.id} OR sess.name = ${sessionData.name})
             WHERE s."isActive" = true
             ${schoolId ? Prisma.sql`AND s."schoolId" = ${schoolId}` : Prisma.empty}
             ${classId ? Prisma.sql`AND s."classId" = ${classId}` : Prisma.empty}
@@ -353,8 +461,8 @@ export class DashboardService {
             LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
             LEFT JOIN classes c ON s."classId" = c.id
             JOIN assessments a ON a."studentId" = s.id
-            JOIN terms t ON a."termId" = t.id AND t.id = ${termData.id}
-            JOIN sessions sess ON t."sessionId" = sess.id AND sess.id = ${sessionData.id}
+            JOIN terms t ON a."termId" = t.id ${isCombined || !termData ? Prisma.empty : Prisma.sql`AND t.id = ${termData.id}`}
+            JOIN sessions sess ON t."sessionId" = sess.id AND (sess.id = ${sessionData.id} OR sess.name = ${sessionData.name})
             WHERE s."isActive" = true
             ${schoolId ? Prisma.sql`AND s."schoolId" = ${schoolId}` : Prisma.empty}
             ${classId ? Prisma.sql`AND s."classId" = ${classId}` : Prisma.empty}
@@ -370,9 +478,10 @@ export class DashboardService {
           topStudentsWithPositions = topScorers.map((student, index) => {
             const totalScore = Number(student.totalScore ?? student.totalscore ?? 0);
             const rawMaxScore = Number(student.totalMaxScore ?? student.totalmaxscore ?? 0);
+            const defaultFallback = isCombined ? 3000 : 1000;
             const totalMaxScore = Math.max(
               rawMaxScore,
-              totalScore > 0 ? Math.ceil(totalScore / 100) * 100 : 1000
+              totalScore > 0 ? Math.ceil(totalScore / 100) * 100 : defaultFallback
             );
 
             return {
@@ -403,12 +512,18 @@ export class DashboardService {
           endDate: sessionData.endDate,
           isCurrent: sessionData.isCurrent,
         },
-        currentTerm: {
+        currentTerm: termData ? {
           id: termData.id,
           name: termData.name,
           startDate: termData.startDate,
           endDate: termData.endDate,
           isCurrent: termData.isCurrent,
+        } : {
+          id: 'combined',
+          name: isCombined ? 'COMBINED' : 'All Terms',
+          startDate: sessionData.startDate,
+          endDate: sessionData.endDate,
+          isCurrent: true,
         },
         availableSessions,
         availableTerms,
@@ -497,13 +612,33 @@ export class DashboardService {
       // Get session
       let sessionData;
       if (session) {
+        const hyphenSession = session.replace('/', '-');
+        const slashSession = session.replace('-', '/');
         sessionData = await this.prisma.session.findFirst({
           where: {
-            OR: [{ id: session }, { name: session }],
+            OR: [
+              { id: session },
+              { name: session },
+              { name: hyphenSession },
+              { name: slashSession },
+            ],
             isActive: true,
           },
         });
-      } else {
+        if (!sessionData) {
+          sessionData = await this.prisma.session.findFirst({
+            where: {
+              OR: [
+                { id: session },
+                { name: session },
+                { name: hyphenSession },
+                { name: slashSession },
+              ],
+            },
+          });
+        }
+      }
+      if (!sessionData) {
         sessionData = await this.prisma.session.findFirst({
           where: { isCurrent: true, isActive: true },
           orderBy: [
@@ -514,6 +649,11 @@ export class DashboardService {
         if (!sessionData) {
           sessionData = await this.prisma.session.findFirst({
             where: { isActive: true },
+            orderBy: { createdAt: 'desc' },
+          });
+        }
+        if (!sessionData) {
+          sessionData = await this.prisma.session.findFirst({
             orderBy: { createdAt: 'desc' },
           });
         }
@@ -542,7 +682,19 @@ export class DashboardService {
               isActive: true,
             },
           });
-        } else {
+          if (!termData) {
+            termData = await this.prisma.term.findFirst({
+              where: {
+                OR: [
+                  { id: term },
+                  ...(isTermType ? [{ name: term as TermType }] : []),
+                ],
+                sessionId: sessionData.id,
+              },
+            });
+          }
+        }
+        if (!termData) {
           termData = await this.prisma.term.findFirst({
             where: {
               sessionId: sessionData.id,
@@ -562,6 +714,19 @@ export class DashboardService {
               },
               orderBy: { createdAt: 'desc' },
             });
+          }
+          if (!termData) {
+            termData = await this.prisma.term.findFirst({
+              where: {
+                sessionId: sessionData.id,
+              },
+              orderBy: { createdAt: 'desc' },
+            });
+          }
+          if (!termData) {
+            termData = (await this.prisma.term.findFirst({
+              where: { isCurrent: true },
+            })) || (await this.prisma.term.findFirst());
           }
         }
 
@@ -584,7 +749,7 @@ export class DashboardService {
         JOIN schools sch ON s."schoolId" = sch.id
         JOIN assessments a ON a."studentId" = s.id
         JOIN terms t ON a."termId" = t.id ${isCombined ? Prisma.empty : Prisma.sql`AND t.id = ${termData.id}`}
-        JOIN sessions sess ON t."sessionId" = sess.id AND sess.id = ${sessionData.id}
+        JOIN sessions sess ON t."sessionId" = sess.id AND (sess.id = ${sessionData.id} OR sess.name = ${sessionData.name})
         WHERE s."isActive" = true
         ${schoolId ? Prisma.sql`AND s."schoolId" = ${schoolId}` : Prisma.empty}
         ${classId ? Prisma.sql`AND s."classId" = ${classId}` : Prisma.empty}
@@ -618,7 +783,7 @@ export class DashboardService {
         LEFT JOIN classes c ON s."classId" = c.id
         JOIN assessments a ON a."studentId" = s.id
         JOIN terms t ON a."termId" = t.id ${isCombined ? Prisma.empty : Prisma.sql`AND t.id = ${termData.id}`}
-        JOIN sessions sess ON t."sessionId" = sess.id AND sess.id = ${sessionData.id}
+        JOIN sessions sess ON t."sessionId" = sess.id AND (sess.id = ${sessionData.id} OR sess.name = ${sessionData.name})
         WHERE s."isActive" = true
         ${schoolId ? Prisma.sql`AND s."schoolId" = ${schoolId}` : Prisma.empty}
         ${classId ? Prisma.sql`AND s."classId" = ${classId}` : Prisma.empty}

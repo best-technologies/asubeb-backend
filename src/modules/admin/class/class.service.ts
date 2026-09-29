@@ -743,6 +743,8 @@ export class ClassService {
       ),
     );
 
+    const totalAssessedClasses = classPerformanceData.length;
+
     const analyticsData = {
       summary: {
         totalClasses,

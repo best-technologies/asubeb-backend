@@ -111,6 +111,7 @@ export class SchoolService {
           data: createSchoolDto.classes.map((className) => ({
             name: className,
             grade: className,
+            section: 'A',
             schoolId: school.id,
             capacity: 35,
             academicYear: '2024-2025',
@@ -136,6 +137,17 @@ export class SchoolService {
       where: { id },
       include: {
         lga: true,
+        classes: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            name: true,
+            grade: true,
+            section: true,
+            capacity: true,
+            currentEnrollment: true,
+          },
+        },
         _count: {
           select: {
             students: { where: { isActive: true } },
@@ -212,6 +224,71 @@ export class SchoolService {
         lga: true,
       },
     });
+
+    // Handle adding and removing classes for this school
+    if (updateSchoolDto.classes && Array.isArray(updateSchoolDto.classes)) {
+      const targetClassNames = updateSchoolDto.classes
+        .map((c) => c.trim())
+        .filter(Boolean);
+
+      const currentClasses = await this.prisma.class.findMany({
+        where: { schoolId: id, isActive: true },
+        select: { id: true, name: true, grade: true },
+      });
+
+      const currentClassNames = new Set(
+        currentClasses.map((c) => c.grade || c.name),
+      );
+      const targetClassSet = new Set(targetClassNames);
+
+      // Classes to add (in target but not currently active)
+      const toAdd = targetClassNames.filter((c) => !currentClassNames.has(c));
+
+      // Classes to remove (in currently active but not in target)
+      const toRemove = currentClasses.filter(
+        (c) => !targetClassSet.has(c.grade) && !targetClassSet.has(c.name),
+      );
+
+      if (toRemove.length > 0) {
+        await this.prisma.class.updateMany({
+          where: {
+            id: { in: toRemove.map((c) => c.id) },
+          },
+          data: { isActive: false },
+        });
+      }
+
+      if (toAdd.length > 0) {
+        for (const className of toAdd) {
+          const existingRecord = await this.prisma.class.findFirst({
+            where: {
+              schoolId: id,
+              OR: [{ grade: className }, { name: className }],
+            },
+          });
+          if (existingRecord) {
+            await this.prisma.class.update({
+              where: { id: existingRecord.id },
+              data: { isActive: true },
+            });
+          } else {
+            await this.prisma.class.create({
+              data: {
+                name: className,
+                grade: className,
+                section: 'A',
+                schoolId: id,
+                capacity: 35,
+                academicYear: '2024-2025',
+                isActive: true,
+              },
+            });
+          }
+        }
+      }
+
+      this.dataCacheService.invalidatePrefix('admin:classes:');
+    }
 
     this.dataCacheService.invalidatePrefix('school-analytics:');
     this.dataCacheService.invalidatePrefix('schools-list:');

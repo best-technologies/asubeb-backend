@@ -54,8 +54,8 @@ export class SubebOfficersService {
    * Get all enrolled SUBEB officers with pagination
    * Filters by stateId if provided (to show only officers in the current user's state)
    */
-  async getAllOfficers(page: number = 1, limit: number = 10, stateId?: string) {
-    this.logger.log(`Fetching SUBEB officers - page: ${page}, limit: ${limit}, stateId: ${stateId || 'all'}`);
+  async getAllOfficers(page: number = 1, limit: number = 10, stateId?: string, search?: string) {
+    this.logger.log(`Fetching SUBEB officers - page: ${page}, limit: ${limit}, stateId: ${stateId || 'all'}, search: ${search || 'none'}`);
 
     const skip = (page - 1) * limit;
 
@@ -63,6 +63,21 @@ export class SubebOfficersService {
     const whereClause: any = {};
     if (stateId) {
       whereClause.stateId = stateId;
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      whereClause.OR = [
+        { firstName: { contains: q, mode: 'insensitive' } },
+        { lastName: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q, mode: 'insensitive' } },
+        { officerId: { contains: q, mode: 'insensitive' } },
+        { user: { firstName: { contains: q, mode: 'insensitive' } } },
+        { user: { lastName: { contains: q, mode: 'insensitive' } } },
+        { user: { email: { contains: q, mode: 'insensitive' } } },
+        { lga: { name: { contains: q, mode: 'insensitive' } } },
+      ];
     }
 
     try {

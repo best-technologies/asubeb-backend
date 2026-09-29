@@ -29,13 +29,14 @@ export class SubebOfficersController {
   @Roles('SUBEB_ADMIN', 'ADMIN', 'SUPER_ADMIN')
   @ApiGetAllOfficers()
   async getAllOfficers(
+    @Request() req: any,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
-    @Request() req,
+    @Query('search') search?: string,
   ) {
     // Get the current user's stateId to filter officers by state
     const userStateId = req.user?.stateId;
-    return this.subebOfficersService.getAllOfficers(page, limit, userStateId);
+    return this.subebOfficersService.getAllOfficers(page, limit, userStateId, search);
   }
 
   @Patch(':id')

@@ -12,14 +12,14 @@ export class CreateClassDto {
   @Transform(({ value }) => value?.trim())
   name: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Grade level (e.g., Primary 1, JSS 1, Basic 1)',
     example: 'Primary 1',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @Transform(({ value }) => value?.trim())
-  grade: string;
+  grade?: string;
 
   @ApiPropertyOptional({
     description: 'Section identifier (e.g., A, B, C, Gold)',
@@ -31,13 +31,13 @@ export class CreateClassDto {
   @Transform(({ value }) => value?.trim() || 'A')
   section?: string = 'A';
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'ID of the school this class belongs to',
     example: 'school-cuid-123',
   })
   @IsString()
-  @IsNotEmpty()
-  schoolId: string;
+  @IsOptional()
+  schoolId?: string;
 
   @ApiPropertyOptional({
     description: 'Class student capacity',

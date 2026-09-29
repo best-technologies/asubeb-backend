@@ -110,6 +110,149 @@ export class ClassService {
 
     const skip = (page - 1) * limit;
 
+    const isStatewide =
+      query.statewide === true ||
+      query.statewide === 'true' ||
+      String(query.statewide) === 'true';
+
+    if (isStatewide) {
+      const allClasses = await this.prisma.class.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          grade: true,
+          academicYear: true,
+          school: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              level: true,
+              lga: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              students: { where: { isActive: true } },
+            },
+          },
+        },
+      });
+
+      const gradeSchoolMap = new Map<
+        string,
+        {
+          grade: string;
+          schoolsMap: Map<string, { id: string; name: string; lgaName: string; studentCount: number }>;
+          totalStudents: number;
+          academicYear: string;
+        }
+      >();
+
+      for (const cls of allClasses) {
+        const norm = normalizeGrade(cls.grade || cls.name);
+        const existing = gradeSchoolMap.get(norm) || {
+          grade: norm,
+          schoolsMap: new Map(),
+          totalStudents: 0,
+          academicYear: cls.academicYear || '2024-2025',
+        };
+
+        const count = cls._count?.students || 0;
+        existing.totalStudents += count;
+
+        if (cls.school) {
+          const prev = existing.schoolsMap.get(cls.school.id) || {
+            id: cls.school.id,
+            name: cls.school.name,
+            lgaName: cls.school.lga?.name || 'N/A',
+            studentCount: 0,
+          };
+          prev.studentCount += count;
+          existing.schoolsMap.set(cls.school.id, prev);
+        }
+
+        gradeSchoolMap.set(norm, existing);
+      }
+
+      const standardList = [
+        'ECCDE 1',
+        'ECCDE 2',
+        'ECCDE 3',
+        'Primary 1',
+        'Primary 2',
+        'Primary 3',
+        'Primary 4',
+        'Primary 5',
+        'Primary 6',
+        'JSS 1',
+        'JSS 2',
+        'JSS 3',
+        'SSS 1',
+        'SSS 2',
+        'SSS 3',
+      ];
+
+      const allGradeNames = Array.from(
+        new Set([...standardList, ...Array.from(gradeSchoolMap.keys())]),
+      );
+
+      let statewideClasses = allGradeNames.map((gradeName) => {
+        const data = gradeSchoolMap.get(gradeName);
+        const schoolsList = data ? Array.from(data.schoolsMap.values()) : [];
+        return {
+          id: `class-level-${gradeName.toLowerCase().replace(/\s+/g, '-')}`,
+          name: gradeName,
+          grade: gradeName,
+          schoolsCount: schoolsList.length,
+          studentCount: data ? data.totalStudents : 0,
+          currentEnrollment: data ? data.totalStudents : 0,
+          capacity: schoolsList.length * 35,
+          utilization: 0,
+          academicYear: data?.academicYear || '2024-2025',
+          schools: schoolsList,
+          school: {
+            id: 'statewide',
+            name: `${schoolsList.length} Registered Schools`,
+            level: gradeName.startsWith('JSS') || gradeName.startsWith('SSS') ? 'SECONDARY' : 'PRIMARY',
+            lga: null,
+          },
+        };
+      });
+
+      if (search && search.trim()) {
+        const s = search.trim().toLowerCase();
+        statewideClasses = statewideClasses.filter(
+          (c) => c.name.toLowerCase().includes(s) || c.grade.toLowerCase().includes(s),
+        );
+      }
+
+      statewideClasses.sort(
+        (a, b) => (GRADE_ORDER[a.grade] || 99) - (GRADE_ORDER[b.grade] || 99),
+      );
+
+      const total = statewideClasses.length;
+      const paginated = statewideClasses.slice(skip, skip + limit);
+
+      const response = ResponseHelper.success('State-wide classes retrieved successfully', {
+        classes: paginated,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit) || 1,
+        },
+      });
+
+      return response;
+    }
+
     // Build where conditions
     const whereConditions: Prisma.ClassWhereInput = {
       isActive: true,
@@ -629,6 +772,77 @@ export class ClassService {
    * Get class details by ID
    */
   async getClassById(id: string) {
+    if (id.startsWith('class-level-')) {
+      const rawGrade = id.replace('class-level-', '').replace(/-/g, ' ');
+      const normGrade = normalizeGrade(rawGrade);
+
+      const classes = await this.prisma.class.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { grade: { equals: normGrade, mode: 'insensitive' } },
+            { name: { equals: normGrade, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          school: {
+            select: {
+              id: true,
+              name: true,
+              lga: { select: { name: true } },
+            },
+          },
+          students: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              studentId: true,
+              firstName: true,
+              lastName: true,
+              gender: true,
+            },
+            take: 100,
+          },
+        },
+      });
+
+      const schoolsMap = new Map<string, any>();
+      const studentsList: any[] = [];
+
+      for (const c of classes) {
+        if (c.school) {
+          const prev = schoolsMap.get(c.school.id) || {
+            id: c.school.id,
+            name: c.school.name,
+            lgaName: c.school.lga?.name || 'N/A',
+            studentCount: 0,
+          };
+          prev.studentCount += c.students.length;
+          schoolsMap.set(c.school.id, prev);
+        }
+
+        for (const st of c.students) {
+          studentsList.push({
+            ...st,
+            schoolName: c.school?.name || 'Abia School',
+            lgaName: c.school?.lga?.name || 'N/A',
+          });
+        }
+      }
+
+      const schoolsList = Array.from(schoolsMap.values());
+      return ResponseHelper.success('Class retrieved successfully', {
+        id,
+        name: normGrade,
+        grade: normGrade,
+        schoolsCount: schoolsList.length,
+        studentCount: studentsList.length,
+        academicYear: '2024-2025',
+        schools: schoolsList,
+        students: studentsList,
+      });
+    }
+
     const cls = await this.prisma.class.findUnique({
       where: { id },
       include: {
@@ -700,17 +914,32 @@ export class ClassService {
    */
   async createClass(createClassDto: CreateClassDto) {
     this.logger.log(
-      colors.cyan(`Creating class: ${createClassDto.name} for school ${createClassDto.schoolId}`),
+      colors.cyan(`Creating class: ${createClassDto.name}`),
     );
+
+    const className = createClassDto.name.trim();
+    const grade = createClassDto.grade ? createClassDto.grade.trim() : className;
+
+    let schoolId = createClassDto.schoolId;
+    if (!schoolId) {
+      const defaultSchool = await this.prisma.school.findFirst({
+        where: { isActive: true },
+        select: { id: true, name: true },
+      });
+      if (!defaultSchool) {
+        throw new NotFoundException('No active school found to associate with class.');
+      }
+      schoolId = defaultSchool.id;
+    }
 
     // 1. Verify school exists
     const school = await this.prisma.school.findUnique({
-      where: { id: createClassDto.schoolId },
+      where: { id: schoolId },
       select: { id: true, name: true },
     });
 
     if (!school) {
-      throw new NotFoundException(`School with ID ${createClassDto.schoolId} not found`);
+      throw new NotFoundException(`School with ID ${schoolId} not found`);
     }
 
     // 2. Resolve academic year
@@ -726,9 +955,9 @@ export class ClassService {
     // 3. Check for duplicates in the same school and academic year
     const existing = await this.prisma.class.findFirst({
       where: {
-        schoolId: createClassDto.schoolId,
+        schoolId: schoolId,
         name: {
-          equals: createClassDto.name.trim(),
+          equals: className,
           mode: 'insensitive',
         },
         academicYear,
@@ -738,17 +967,17 @@ export class ClassService {
 
     if (existing) {
       throw new ConflictException(
-        `A class named "${createClassDto.name}" already exists in ${school.name} for the ${academicYear} academic year`,
+        `A class named "${className}" already exists in ${school.name} for the ${academicYear} academic year`,
       );
     }
 
     // 4. Create class
     const newClass = await this.prisma.class.create({
       data: {
-        name: createClassDto.name.trim(),
-        grade: createClassDto.grade.trim(),
+        name: className,
+        grade: grade,
         section: createClassDto.section?.trim() || 'A',
-        schoolId: createClassDto.schoolId,
+        schoolId: schoolId,
         capacity: createClassDto.capacity || 35,
         academicYear,
         teacherId: createClassDto.teacherId || null,
@@ -787,6 +1016,32 @@ export class ClassService {
    */
   async updateClass(id: string, updateClassDto: UpdateClassDto) {
     this.logger.log(colors.cyan(`Updating class ID: ${id}`));
+
+    if (id.startsWith('class-level-')) {
+      const oldGrade = id.replace('class-level-', '').replace(/-/g, ' ');
+      const normOld = normalizeGrade(oldGrade);
+      const newName = updateClassDto.name ? updateClassDto.name.trim() : normOld;
+
+      await this.prisma.class.updateMany({
+        where: {
+          OR: [
+            { grade: { equals: normOld, mode: 'insensitive' } },
+            { name: { equals: normOld, mode: 'insensitive' } },
+          ],
+        },
+        data: {
+          name: newName,
+          grade: newName,
+        },
+      });
+
+      this.dataCacheService.invalidatePrefix('admin:classes');
+      return ResponseHelper.success('Class updated successfully', {
+        id,
+        name: newName,
+        grade: newName,
+      });
+    }
 
     const existingClass = await this.prisma.class.findUnique({
       where: { id },
@@ -894,6 +1149,77 @@ export class ClassService {
    * Get students belonging to a class
    */
   async getClassStudents(id: string) {
+    if (id.startsWith('class-level-')) {
+      const rawGrade = id.replace('class-level-', '').replace(/-/g, ' ');
+      const normGrade = normalizeGrade(rawGrade);
+
+      const classes = await this.prisma.class.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { grade: { equals: normGrade, mode: 'insensitive' } },
+            { name: { equals: normGrade, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          school: {
+            select: {
+              id: true,
+              name: true,
+              lga: { select: { name: true } },
+            },
+          },
+          students: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              studentId: true,
+              firstName: true,
+              lastName: true,
+              gender: true,
+              dateOfBirth: true,
+            },
+            take: 100,
+          },
+        },
+      });
+
+      const studentsList: any[] = [];
+      const schoolsMap = new Map<string, any>();
+
+      for (const c of classes) {
+        if (c.school) {
+          const prev = schoolsMap.get(c.school.id) || {
+            id: c.school.id,
+            name: c.school.name,
+            lgaName: c.school.lga?.name || 'N/A',
+            studentCount: 0,
+          };
+          prev.studentCount += c.students.length;
+          schoolsMap.set(c.school.id, prev);
+        }
+
+        for (const st of c.students) {
+          studentsList.push({
+            ...st,
+            schoolName: c.school?.name || 'Abia School',
+            lgaName: c.school?.lga?.name || 'N/A',
+          });
+        }
+      }
+
+      return ResponseHelper.success('Class students retrieved successfully', {
+        classId: id,
+        className: normGrade,
+        grade: normGrade,
+        schools: Array.from(schoolsMap.values()),
+        totalStudents: studentsList.length,
+        students: studentsList,
+      });
+    }
+
     const cls = await this.prisma.class.findUnique({
       where: { id },
       select: {

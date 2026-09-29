@@ -101,10 +101,33 @@ export class SchoolService {
       },
     });
 
+    if (
+      createSchoolDto.classes &&
+      Array.isArray(createSchoolDto.classes) &&
+      createSchoolDto.classes.length > 0
+    ) {
+      try {
+        await this.prisma.class.createMany({
+          data: createSchoolDto.classes.map((className) => ({
+            name: className,
+            grade: className,
+            schoolId: school.id,
+            capacity: 35,
+            academicYear: '2024-2025',
+            isActive: true,
+          })),
+          skipDuplicates: true,
+        });
+      } catch (classErr) {
+        this.logger.warn(`Could not automatically create classes for school: ${classErr.message}`);
+      }
+    }
+
     this.logger.log(colors.america('School created successfully'));
     this.dataCacheService.invalidatePrefix('school-analytics:');
     this.dataCacheService.invalidatePrefix('schools-list:');
     this.dataCacheService.invalidatePrefix('admin-dashboard:');
+    this.dataCacheService.invalidatePrefix('admin:classes:');
     return ResponseHelper.created('School created successfully', school);
   }
 

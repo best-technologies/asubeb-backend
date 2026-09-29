@@ -64,4 +64,11 @@ export class ClassQueryDto {
   @IsOptional()
   @IsString()
   academicYear?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether to return aggregated state-wide classes',
+    example: true,
+  })
+  @IsOptional()
+  statewide?: boolean | string;
 }

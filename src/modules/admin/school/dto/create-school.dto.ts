@@ -125,4 +125,11 @@ export class CreateSchoolDto {
   @IsString()
   @IsNotEmpty()
   lgaId: string;
+
+  @ApiPropertyOptional({
+    description: 'List of state-wide class names assigned to this school',
+    example: ['Primary 1', 'Primary 2', 'Primary 3'],
+  })
+  @IsOptional()
+  classes?: string[];
 } 

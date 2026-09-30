@@ -7,15 +7,45 @@ export class AuditLogService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async createLog(userId: string, action: string, details: any) {
+  async createLog(userId: string, action: string, details: any, entity?: string, entityId?: string) {
     try {
+      let determinedEntity = entity || 'General';
+      let determinedEntityId = entityId || 'N/A';
+
+      if (determinedEntity === 'General' && action) {
+        const lower = action.toLowerCase();
+        if (lower.includes('classes')) determinedEntity = 'Class';
+        else if (lower.includes('sessions')) determinedEntity = 'Academic Session';
+        else if (lower.includes('terms')) determinedEntity = 'Academic Term';
+        else if (lower.includes('schools')) determinedEntity = 'School Management';
+        else if (lower.includes('students') || lower.includes('enrollment')) determinedEntity = 'Student Enrollment';
+        else if (lower.includes('profile')) determinedEntity = 'User Profile';
+        else if (lower.includes('officers') || lower.includes('register-officer')) determinedEntity = 'SUBEB Officer';
+        else if (lower.includes('results')) determinedEntity = 'Results';
+      }
+
+      if (determinedEntityId === 'N/A' && details && typeof details === 'object') {
+        determinedEntityId = details.id || details.classId || details.schoolId || details.sessionId || details.termId || details.studentId || 'N/A';
+      }
+
+      let sanitizedDetails = details;
+      if (details && typeof details === 'object') {
+        const copy = { ...details };
+        delete copy.password;
+        delete copy.confirmPassword;
+        delete copy.currentPassword;
+        delete copy.newPassword;
+        delete copy.token;
+        sanitizedDetails = copy;
+      }
+
       await this.prisma.auditLog.create({
         data: {
           userId,
           action,
-          details: JSON.stringify(details),
-          entity: 'General',
-          entityId: 'N/A',
+          details: typeof sanitizedDetails === 'string' ? sanitizedDetails : JSON.stringify(sanitizedDetails || {}),
+          entity: determinedEntity,
+          entityId: String(determinedEntityId),
         },
       });
     } catch (error) {

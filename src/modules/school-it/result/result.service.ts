@@ -245,6 +245,12 @@ export class SchoolItResultService {
       },
     });
 
+    await this.auditLogService.createLog(userId, 'SUBMITTED_RESULTS', {
+      schoolId: profile.schoolId,
+      count: updateResult.count,
+      termId: activeTerm.id,
+    });
+
     return {
       success: true,
       message: `Successfully submitted ${updateResult.count} results for approval.`,

@@ -245,4 +245,29 @@ export class AuthService {
   getProfile(user: any) {
     return ResponseHelper.success('Profile fetched', user);
   }
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(userId: string, data: { firstName?: string; lastName?: string }) {
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.firstName !== undefined && { firstName: data.firstName }),
+        ...(data.lastName !== undefined && { lastName: data.lastName }),
+      },
+    });
+
+    const safeUser = {
+      id: updated.id,
+      email: updated.email,
+      role: updated.role,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+      stateId: updated.stateId,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+    };
+    return ResponseHelper.success('Profile updated successfully', safeUser);
+  }
 }

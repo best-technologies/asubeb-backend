@@ -68,12 +68,14 @@ export class AuditLogService {
 
     const whereClause: any = {};
     if (userId) {
+      // Users can see all of their own activities (including sign in / sign out)
       whereClause.userId = userId;
-    }
-    const isAdmin = !userRole || ['SUPER_ADMIN', 'SUBEB_ADMIN', 'ADMIN'].includes(userRole.toUpperCase());
-    if (!isAdmin) {
-      // Non-admins cannot see sign-in / sign-out audit logs
-      whereClause.action = { notIn: ['USER_LOGIN', 'USER_LOGOUT', 'LOGIN', 'LOGOUT'] };
+    } else {
+      // System-wide view: only admins can see sign-in / sign-out logs of everyone
+      const isAdmin = !userRole || ['SUPER_ADMIN', 'SUBEB_ADMIN', 'ADMIN'].includes(userRole.toUpperCase());
+      if (!isAdmin) {
+        whereClause.action = { notIn: ['USER_LOGIN', 'USER_LOGOUT', 'LOGIN', 'LOGOUT'] };
+      }
     }
     
     const [logs, total] = await Promise.all([

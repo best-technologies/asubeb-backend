@@ -164,7 +164,7 @@ export class TermService {
         // Ensure parent session is active and other sessions closed
         await this.prisma.session.updateMany({
           where: { id: { not: createTermDto.sessionId } },
-          data: { isCurrent: false, status: 'CLOSED' as any },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
         await this.prisma.session.update({
           where: { id: createTermDto.sessionId },
@@ -172,7 +172,7 @@ export class TermService {
         });
 
         await this.prisma.term.updateMany({
-          data: { isCurrent: false, status: 'CLOSED' as any },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
       }
 
@@ -238,7 +238,7 @@ export class TermService {
       if (updateTermDto.isCurrent) {
         await this.prisma.term.updateMany({
           where: { sessionId: existingTerm.sessionId, isCurrent: true, id: { not: id } },
-          data: { isCurrent: false },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
       }
 
@@ -322,7 +322,7 @@ export class TermService {
         // 1. Ensure the parent session is also active & open, and close other sessions
         await tx.session.updateMany({
           where: { id: { not: term.sessionId } },
-          data: { isCurrent: false, status: 'CLOSED' as any },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
 
         await tx.session.update({
@@ -333,7 +333,7 @@ export class TermService {
         // 2. Close and de-current ALL other terms across the entire database
         await tx.term.updateMany({
           where: { id: { not: id } },
-          data: { isCurrent: false, status: 'CLOSED' as any },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
 
         // 3. Mark target term as Current, Active, and OPEN

@@ -137,12 +137,12 @@ export class SessionService {
       if (isCurrent) {
         await this.prisma.session.updateMany({
           where: { stateId: stateId },
-          data: { isCurrent: false, status: 'CLOSED' as any },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
 
         await this.prisma.term.updateMany({
           where: { stateId: stateId },
-          data: { isCurrent: false, status: 'CLOSED' as any },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
       }
 
@@ -198,7 +198,7 @@ export class SessionService {
       if (updateSessionDto.isCurrent) {
         await this.prisma.session.updateMany({
           where: { isCurrent: true, id: { not: id } },
-          data: { isCurrent: false },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
       }
 
@@ -271,13 +271,13 @@ export class SessionService {
         // 1. Close and de-current all other sessions
         await tx.session.updateMany({
           where: { id: { not: id } },
-          data: { isCurrent: false, status: 'CLOSED' as any },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
 
         // 2. Close and de-current all terms belonging to other sessions
         await tx.term.updateMany({
           where: { sessionId: { not: id } },
-          data: { isCurrent: false, status: 'CLOSED' as any },
+          data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
         });
 
         // 3. Mark target session as Current, Active, and OPEN
@@ -294,7 +294,7 @@ export class SessionService {
         if (openTerm) {
           await tx.term.updateMany({
             where: { sessionId: id, id: { not: openTerm.id } },
-            data: { isCurrent: false, status: 'CLOSED' as any },
+            data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
           });
           await tx.term.update({
             where: { id: openTerm.id },
@@ -308,7 +308,7 @@ export class SessionService {
           if (firstTerm) {
             await tx.term.updateMany({
               where: { sessionId: id, id: { not: firstTerm.id } },
-              data: { isCurrent: false, status: 'CLOSED' as any },
+              data: { isCurrent: false, isActive: false, status: 'CLOSED' as any },
             });
             await tx.term.update({
               where: { id: firstTerm.id },

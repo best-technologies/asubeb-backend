@@ -24,11 +24,73 @@ export class ExamOfficerService {
     return officer;
   }
 
-  private async getActiveTerm() {
-    const activeTerm = await this.prisma.term.findFirst({
-      where: { isActive: true },
+  private async getActiveTerm(officer?: any) {
+    const stateId = officer?.stateId;
+
+    // 1. Prioritize current term with OPEN status belonging to current OPEN session for this state
+    let activeTerm = await this.prisma.term.findFirst({
+      where: {
+        isCurrent: true,
+        status: 'OPEN' as any,
+        session: {
+          isCurrent: true,
+          status: 'OPEN' as any,
+          ...(stateId ? { stateId } : {}),
+        },
+        ...(stateId ? { stateId } : {}),
+      },
       include: { session: true },
+      orderBy: { updatedAt: 'desc' },
     });
+
+    // 2. Fallback: current term belonging to current session (with stateId)
+    if (!activeTerm) {
+      activeTerm = await this.prisma.term.findFirst({
+        where: {
+          isCurrent: true,
+          session: {
+            isCurrent: true,
+            ...(stateId ? { stateId } : {}),
+          },
+          ...(stateId ? { stateId } : {}),
+        },
+        include: { session: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+    }
+
+    // 3. Fallback: current term belonging to current session (across states)
+    if (!activeTerm) {
+      activeTerm = await this.prisma.term.findFirst({
+        where: {
+          isCurrent: true,
+          session: {
+            isCurrent: true,
+          },
+        },
+        include: { session: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+    }
+
+    // 4. Fallback: any isCurrent: true term
+    if (!activeTerm) {
+      activeTerm = await this.prisma.term.findFirst({
+        where: { isCurrent: true },
+        include: { session: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+    }
+
+    // 5. Fallback: active term
+    if (!activeTerm) {
+      activeTerm = await this.prisma.term.findFirst({
+        where: { isActive: true },
+        include: { session: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+    }
+
     if (!activeTerm) {
       throw new BadRequestException('No active academic term found');
     }
@@ -37,7 +99,7 @@ export class ExamOfficerService {
 
   async getDashboardAnalytics(userId: string) {
     const officer = await this.getOfficer(userId);
-    const activeTerm = await this.getActiveTerm();
+    const activeTerm = await this.getActiveTerm(officer);
     const lgaId = officer.lgaId as string;
 
     const totalSchools = await this.prisma.school.count({
@@ -86,7 +148,7 @@ export class ExamOfficerService {
 
   async getSchoolsWithResults(userId: string, statusFilter?: string) {
     const officer = await this.getOfficer(userId);
-    const activeTerm = await this.getActiveTerm();
+    const activeTerm = await this.getActiveTerm(officer);
     const lgaId = officer.lgaId as string;
 
     const schools = await this.prisma.school.findMany({
@@ -143,7 +205,7 @@ export class ExamOfficerService {
 
   async getSchoolResultsDetails(userId: string, schoolId: string) {
     const officer = await this.getOfficer(userId);
-    const activeTerm = await this.getActiveTerm();
+    const activeTerm = await this.getActiveTerm(officer);
     const lgaId = officer.lgaId as string;
 
     const school = await this.prisma.school.findFirst({
@@ -198,7 +260,7 @@ export class ExamOfficerService {
 
   async approveSchoolResults(userId: string, schoolId: string) {
     const officer = await this.getOfficer(userId);
-    const activeTerm = await this.getActiveTerm();
+    const activeTerm = await this.getActiveTerm(officer);
     const lgaId = officer.lgaId as string;
 
     // Verify school is in officer's LGA
@@ -242,7 +304,7 @@ export class ExamOfficerService {
 
   async rejectSchoolResults(userId: string, schoolId: string) {
     const officer = await this.getOfficer(userId);
-    const activeTerm = await this.getActiveTerm();
+    const activeTerm = await this.getActiveTerm(officer);
     const lgaId = officer.lgaId as string;
 
     // Verify school is in officer's LGA

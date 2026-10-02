@@ -14,18 +14,19 @@ export class AuditLogService {
 
       if (determinedEntity === 'General' && action) {
         const lower = action.toLowerCase();
-        if (lower.includes('classes')) determinedEntity = 'Class';
-        else if (lower.includes('sessions')) determinedEntity = 'Academic Session';
-        else if (lower.includes('terms')) determinedEntity = 'Academic Term';
-        else if (lower.includes('schools')) determinedEntity = 'School Management';
-        else if (lower.includes('students') || lower.includes('enrollment')) determinedEntity = 'Student Enrollment';
+        if (lower.includes('login') || lower.includes('logout') || lower.includes('auth')) determinedEntity = 'Authentication';
+        else if (lower.includes('class')) determinedEntity = 'Class';
+        else if (lower.includes('session')) determinedEntity = 'Academic Session';
+        else if (lower.includes('term')) determinedEntity = 'Academic Term';
+        else if (lower.includes('school')) determinedEntity = 'School Management';
+        else if (lower.includes('student') || lower.includes('enrollment')) determinedEntity = 'Student Enrollment';
         else if (lower.includes('profile')) determinedEntity = 'User Profile';
-        else if (lower.includes('officers') || lower.includes('register-officer')) determinedEntity = 'SUBEB Officer';
-        else if (lower.includes('results')) determinedEntity = 'Results';
+        else if (lower.includes('officer') || lower.includes('register-officer')) determinedEntity = 'SUBEB Officer';
+        else if (lower.includes('result')) determinedEntity = 'Results';
       }
 
       if (determinedEntityId === 'N/A' && details && typeof details === 'object') {
-        determinedEntityId = details.id || details.classId || details.schoolId || details.sessionId || details.termId || details.studentId || 'N/A';
+        determinedEntityId = details.id || details.userId || details.classId || details.schoolId || details.sessionId || details.termId || details.studentId || 'N/A';
       }
 
       let sanitizedDetails = details;
@@ -39,30 +40,50 @@ export class AuditLogService {
         sanitizedDetails = copy;
       }
 
+      let parsedDetails = sanitizedDetails;
+      if (typeof sanitizedDetails === 'string') {
+        try {
+          parsedDetails = JSON.parse(sanitizedDetails);
+        } catch (e) {
+          parsedDetails = { message: sanitizedDetails };
+        }
+      }
+
       await this.prisma.auditLog.create({
         data: {
           userId,
           action,
-          details: typeof sanitizedDetails === 'string' ? sanitizedDetails : JSON.stringify(sanitizedDetails || {}),
+          details: parsedDetails || {},
           entity: determinedEntity,
           entityId: String(determinedEntityId),
         },
       });
-    } catch (error) {
-      this.logger.error(`Failed to create audit log: ${error.message}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to create audit log: ${error?.message || error}`);
     }
   }
 
-  async getLogs(page: number = 1, limit: number = 20) {
+  async getLogs(page: number = 1, limit: number = 20, userRole?: string, userId?: string) {
     const skip = (page - 1) * limit;
+
+    const whereClause: any = {};
+    if (userId) {
+      whereClause.userId = userId;
+    }
+    const isAdmin = !userRole || ['SUPER_ADMIN', 'SUBEB_ADMIN', 'ADMIN'].includes(userRole.toUpperCase());
+    if (!isAdmin) {
+      // Non-admins cannot see sign-in / sign-out audit logs
+      whereClause.action = { notIn: ['USER_LOGIN', 'USER_LOGOUT', 'LOGIN', 'LOGOUT'] };
+    }
     
     const [logs, total] = await Promise.all([
       this.prisma.auditLog.findMany({
+        where: whereClause,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.auditLog.count(),
+      this.prisma.auditLog.count({ where: whereClause }),
     ]);
 
     const userIds = [...new Set(logs.map(l => l.userId))];

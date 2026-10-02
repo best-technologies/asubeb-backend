@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuditLogService } from './audit-log.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
@@ -13,15 +13,16 @@ export class AuditLogController {
   constructor(private readonly auditLogService: AuditLogService) {}
 
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'SUBEB_ADMIN', 'ADMIN')
   @ApiOperation({ summary: 'Fetch audit logs' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'Audit logs retrieved successfully' })
   async getLogs(
+    @Request() req,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
   ) {
-    return this.auditLogService.getLogs(Number(page), Number(limit));
+    return this.auditLogService.getLogs(Number(page), Number(limit), req.user?.role);
   }
 }

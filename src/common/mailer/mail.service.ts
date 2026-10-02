@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { SendMailProps } from './providers/mail-provider.interface';
-import { sendMail } from './send-mail';
 import {
+  sendMail,
   sendStudentResultEmail as sendStudentResultEmailHelper,
   sendSubebOfficerWelcomeEmail as sendSubebOfficerWelcomeEmailHelper,
+  sendPasswordResetOtpEmail as sendPasswordResetOtpEmailHelper,
 } from './send-mail';
 import { StudentResultEmailPayload } from '../helpers/email-templates/student-result.template';
 import { SubebOfficerWelcomeEmailPayload } from '../helpers/email-templates/subeb-officer-welcome.template';
+import { PasswordResetOtpEmailPayload } from '../helpers/email-templates/password-reset-otp.template';
 
 @Injectable()
 export class MailService {
@@ -27,6 +29,11 @@ export class MailService {
   ): Promise<void> {
     return sendSubebOfficerWelcomeEmailHelper(to, payload);
   }
+
+  async sendPasswordResetOtpEmail(
+    to: string,
+    payload: PasswordResetOtpEmailPayload,
+  ): Promise<void> {
+    return sendPasswordResetOtpEmailHelper(to, payload);
+  }
 }
-
-

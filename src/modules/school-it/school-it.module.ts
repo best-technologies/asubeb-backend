@@ -5,6 +5,7 @@ import { SchoolItStudentController } from './student/student.controller';
 import { SchoolItStudentService } from './student/student.service';
 import { SchoolItResultController } from './result/result.controller';
 import { SchoolItResultService } from './result/result.service';
+import { SchoolItAuditLogController } from './audit-log/audit-log.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { AuditLogModule } from '../admin/audit-log/audit-log.module';
 
@@ -14,6 +15,7 @@ import { AuditLogModule } from '../admin/audit-log/audit-log.module';
     SchoolItDashboardController,
     SchoolItStudentController,
     SchoolItResultController,
+    SchoolItAuditLogController,
   ],
   providers: [
     SchoolItDashboardService,

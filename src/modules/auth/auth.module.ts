@@ -7,11 +7,13 @@ import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { AuditLogModule } from '../admin/audit-log/audit-log.module';
 
 @Module({
   imports: [
     PrismaModule,
     PassportModule,
+    AuditLogModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

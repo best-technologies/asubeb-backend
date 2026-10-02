@@ -235,7 +235,7 @@ export class ExamOfficerService {
       termId: activeTerm.id,
       action: 'APPROVED',
       count: studentCount
-    });
+    }, 'Results', school.id);
 
     return { message: `Successfully approved results for ${studentCount} students in ${school.name}` };
   }
@@ -279,7 +279,7 @@ export class ExamOfficerService {
       termId: activeTerm.id,
       action: 'REJECTED',
       count: studentCount
-    });
+    }, 'Results', school.id);
 
     return { message: `Successfully rejected results for ${studentCount} students in ${school.name}` };
   }
@@ -316,27 +316,15 @@ export class ExamOfficerService {
       });
     }
 
+    await this.auditLogService.createLog(userId, 'UPDATED_PROFILE', {
+      ...updateData,
+      ...userUpdateData,
+    }, 'User Profile', userId);
+
     return updated;
   }
 
   async getAuditLogs(userId: string, page: number = 1, limit: number = 20) {
-    const skip = (page - 1) * limit;
-    
-    const [logs, total] = await Promise.all([
-      this.prisma.auditLog.findMany({
-        where: { userId, action: { in: ['RESULT_APPROVAL', 'RESULT_REJECTION'] } },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.auditLog.count({
-        where: { userId, action: { in: ['RESULT_APPROVAL', 'RESULT_REJECTION'] } }
-      }),
-    ]);
-
-    return {
-      data: logs,
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return this.auditLogService.getLogs(page, limit, 'SUBEB_OFFICER', userId);
   }
 }

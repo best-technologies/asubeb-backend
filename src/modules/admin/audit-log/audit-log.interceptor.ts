@@ -37,6 +37,7 @@ export class AuditLogInterceptor implements NestInterceptor {
     // Skip public authentication endpoints to avoid logging raw credential payloads
     if (
       originalUrl?.includes('/auth/login') ||
+      originalUrl?.includes('/auth/logout') ||
       originalUrl?.includes('/auth/refresh') ||
       originalUrl?.includes('/auth/forgot-password') ||
       originalUrl?.includes('/auth/reset-password')

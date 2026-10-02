@@ -1,11 +1,12 @@
-import { SendMailProps, EmailProvider } from './providers/mail-provider.interface';
+import { SendMailProps } from './providers/mail-provider.interface';
 import { getEmailProvider, sendWithGmail } from './providers/gmail.provider';
 import { sendWithSendGrid } from './providers/sendgrid.provider';
 import { sendWithResend } from './providers/resend.provider';
 import { studentResultEmailTemplate, StudentResultEmailPayload } from '../helpers/email-templates/student-result.template';
 import { subebOfficerWelcomeEmailTemplate, SubebOfficerWelcomeEmailPayload } from '../helpers/email-templates/subeb-officer-welcome.template';
-// Facade that chooses the right provider implementation based on EMAIL_PROVIDER
+import { passwordResetOtpEmailTemplate, PasswordResetOtpEmailPayload } from '../helpers/email-templates/password-reset-otp.template';
 
+// Facade that chooses the right provider implementation based on EMAIL_PROVIDER
 export async function sendMail({ to, subject, html }: SendMailProps): Promise<void> {
   const provider = getEmailProvider();
 
@@ -18,7 +19,6 @@ export async function sendMail({ to, subject, html }: SendMailProps): Promise<vo
       await sendWithGmail({ to, subject, html });
     }
   } catch (error: any) {
-    // Log detailed error information
     const errorDetails = {
       message: error?.message,
       code: error?.code,
@@ -32,7 +32,6 @@ export async function sendMail({ to, subject, html }: SendMailProps): Promise<vo
 
     console.error('Email sending failed:', errorDetails);
 
-    // Re-throw with more context
     throw new Error(
       `Failed to send email to ${to}: ${error?.message || 'Unknown error'}. ` +
       `Error code: ${error?.code || 'N/A'}, Response: ${error?.response || 'N/A'}`,
@@ -53,5 +52,10 @@ export async function sendSubebOfficerWelcomeEmail(
   await sendMail({ to, subject: 'Welcome to ASUBEB Platform (SUBEB Officer)', html });
 }
 
-
-
+export async function sendPasswordResetOtpEmail(
+  to: string,
+  payload: PasswordResetOtpEmailPayload,
+): Promise<void> {
+  const html = passwordResetOtpEmailTemplate(payload);
+  await sendMail({ to, subject: 'Your ASUBEB Password Recovery Code', html });
+}

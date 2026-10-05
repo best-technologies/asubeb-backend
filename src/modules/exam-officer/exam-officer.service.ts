@@ -100,49 +100,193 @@ export class ExamOfficerService {
   async getDashboardAnalytics(userId: string) {
     const officer = await this.getOfficer(userId);
     const activeTerm = await this.getActiveTerm(officer);
-    const lgaId = officer.lgaId as string;
 
-    const totalSchools = await this.prisma.school.count({
-      where: { lgaId: lgaId, isActive: true }
+    // Resolve officer's LGA(s) - handle single or multiple comma-separated LGAs
+    const rawLgaId = officer.lgaId as string;
+    const lgaIds = rawLgaId.includes(',')
+      ? rawLgaId.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [rawLgaId];
+
+    let lgas = await this.prisma.localGovernmentArea.findMany({
+      where: { id: { in: lgaIds } },
+      select: { id: true, name: true, code: true, state: true }
     });
 
-    const totalStudents = await this.prisma.student.count({
-      where: { school: { lgaId: lgaId }, isActive: true }
+    if (lgas.length === 0 && officer.lga) {
+      lgas = [officer.lga];
+    }
+
+    // Fetch all active schools in the officer's LGA(s) with their assigned School IT person and student count
+    const schools = await this.prisma.school.findMany({
+      where: { lgaId: { in: lgaIds }, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        level: true,
+        lgaId: true,
+        lga: {
+          select: { id: true, name: true, code: true }
+        },
+        schoolIts: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            schoolItId: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            isActive: true,
+            createdAt: true,
+          }
+        },
+        _count: {
+          select: {
+            students: { where: { isActive: true } }
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
     });
 
-    const schoolIds = (await this.prisma.school.findMany({ where: { lgaId: lgaId }, select: { id: true } })).map(s => s.id);
+    const schoolIds = schools.map(s => s.id);
+    const totalSchools = schools.length;
+    const totalStudents = schools.reduce((acc, s) => acc + (s._count?.students || 0), 0);
 
-    const awaitingApprovalCountQuery = await this.prisma.assessment.findMany({
+    const allSchoolIts = schools.flatMap(s => s.schoolIts);
+    const totalSchoolIt = allSchoolIts.length;
+    const schoolsWithItCount = schools.filter(s => s.schoolIts.length > 0).length;
+    const schoolsWithoutItCount = Math.max(0, totalSchools - schoolsWithItCount);
+
+    // Fetch all active term assessments for schools in these LGA(s) in a single fast batch query
+    const assessments = await this.prisma.assessment.findMany({
       where: {
         class: { schoolId: { in: schoolIds } },
         termId: activeTerm.id,
-        status: ApprovalStatus.AWAITING_APPROVAL
       },
-      distinct: ['studentId'],
-      select: { studentId: true }
+      select: {
+        studentId: true,
+        status: true,
+        createdAt: true,
+        class: { select: { schoolId: true } },
+      },
     });
-    const awaitingApprovalCount = awaitingApprovalCountQuery.length;
 
-    const approvedCountQuery = await this.prisma.assessment.findMany({
-      where: {
-        class: { schoolId: { in: schoolIds } },
-        termId: activeTerm.id,
-        status: ApprovalStatus.APPROVED
-      },
-      distinct: ['studentId'],
-      select: { studentId: true }
+    // Group assessments by schoolId
+    const assessmentsBySchool = new Map<string, {
+      awaiting: Set<string>;
+      approved: Set<string>;
+      rejected: Set<string>;
+      allAssessed: Set<string>;
+      lastSubmission: Date | null;
+    }>();
+
+    for (const a of assessments) {
+      const sId = a.class.schoolId;
+      if (!assessmentsBySchool.has(sId)) {
+        assessmentsBySchool.set(sId, {
+          awaiting: new Set(),
+          approved: new Set(),
+          rejected: new Set(),
+          allAssessed: new Set(),
+          lastSubmission: null,
+        });
+      }
+      const data = assessmentsBySchool.get(sId)!;
+      data.allAssessed.add(a.studentId);
+      if (a.status === ApprovalStatus.AWAITING_APPROVAL) {
+        data.awaiting.add(a.studentId);
+      } else if (a.status === ApprovalStatus.APPROVED) {
+        data.approved.add(a.studentId);
+      } else if (a.status === ApprovalStatus.REJECTED) {
+        data.rejected.add(a.studentId);
+      }
+      if (!data.lastSubmission || (a.createdAt && a.createdAt > data.lastSubmission)) {
+        data.lastSubmission = a.createdAt;
+      }
+    }
+
+    const allAwaitingStudents = new Set<string>();
+    const allApprovedStudents = new Set<string>();
+
+    for (const data of assessmentsBySchool.values()) {
+      for (const s of data.awaiting) allAwaitingStudents.add(s);
+      for (const s of data.approved) allApprovedStudents.add(s);
+    }
+    const awaitingApprovalCount = allAwaitingStudents.size;
+    const approvedCount = allApprovedStudents.size;
+
+    // Build the analytical relation records between School IT persons, their schools, and active exam submissions
+    const schoolItRelations = schools.map(school => {
+      const itOfficer = school.schoolIts[0] ? {
+        id: school.schoolIts[0].id,
+        schoolItId: school.schoolIts[0].schoolItId,
+        name: `${school.schoolIts[0].firstName} ${school.schoolIts[0].lastName}`.trim(),
+        email: school.schoolIts[0].email,
+        phone: school.schoolIts[0].phone,
+        isActive: school.schoolIts[0].isActive,
+        assignedAt: school.schoolIts[0].createdAt,
+      } : null;
+
+      const schoolAssessments = assessmentsBySchool.get(school.id);
+      const awaiting = schoolAssessments ? schoolAssessments.awaiting.size : 0;
+      const approved = schoolAssessments ? schoolAssessments.approved.size : 0;
+      const rejected = schoolAssessments ? schoolAssessments.rejected.size : 0;
+      const totalAssessed = schoolAssessments ? schoolAssessments.allAssessed.size : 0;
+
+      let overallStatus: 'AWAITING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'NO_RESULTS' = 'NO_RESULTS';
+      if (awaiting > 0) {
+        overallStatus = 'AWAITING_APPROVAL';
+      } else if (approved > 0) {
+        overallStatus = 'APPROVED';
+      } else if (rejected > 0) {
+        overallStatus = 'REJECTED';
+      }
+
+      return {
+        schoolId: school.id,
+        schoolName: school.name,
+        schoolCode: school.code,
+        schoolLevel: school.level,
+        lgaName: school.lga?.name || (officer.lga?.name ?? 'Unknown'),
+        totalStudents: school._count?.students || 0,
+        itOfficer,
+        activeTermStats: {
+          termId: activeTerm.id,
+          termName: activeTerm.name,
+          awaitingApprovalCount: awaiting,
+          approvedCount: approved,
+          rejectedCount: rejected,
+          totalAssessedCount: totalAssessed,
+          status: overallStatus,
+          lastSubmissionDate: schoolAssessments?.lastSubmission || null,
+        }
+      };
     });
-    const approvedCount = approvedCountQuery.length;
 
     return {
+      officer: {
+        id: officer.id,
+        firstName: officer.firstName,
+        lastName: officer.lastName,
+        email: officer.email,
+        state: officer.stateRef?.stateName || 'Abia State',
+        currentLga: officer.lga?.name || (lgas[0]?.name ?? 'Unassigned'),
+        lgas: lgas.map(l => ({ id: l.id, name: l.name, code: l.code })),
+      },
       activeSession: activeTerm.session,
       activeTerm,
       analytics: {
         totalSchools,
         totalStudents,
+        totalSchoolIt,
+        schoolsWithItCount,
+        schoolsWithoutItCount,
         awaitingApproval: awaitingApprovalCount,
         approved: approvedCount
-      }
+      },
+      schoolItRelations,
     };
   }
 

@@ -1,13 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../admin/audit-log/audit-log.service';
+import { MailService } from '../../common/mailer/mail.service';
 import { ApprovalStatus } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
+import { CreateSchoolItDto, UpdateSchoolItDto } from './dto/school-it.dto';
 
 @Injectable()
 export class ExamOfficerService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditLogService: AuditLogService
+    private readonly auditLogService: AuditLogService,
+    private readonly mailService: MailService,
   ) {}
 
   private async getOfficer(userId: string) {
@@ -532,5 +536,411 @@ export class ExamOfficerService {
 
   async getAuditLogs(userId: string, page: number = 1, limit: number = 20) {
     return this.auditLogService.getLogs(page, limit, 'SUBEB_OFFICER', userId);
+  }
+
+  /**
+   * Get all active schools in the Exam Officer's LGA jurisdiction for selection and assignment
+   */
+  async getSchoolsInLga(userId: string) {
+    const officer = await this.getOfficer(userId);
+    const rawLgaId = officer.lgaId as string;
+    const lgaIds = rawLgaId.includes(',')
+      ? rawLgaId.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [rawLgaId];
+
+    const schools = await this.prisma.school.findMany({
+      where: { lgaId: { in: lgaIds }, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        level: true,
+        lgaId: true,
+        lga: {
+          select: { id: true, name: true, code: true }
+        },
+        schoolIts: {
+          where: { isActive: true },
+          select: { id: true, firstName: true, lastName: true, schoolItId: true, email: true }
+        },
+        _count: {
+          select: { students: { where: { isActive: true } } }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    return schools.map(s => ({
+      id: s.id,
+      name: s.name,
+      code: s.code,
+      level: s.level,
+      lgaId: s.lgaId,
+      lgaName: s.lga?.name || 'Unknown',
+      studentCount: s._count?.students || 0,
+      assignedIt: s.schoolIts[0] ? {
+        id: s.schoolIts[0].id,
+        name: `${s.schoolIts[0].firstName} ${s.schoolIts[0].lastName}`,
+        schoolItId: s.schoolIts[0].schoolItId,
+        email: s.schoolIts[0].email,
+      } : null,
+      hasAssignedIt: s.schoolIts.length > 0,
+    }));
+  }
+
+  /**
+   * Get list of School IT personnel associated with the officer's LGA(s) or created by the officer
+   */
+  async getSchoolItList(userId: string, search?: string, schoolId?: string, status?: string) {
+    const officer = await this.getOfficer(userId);
+    const rawLgaId = officer.lgaId as string;
+    const lgaIds = rawLgaId.includes(',')
+      ? rawLgaId.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [rawLgaId];
+
+    const officerSchools = await this.prisma.school.findMany({
+      where: { lgaId: { in: lgaIds } },
+      select: { id: true }
+    });
+    const officerSchoolIds = officerSchools.map(s => s.id);
+
+    const whereClause: any = {
+      OR: [
+        { schoolId: { in: officerSchoolIds } },
+        { officerId: officer.id },
+        { createdById: officer.userId }
+      ]
+    };
+
+    if (schoolId && schoolId !== 'ALL') {
+      whereClause.schoolId = schoolId;
+    }
+
+    if (status && status !== 'ALL') {
+      if (status === 'ACTIVE') {
+        whereClause.isActive = true;
+      } else if (status === 'INACTIVE') {
+        whereClause.isActive = false;
+      }
+    }
+
+    if (search && search.trim() !== '') {
+      const q = search.trim();
+      whereClause.AND = [
+        {
+          OR: [
+            { firstName: { contains: q, mode: 'insensitive' } },
+            { lastName: { contains: q, mode: 'insensitive' } },
+            { email: { contains: q, mode: 'insensitive' } },
+            { phone: { contains: q, mode: 'insensitive' } },
+            { schoolItId: { contains: q, mode: 'insensitive' } },
+            { school: { name: { contains: q, mode: 'insensitive' } } },
+            { school: { code: { contains: q, mode: 'insensitive' } } },
+          ]
+        }
+      ];
+    }
+
+    const schoolIts = await this.prisma.schoolIt.findMany({
+      where: whereClause,
+      include: {
+        school: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            level: true,
+            lga: { select: { id: true, name: true, code: true } }
+          }
+        },
+        officer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            officerId: true
+          }
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            profilePicture: true,
+            isActive: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return schoolIts.map(it => ({
+      id: it.id,
+      schoolItId: it.schoolItId,
+      userId: it.userId,
+      firstName: it.firstName,
+      lastName: it.lastName,
+      fullName: `${it.firstName} ${it.lastName}`.trim(),
+      email: it.email,
+      phone: it.phone,
+      isActive: it.isActive,
+      profilePicture: it.user?.profilePicture || null,
+      createdAt: it.createdAt,
+      school: it.school ? {
+        id: it.school.id,
+        name: it.school.name,
+        code: it.school.code,
+        level: it.school.level,
+        lgaName: it.school.lga?.name || 'Unknown'
+      } : null,
+      creatorOfficer: it.officer ? {
+        id: it.officer.id,
+        name: `${it.officer.firstName} ${it.officer.lastName}`.trim(),
+        officerId: it.officer.officerId,
+      } : it.createdByUser ? {
+        id: it.createdByUser.id,
+        name: `${it.createdByUser.firstName || ''} ${it.createdByUser.lastName || ''}`.trim() || it.createdByUser.email,
+        officerId: 'N/A'
+      } : null,
+      isCreatedByCurrentOfficer: (it.officerId === officer.id || it.createdById === officer.userId),
+    }));
+  }
+
+  /**
+   * Create a new School IT personnel for any school in the officer's LGA jurisdiction,
+   * permanently attaching the creating Exam Officer so ownership is never lost upon reassignment.
+   */
+  async createSchoolItPerson(userId: string, dto: CreateSchoolItDto) {
+    const officer = await this.getOfficer(userId);
+    const rawLgaId = officer.lgaId as string;
+    const lgaIds = rawLgaId.includes(',')
+      ? rawLgaId.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [rawLgaId];
+
+    // 1. Check if user with this email already exists
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail }
+    });
+    if (existingUser) {
+      throw new BadRequestException('A user with this email already exists.');
+    }
+
+    // 2. Validate that school belongs to one of officer's assigned LGA(s)
+    const targetSchool = await this.prisma.school.findFirst({
+      where: {
+        id: dto.schoolId,
+        lgaId: { in: lgaIds },
+        isActive: true
+      },
+      include: { lga: true }
+    });
+    if (!targetSchool) {
+      throw new BadRequestException('Selected school not found or does not belong to your assigned LGA jurisdiction.');
+    }
+
+    // 3. Generate temporary password
+    const tempPassword = Math.random().toString(36).slice(-10);
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    // 4. Generate unique SchoolIt ID
+    let schoolItId = '';
+    let isUnique = false;
+    while (!isUnique) {
+      const randomDigits = Math.floor(Math.random() * 90000) + 10000;
+      const candidateId = `SIT${randomDigits}`;
+      const exists = await this.prisma.schoolIt.findUnique({ where: { schoolItId: candidateId } });
+      if (!exists) {
+        schoolItId = candidateId;
+        isUnique = true;
+      }
+    }
+
+    // 5. Create user and SchoolIt inside transaction, attaching officerId and createdById
+    const stateId = officer.stateId;
+    const result = await this.prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          username: normalizedEmail,
+          password: hashedPassword,
+          firstName: dto.firstName.trim(),
+          lastName: dto.lastName.trim(),
+          role: 'SCHOOL_IT' as any,
+          stateId,
+          profilePicture: dto.profilePicture || null,
+        }
+      });
+
+      const newSchoolIt = await tx.schoolIt.create({
+        data: {
+          userId: newUser.id,
+          schoolItId,
+          schoolId: targetSchool.id,
+          firstName: dto.firstName.trim(),
+          lastName: dto.lastName.trim(),
+          email: normalizedEmail,
+          phone: dto.phone.trim(),
+          stateId,
+          officerId: officer.id,
+          createdById: officer.userId,
+        },
+        include: {
+          school: {
+            select: { id: true, name: true, code: true, level: true, lga: true }
+          }
+        }
+      });
+
+      // 6. Record Audit Log for the creation action
+      await tx.auditLog.create({
+        data: {
+          action: 'CREATE_SCHOOL_IT',
+          entity: 'SchoolIt',
+          entityId: newSchoolIt.id,
+          userId: officer.userId,
+          details: {
+            officerId: officer.id,
+            officerName: `${officer.firstName} ${officer.lastName}`,
+            schoolItId: newSchoolIt.schoolItId,
+            personnelName: `${newSchoolIt.firstName} ${newSchoolIt.lastName}`,
+            email: newSchoolIt.email,
+            schoolId: targetSchool.id,
+            schoolName: targetSchool.name,
+            lgaName: targetSchool.lga?.name,
+          }
+        }
+      });
+
+      return newSchoolIt;
+    });
+
+    // 7. Send welcome email with login credentials
+    try {
+      await this.mailService.sendSubebOfficerWelcomeEmail(normalizedEmail, {
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
+        email: normalizedEmail,
+        password: tempPassword,
+      });
+    } catch (mailError: any) {
+      console.warn(`[ExamOfficerService] Welcome email failed for ${normalizedEmail}:`, mailError?.message || mailError);
+    }
+
+    return {
+      id: result.id,
+      schoolItId: result.schoolItId,
+      firstName: result.firstName,
+      lastName: result.lastName,
+      fullName: `${result.firstName} ${result.lastName}`.trim(),
+      email: result.email,
+      phone: result.phone,
+      school: result.school,
+      officerId: officer.id,
+      createdById: officer.userId,
+      createdAt: result.createdAt,
+      tempPassword,
+    };
+  }
+
+  /**
+   * Update an existing School IT personnel
+   */
+  async updateSchoolItPerson(userId: string, id: string, dto: UpdateSchoolItDto) {
+    const officer = await this.getOfficer(userId);
+    const rawLgaId = officer.lgaId as string;
+    const lgaIds = rawLgaId.includes(',')
+      ? rawLgaId.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [rawLgaId];
+
+    const schoolIt = await this.prisma.schoolIt.findUnique({
+      where: { id },
+      include: { school: true }
+    });
+
+    if (!schoolIt) {
+      throw new NotFoundException('School IT personnel not found.');
+    }
+
+    // Verify permission: school is in officer's LGA or was created by this officer
+    const isLgaSchool = schoolIt.school && lgaIds.includes(schoolIt.school.lgaId);
+    const isCreator = (schoolIt.officerId === officer.id || schoolIt.createdById === officer.userId);
+
+    if (!isLgaSchool && !isCreator) {
+      throw new ForbiddenException('You do not have permission to manage this School IT personnel.');
+    }
+
+    // If reassigning school, ensure new school is in officer's LGA
+    if (dto.schoolId && dto.schoolId !== schoolIt.schoolId) {
+      const newSchool = await this.prisma.school.findFirst({
+        where: { id: dto.schoolId, lgaId: { in: lgaIds } }
+      });
+      if (!newSchool) {
+        throw new BadRequestException('Selected school is not within your assigned LGA jurisdiction.');
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updatedSchoolIt = await tx.schoolIt.update({
+        where: { id },
+        data: {
+          ...(dto.firstName !== undefined && { firstName: dto.firstName.trim() }),
+          ...(dto.lastName !== undefined && { lastName: dto.lastName.trim() }),
+          ...(dto.phone !== undefined && { phone: dto.phone.trim() }),
+          ...(dto.schoolId !== undefined && { schoolId: dto.schoolId }),
+          ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        },
+        include: {
+          school: {
+            select: { id: true, name: true, code: true, level: true, lga: true }
+          }
+        }
+      });
+
+      // Sync with user record
+      await tx.user.update({
+        where: { id: schoolIt.userId },
+        data: {
+          ...(dto.firstName !== undefined && { firstName: dto.firstName.trim() }),
+          ...(dto.lastName !== undefined && { lastName: dto.lastName.trim() }),
+          ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        }
+      });
+
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          action: 'UPDATE_SCHOOL_IT',
+          entity: 'SchoolIt',
+          entityId: schoolIt.id,
+          userId: officer.userId,
+          details: {
+            officerId: officer.id,
+            schoolItId: schoolIt.schoolItId,
+            changes: dto as any,
+          }
+        }
+      });
+
+      return updatedSchoolIt;
+    });
+
+    return updated;
+  }
+
+  /**
+   * Toggle active/inactive status of School IT personnel
+   */
+  async toggleSchoolItStatus(userId: string, id: string) {
+    const schoolIt = await this.prisma.schoolIt.findUnique({ where: { id } });
+    if (!schoolIt) throw new NotFoundException('School IT personnel not found.');
+    return this.updateSchoolItPerson(userId, id, { isActive: !schoolIt.isActive });
   }
 }

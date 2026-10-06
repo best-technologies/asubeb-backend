@@ -1,10 +1,11 @@
 import { Controller, Get, Post, Patch, Body, Query, Param, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { ExamOfficerService } from './exam-officer.service';
+import { CreateSchoolItDto, UpdateSchoolItDto } from './dto/school-it.dto';
 
 @ApiTags('exam-officer')
 @ApiBearerAuth()
@@ -20,6 +21,65 @@ export class ExamOfficerController {
     return {
       success: true,
       data: await this.examOfficerService.getDashboardAnalytics(req.user.id),
+    };
+  }
+
+  @Get('schools')
+  @ApiOperation({ summary: 'Get active schools in the officer LGA jurisdiction' })
+  async getSchools(@Request() req) {
+    return {
+      success: true,
+      data: await this.examOfficerService.getSchoolsInLga(req.user.id),
+    };
+  }
+
+  @Get('school-it')
+  @ApiOperation({ summary: 'Get list of School IT personnels in the officer LGA jurisdiction' })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'schoolId', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: ['ALL', 'ACTIVE', 'INACTIVE'] })
+  async getSchoolItPersonnel(
+    @Request() req,
+    @Query('search') search?: string,
+    @Query('schoolId') schoolId?: string,
+    @Query('status') status?: string
+  ) {
+    return {
+      success: true,
+      data: await this.examOfficerService.getSchoolItList(req.user.id, search, schoolId, status),
+    };
+  }
+
+  @Post('school-it')
+  @ApiOperation({ summary: 'Create a new School IT personnel for a school in the officer LGA jurisdiction' })
+  @ApiBody({ type: CreateSchoolItDto })
+  async createSchoolItPersonnel(@Request() req, @Body() dto: CreateSchoolItDto) {
+    return {
+      success: true,
+      data: await this.examOfficerService.createSchoolItPerson(req.user.id, dto),
+    };
+  }
+
+  @Patch('school-it/:id')
+  @ApiOperation({ summary: 'Update an existing School IT personnel' })
+  @ApiBody({ type: UpdateSchoolItDto })
+  async updateSchoolItPersonnel(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: UpdateSchoolItDto
+  ) {
+    return {
+      success: true,
+      data: await this.examOfficerService.updateSchoolItPerson(req.user.id, id, dto),
+    };
+  }
+
+  @Patch('school-it/:id/toggle-status')
+  @ApiOperation({ summary: 'Toggle status of a School IT personnel' })
+  async toggleSchoolItStatus(@Request() req, @Param('id') id: string) {
+    return {
+      success: true,
+      data: await this.examOfficerService.toggleSchoolItStatus(req.user.id, id),
     };
   }
 

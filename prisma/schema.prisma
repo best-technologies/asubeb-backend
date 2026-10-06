@@ -89,6 +89,7 @@ model User {
   schoolIt         SchoolIt?
   subebOfficer     SubebOfficer?  @relation("OfficerUser")
   enrolledOfficers SubebOfficer[] @relation("EnrolledOfficers")
+  createdSchoolIts SchoolIt[]     @relation("UserCreatedSchoolIts")
   // Required relation to State
   stateId          String
   stateRef         State          @relation(fields: [stateId], references: [id])
@@ -472,7 +473,8 @@ model SubebOfficer {
   enrolledByUser User?                @relation("EnrolledOfficers", fields: [enrolledBy], references: [id])
 
   // Relations
-  user User @relation("OfficerUser", fields: [userId], references: [id])
+  user             User       @relation("OfficerUser", fields: [userId], references: [id])
+  createdSchoolIts SchoolIt[] @relation("OfficerCreatedSchoolIts")
 
   @@map("subeb_officers")
 }
@@ -494,6 +496,12 @@ model SchoolIt {
   // Required relation to State
   stateId  String
   stateRef State  @relation(fields: [stateId], references: [id])
+
+  // Creator attribution (Exam Officer)
+  officerId     String?
+  officer       SubebOfficer? @relation("OfficerCreatedSchoolIts", fields: [officerId], references: [id])
+  createdById   String?
+  createdByUser User?         @relation("UserCreatedSchoolIts", fields: [createdById], references: [id])
 
   // Relations
   user   User   @relation(fields: [userId], references: [id])

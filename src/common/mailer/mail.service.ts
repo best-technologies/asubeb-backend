@@ -4,10 +4,12 @@ import {
   sendMail,
   sendStudentResultEmail as sendStudentResultEmailHelper,
   sendSubebOfficerWelcomeEmail as sendSubebOfficerWelcomeEmailHelper,
+  sendSchoolItWelcomeEmail as sendSchoolItWelcomeEmailHelper,
   sendPasswordResetOtpEmail as sendPasswordResetOtpEmailHelper,
 } from './send-mail';
 import { StudentResultEmailPayload } from '../helpers/email-templates/student-result.template';
 import { SubebOfficerWelcomeEmailPayload } from '../helpers/email-templates/subeb-officer-welcome.template';
+import { SchoolItWelcomeEmailPayload } from '../helpers/email-templates/school-it-welcome.template';
 import { PasswordResetOtpEmailPayload } from '../helpers/email-templates/password-reset-otp.template';
 
 @Injectable()
@@ -28,6 +30,13 @@ export class MailService {
     payload: SubebOfficerWelcomeEmailPayload,
   ): Promise<void> {
     return sendSubebOfficerWelcomeEmailHelper(to, payload);
+  }
+
+  async sendSchoolItWelcomeEmail(
+    to: string,
+    payload: SchoolItWelcomeEmailPayload,
+  ): Promise<void> {
+    return sendSchoolItWelcomeEmailHelper(to, payload);
   }
 
   async sendPasswordResetOtpEmail(

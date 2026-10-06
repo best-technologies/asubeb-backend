@@ -4,6 +4,7 @@ import { sendWithSendGrid } from './providers/sendgrid.provider';
 import { sendWithResend } from './providers/resend.provider';
 import { studentResultEmailTemplate, StudentResultEmailPayload } from '../helpers/email-templates/student-result.template';
 import { subebOfficerWelcomeEmailTemplate, SubebOfficerWelcomeEmailPayload } from '../helpers/email-templates/subeb-officer-welcome.template';
+import { schoolItWelcomeEmailTemplate, SchoolItWelcomeEmailPayload } from '../helpers/email-templates/school-it-welcome.template';
 import { passwordResetOtpEmailTemplate, PasswordResetOtpEmailPayload } from '../helpers/email-templates/password-reset-otp.template';
 
 // Facade that chooses the right provider implementation based on EMAIL_PROVIDER
@@ -50,6 +51,14 @@ export async function sendSubebOfficerWelcomeEmail(
 ): Promise<void> {
   const html = subebOfficerWelcomeEmailTemplate(payload);
   await sendMail({ to, subject: 'Welcome to ASUBEB Platform (SUBEB Officer)', html });
+}
+
+export async function sendSchoolItWelcomeEmail(
+  to: string,
+  payload: SchoolItWelcomeEmailPayload,
+): Promise<void> {
+  const html = schoolItWelcomeEmailTemplate(payload);
+  await sendMail({ to, subject: 'Welcome to ASUBEB Platform (School IT Officer)', html });
 }
 
 export async function sendPasswordResetOtpEmail(

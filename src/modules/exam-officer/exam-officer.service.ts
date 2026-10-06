@@ -822,13 +822,21 @@ export class ExamOfficerService {
       return newSchoolIt;
     });
 
-    // 7. Send welcome email with login credentials
+    // 7. Send welcome email with login credentials and school assignment details
     try {
-      await this.mailService.sendSubebOfficerWelcomeEmail(normalizedEmail, {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      await this.mailService.sendSchoolItWelcomeEmail(normalizedEmail, {
         firstName: dto.firstName.trim(),
         lastName: dto.lastName.trim(),
         email: normalizedEmail,
         password: tempPassword,
+        schoolItId: result.schoolItId,
+        schoolName: targetSchool.name,
+        schoolCode: targetSchool.code,
+        schoolLevel: targetSchool.level,
+        lgaName: targetSchool.lga?.name,
+        officerName: `${officer.firstName} ${officer.lastName}`.trim(),
+        loginUrl: `${frontendUrl.replace(/\/$/, '')}/login`,
       });
     } catch (mailError: any) {
       console.warn(`[ExamOfficerService] Welcome email failed for ${normalizedEmail}:`, mailError?.message || mailError);

@@ -5,6 +5,7 @@ import {
   ConflictException,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -60,7 +61,12 @@ export class AuthService {
         where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
         include: {
           schoolIt: {
-            include: { school: true },
+            include: {
+              school: {
+                include: { lga: true },
+              },
+              officer: true,
+            },
           },
         },
       });
@@ -73,6 +79,82 @@ export class AuthService {
       if (!isValid) {
         this.logger.warn(`Invalid password attempt for user: ${email}`);
         return null;
+      }
+
+      // Resolve School IT profile if user has SCHOOL_IT role or relation
+      let schoolIt = user.schoolIt;
+      if (!schoolIt && (user.role as string) === 'SCHOOL_IT') {
+        schoolIt = await this.prisma.schoolIt.findFirst({
+          where: {
+            OR: [
+              { userId: user.id },
+              { email: { equals: normalizedEmail, mode: 'insensitive' } },
+            ],
+          },
+          include: {
+            school: {
+              include: { lga: true },
+            },
+            officer: true,
+          },
+        });
+      }
+
+      // Check if user account or School IT profile is deactivated
+      const isSchoolIt = (user.role as string) === 'SCHOOL_IT' || !!schoolIt;
+      const isDeactivated = !user.isActive || (isSchoolIt && schoolIt && !schoolIt.isActive);
+
+      if (isDeactivated) {
+        this.logger.warn(`Login rejected: deactivated user ${email} (${user.role})`);
+
+        // Ensure database state is synchronized if one record is deactivated
+        if (user.isActive) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: { isActive: false },
+          }).catch(() => {});
+        }
+        if (schoolIt && schoolIt.isActive) {
+          await this.prisma.schoolIt.update({
+            where: { id: schoolIt.id },
+            data: { isActive: false },
+          }).catch(() => {});
+        }
+
+        if (isSchoolIt) {
+          const lgaName = schoolIt?.school?.lga?.name;
+          let officer = schoolIt?.officer;
+
+          // If officer not directly attached, lookup by LGA
+          if (!officer && schoolIt?.school?.lgaId) {
+            officer = await this.prisma.subebOfficer.findFirst({
+              where: {
+                lgaId: { contains: schoolIt.school.lgaId },
+              },
+            }).catch(() => null) as any;
+          }
+
+          const officerName = officer
+            ? `${officer.firstName} ${officer.lastName}`.trim()
+            : null;
+
+          let contactTarget = 'your LGA Exam Officer';
+          if (officerName && lgaName) {
+            contactTarget = `your LGA Exam Officer (${officerName} - ${lgaName} LGA)`;
+          } else if (lgaName) {
+            contactTarget = `your LGA Exam Officer in ${lgaName} LGA`;
+          } else if (officerName) {
+            contactTarget = `your LGA Exam Officer (${officerName})`;
+          }
+
+          throw new UnauthorizedException(
+            `Your account has been deactivated. If you believe this is an error, please reach out to ${contactTarget} to reactivate your access.`
+          );
+        }
+
+        throw new UnauthorizedException(
+          'Your account has been deactivated. If you believe this is an error, please reach out to the system administrator to reactivate your access.'
+        );
       }
 
       const safe: SafeUser = {
@@ -88,6 +170,13 @@ export class AuthService {
       this.logger.log(`User validated: ${email}`);
       return safe;
     } catch (error) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof BadRequestException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
       this.logger.error(`Error validating user ${email}: ${error?.message ?? error}`);
       throw new InternalServerErrorException('Failed to validate user');
     }

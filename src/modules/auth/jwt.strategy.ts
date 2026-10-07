@@ -32,9 +32,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Token has been invalidated. Please sign in again.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('Invalid token');
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { schoolIt: true },
+    });
+    if (!user || !user.isActive || (user.schoolIt && !user.schoolIt.isActive)) {
+      throw new UnauthorizedException('Token has expired or account has been deactivated.');
     }
 
     // return minimal user object for request

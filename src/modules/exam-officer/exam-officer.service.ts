@@ -539,11 +539,111 @@ export class ExamOfficerService {
   }
 
   /**
-   * Get all active schools in the Exam Officer's LGA jurisdiction for selection and assignment
+   * Get current assigned LGA(s) and any past activity LGAs where the officer created School IT personnel or operated.
    */
-  async getSchoolsInLga(userId: string) {
+  async getOfficerLgas(userId: string) {
     const officer = await this.getOfficer(userId);
     const rawLgaId = officer.lgaId as string;
+    const currentLgaIds = rawLgaId.includes(',')
+      ? rawLgaId.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [rawLgaId];
+
+    // 1. Current LGAs
+    const currentLgas = await this.prisma.localGovernmentArea.findMany({
+      where: { id: { in: currentLgaIds } },
+      select: { id: true, name: true, code: true }
+    });
+
+    // 2. Discover past LGAs where this officer created School IT personnel
+    const createdSchoolIts = await this.prisma.schoolIt.findMany({
+      where: {
+        OR: [
+          { officerId: officer.id },
+          { createdById: officer.userId }
+        ]
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        school: {
+          select: {
+            id: true,
+            lgaId: true,
+            lga: { select: { id: true, name: true, code: true } }
+          }
+        }
+      }
+    });
+
+    const pastLgaMap = new Map<string, { id: string; name: string; code: string; itCount: number }>();
+    for (const it of createdSchoolIts) {
+      const lga = it.school?.lga;
+      if (lga && !currentLgaIds.includes(lga.id)) {
+        if (!pastLgaMap.has(lga.id)) {
+          pastLgaMap.set(lga.id, {
+            id: lga.id,
+            name: lga.name,
+            code: lga.code,
+            itCount: 0
+          });
+        }
+        pastLgaMap.get(lga.id)!.itCount += 1;
+      }
+    }
+
+    // 3. Discover past LGAs from audit logs
+    const auditLogs = await this.prisma.auditLog.findMany({
+      where: { userId: officer.userId },
+      select: { details: true },
+      take: 200,
+    });
+
+    const auditSchoolIds = new Set<string>();
+    for (const log of auditLogs) {
+      const details = log.details as any;
+      if (details?.schoolId) auditSchoolIds.add(details.schoolId);
+    }
+
+    if (auditSchoolIds.size > 0) {
+      const schoolsInAudit = await this.prisma.school.findMany({
+        where: { id: { in: Array.from(auditSchoolIds) } },
+        select: {
+          lga: { select: { id: true, name: true, code: true } }
+        }
+      });
+      for (const s of schoolsInAudit) {
+        if (s.lga && !currentLgaIds.includes(s.lga.id) && !pastLgaMap.has(s.lga.id)) {
+          pastLgaMap.set(s.lga.id, {
+            id: s.lga.id,
+            name: s.lga.name,
+            code: s.lga.code,
+            itCount: 0,
+          });
+        }
+      }
+    }
+
+    // 4. Fetch all LGAs in state for full flexibility
+    const allStateLgas = await this.prisma.localGovernmentArea.findMany({
+      where: { stateId: officer.stateId },
+      select: { id: true, name: true, code: true },
+      orderBy: { name: 'asc' }
+    });
+
+    return {
+      currentLga: currentLgas[0] || { id: rawLgaId, name: officer.lga?.name || 'Assigned LGA', code: '' },
+      currentLgas,
+      pastLgas: Array.from(pastLgaMap.values()),
+      allStateLgas,
+    };
+  }
+
+  /**
+   * Get all active schools in the Exam Officer's LGA jurisdiction for selection and assignment
+   */
+  async getSchoolsInLga(userId: string, lgaId?: string) {
+    const officer = await this.getOfficer(userId);
+    const rawLgaId = lgaId || (officer.lgaId as string);
     const lgaIds = rawLgaId.includes(',')
       ? rawLgaId.split(',').map((s: string) => s.trim()).filter(Boolean)
       : [rawLgaId];
@@ -589,27 +689,30 @@ export class ExamOfficerService {
   }
 
   /**
-   * Get list of School IT personnel associated with the officer's LGA(s) or created by the officer
+   * Get list of School IT personnel associated with the specified or current LGA
    */
-  async getSchoolItList(userId: string, search?: string, schoolId?: string, status?: string) {
+  async getSchoolItList(
+    userId: string,
+    search?: string,
+    schoolId?: string,
+    status?: string,
+    lgaId?: string
+  ) {
     const officer = await this.getOfficer(userId);
     const rawLgaId = officer.lgaId as string;
-    const lgaIds = rawLgaId.includes(',')
-      ? rawLgaId.split(',').map((s: string) => s.trim()).filter(Boolean)
-      : [rawLgaId];
+    const effectiveLgaId = lgaId || rawLgaId;
+    const lgaIds = effectiveLgaId.includes(',')
+      ? effectiveLgaId.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [effectiveLgaId];
 
-    const officerSchools = await this.prisma.school.findMany({
+    const targetSchools = await this.prisma.school.findMany({
       where: { lgaId: { in: lgaIds } },
       select: { id: true }
     });
-    const officerSchoolIds = officerSchools.map(s => s.id);
+    const targetSchoolIds = targetSchools.map(s => s.id);
 
     const whereClause: any = {
-      OR: [
-        { schoolId: { in: officerSchoolIds } },
-        { officerId: officer.id },
-        { createdById: officer.userId }
-      ]
+      schoolId: { in: targetSchoolIds }
     };
 
     if (schoolId && schoolId !== 'ALL') {
@@ -681,36 +784,91 @@ export class ExamOfficerService {
       orderBy: { createdAt: 'desc' }
     });
 
-    return schoolIts.map(it => ({
-      id: it.id,
-      schoolItId: it.schoolItId,
-      userId: it.userId,
-      firstName: it.firstName,
-      lastName: it.lastName,
-      fullName: `${it.firstName} ${it.lastName}`.trim(),
-      email: it.email,
-      phone: it.phone,
-      isActive: it.isActive,
-      profilePicture: it.user?.profilePicture || null,
-      createdAt: it.createdAt,
-      school: it.school ? {
-        id: it.school.id,
-        name: it.school.name,
-        code: it.school.code,
-        level: it.school.level,
-        lgaName: it.school.lga?.name || 'Unknown'
-      } : null,
-      creatorOfficer: it.officer ? {
-        id: it.officer.id,
-        name: `${it.officer.firstName} ${it.officer.lastName}`.trim(),
-        officerId: it.officer.officerId,
-      } : it.createdByUser ? {
-        id: it.createdByUser.id,
-        name: `${it.createdByUser.firstName || ''} ${it.createdByUser.lastName || ''}`.trim() || it.createdByUser.email,
-        officerId: 'N/A'
-      } : null,
-      isCreatedByCurrentOfficer: (it.officerId === officer.id || it.createdById === officer.userId),
-    }));
+    // Calculate uploaded results count across terms and sessions for each school IT
+    const schoolIds = schoolIts.map(it => it.schoolId).filter(Boolean);
+    const itUserIds = schoolIts.map(it => it.userId).filter(Boolean);
+
+    const assessments = await this.prisma.assessment.findMany({
+      where: {
+        class: { schoolId: { in: schoolIds } }
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        updatedAt: true,
+        class: { select: { schoolId: true } }
+      }
+    });
+
+    const assessmentsBySchool = new Map<string, Array<{ createdAt: Date; updatedAt: Date }>>();
+    for (const a of assessments) {
+      const sId = a.class.schoolId;
+      if (!assessmentsBySchool.has(sId)) {
+        assessmentsBySchool.set(sId, []);
+      }
+      assessmentsBySchool.get(sId)!.push({ createdAt: a.createdAt, updatedAt: a.updatedAt });
+    }
+
+    const auditLogs = await this.prisma.auditLog.findMany({
+      where: {
+        userId: { in: itUserIds },
+        action: { in: ['UPLOADED_RESULTS', 'SUBMITTED_RESULTS'] }
+      },
+      select: { userId: true, details: true }
+    });
+
+    const auditCountsByUser = new Map<string, number>();
+    for (const log of auditLogs) {
+      const details = log.details as any;
+      const count = Number(details?.count || details?.totalStudents || 0);
+      auditCountsByUser.set(log.userId, (auditCountsByUser.get(log.userId) || 0) + count);
+    }
+
+    return schoolIts.map(it => {
+      const schoolAssessments = assessmentsBySchool.get(it.schoolId) || [];
+      const joinedDate = new Date(it.createdAt);
+      const assessmentsSinceJoined = schoolAssessments.filter(
+        a => new Date(a.createdAt) >= joinedDate || new Date(a.updatedAt) >= joinedDate
+      ).length;
+      const auditCount = auditCountsByUser.get(it.userId) || 0;
+      const resultsUploadedCount = Math.max(
+        assessmentsSinceJoined,
+        auditCount,
+        schoolAssessments.length > 0 && assessmentsSinceJoined === 0 ? schoolAssessments.length : 0
+      );
+
+      return {
+        id: it.id,
+        schoolItId: it.schoolItId,
+        userId: it.userId,
+        firstName: it.firstName,
+        lastName: it.lastName,
+        fullName: `${it.firstName} ${it.lastName}`.trim(),
+        email: it.email,
+        phone: it.phone,
+        isActive: it.isActive,
+        profilePicture: it.user?.profilePicture || null,
+        createdAt: it.createdAt,
+        resultsUploadedCount,
+        school: it.school ? {
+          id: it.school.id,
+          name: it.school.name,
+          code: it.school.code,
+          level: it.school.level,
+          lgaName: it.school.lga?.name || 'Unknown'
+        } : null,
+        creatorOfficer: it.officer ? {
+          id: it.officer.id,
+          name: `${it.officer.firstName} ${it.officer.lastName}`.trim(),
+          officerId: it.officer.officerId,
+        } : it.createdByUser ? {
+          id: it.createdByUser.id,
+          name: `${it.createdByUser.firstName || ''} ${it.createdByUser.lastName || ''}`.trim() || it.createdByUser.email,
+          officerId: 'N/A'
+        } : null,
+        isCreatedByCurrentOfficer: (it.officerId === officer.id || it.createdById === officer.userId),
+      };
+    });
   }
 
   /**

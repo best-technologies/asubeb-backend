@@ -24,12 +24,22 @@ export class ExamOfficerController {
     };
   }
 
-  @Get('schools')
-  @ApiOperation({ summary: 'Get active schools in the officer LGA jurisdiction' })
-  async getSchools(@Request() req) {
+  @Get('lgas')
+  @ApiOperation({ summary: 'Get current and past LGAs for the exam officer' })
+  async getOfficerLgas(@Request() req) {
     return {
       success: true,
-      data: await this.examOfficerService.getSchoolsInLga(req.user.id),
+      data: await this.examOfficerService.getOfficerLgas(req.user.id),
+    };
+  }
+
+  @Get('schools')
+  @ApiOperation({ summary: 'Get active schools in the officer LGA jurisdiction' })
+  @ApiQuery({ name: 'lgaId', required: false, type: String })
+  async getSchools(@Request() req, @Query('lgaId') lgaId?: string) {
+    return {
+      success: true,
+      data: await this.examOfficerService.getSchoolsInLga(req.user.id, lgaId),
     };
   }
 
@@ -38,15 +48,17 @@ export class ExamOfficerController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'schoolId', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['ALL', 'ACTIVE', 'INACTIVE'] })
+  @ApiQuery({ name: 'lgaId', required: false, type: String })
   async getSchoolItPersonnel(
     @Request() req,
     @Query('search') search?: string,
     @Query('schoolId') schoolId?: string,
-    @Query('status') status?: string
+    @Query('status') status?: string,
+    @Query('lgaId') lgaId?: string,
   ) {
     return {
       success: true,
-      data: await this.examOfficerService.getSchoolItList(req.user.id, search, schoolId, status),
+      data: await this.examOfficerService.getSchoolItList(req.user.id, search, schoolId, status, lgaId),
     };
   }
 

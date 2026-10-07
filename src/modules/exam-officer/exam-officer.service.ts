@@ -784,58 +784,39 @@ export class ExamOfficerService {
       orderBy: { createdAt: 'desc' }
     });
 
-    // Calculate uploaded results count across terms and sessions for each school IT
-    const schoolIds = schoolIts.map(it => it.schoolId).filter(Boolean);
+    // Calculate uploaded results count strictly for each school IT personnel from their own audit logs
     const itUserIds = schoolIts.map(it => it.userId).filter(Boolean);
-
-    const assessments = await this.prisma.assessment.findMany({
-      where: {
-        class: { schoolId: { in: schoolIds } }
-      },
-      select: {
-        id: true,
-        createdAt: true,
-        updatedAt: true,
-        class: { select: { schoolId: true } }
-      }
-    });
-
-    const assessmentsBySchool = new Map<string, Array<{ createdAt: Date; updatedAt: Date }>>();
-    for (const a of assessments) {
-      const sId = a.class.schoolId;
-      if (!assessmentsBySchool.has(sId)) {
-        assessmentsBySchool.set(sId, []);
-      }
-      assessmentsBySchool.get(sId)!.push({ createdAt: a.createdAt, updatedAt: a.updatedAt });
-    }
 
     const auditLogs = await this.prisma.auditLog.findMany({
       where: {
         userId: { in: itUserIds },
-        action: { in: ['UPLOADED_RESULTS', 'SUBMITTED_RESULTS'] }
+        action: { in: ['UPLOADED_RESULTS', 'SUBMITTED_RESULTS'] },
       },
-      select: { userId: true, details: true }
+      select: { userId: true, action: true, details: true },
+      orderBy: { createdAt: 'desc' },
     });
 
-    const auditCountsByUser = new Map<string, number>();
+    const uploadedCountsByUser = new Map<string, number>();
+    const submittedCountsByUser = new Map<string, number>();
+
     for (const log of auditLogs) {
       const details = log.details as any;
-      const count = Number(details?.count || details?.totalStudents || 0);
-      auditCountsByUser.set(log.userId, (auditCountsByUser.get(log.userId) || 0) + count);
+      const count = Number(
+        details?.totalResults ?? details?.count ?? details?.totalStudents ?? 0
+      );
+      if (log.action === 'UPLOADED_RESULTS') {
+        uploadedCountsByUser.set(log.userId, (uploadedCountsByUser.get(log.userId) || 0) + count);
+      } else if (log.action === 'SUBMITTED_RESULTS') {
+        submittedCountsByUser.set(log.userId, (submittedCountsByUser.get(log.userId) || 0) + count);
+      }
     }
 
     return schoolIts.map(it => {
-      const schoolAssessments = assessmentsBySchool.get(it.schoolId) || [];
-      const joinedDate = new Date(it.createdAt);
-      const assessmentsSinceJoined = schoolAssessments.filter(
-        a => new Date(a.createdAt) >= joinedDate || new Date(a.updatedAt) >= joinedDate
-      ).length;
-      const auditCount = auditCountsByUser.get(it.userId) || 0;
-      const resultsUploadedCount = Math.max(
-        assessmentsSinceJoined,
-        auditCount,
-        schoolAssessments.length > 0 && assessmentsSinceJoined === 0 ? schoolAssessments.length : 0
-      );
+      // Attribute only results actually uploaded by this IT personnel (never school-wide or other individuals' uploads)
+      const resultsUploadedCount =
+        uploadedCountsByUser.get(it.userId) ??
+        submittedCountsByUser.get(it.userId) ??
+        0;
 
       return {
         id: it.id,

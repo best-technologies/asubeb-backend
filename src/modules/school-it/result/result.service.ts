@@ -171,12 +171,22 @@ export class SchoolItResultService {
         }
       });
 
-      // If transaction succeeds, log it
+      // If transaction succeeds, log total uploaded assessment results
+      let totalResultsCount = 0;
+      for (const studentData of data.students) {
+        if (studentData.subjects && Array.isArray(studentData.subjects)) {
+          totalResultsCount += studentData.subjects.length;
+        }
+      }
+      const countToLog = totalResultsCount > 0 ? totalResultsCount : data.students.length;
+
       await this.auditLogService.createLog(userId, 'UPLOADED_RESULTS', {
         schoolId: data.schoolId,
         classId: data.classId,
         termId: data.termId,
         totalStudents: data.students.length,
+        totalResults: countToLog,
+        count: countToLog,
       });
 
       return { success: true, message: `Successfully uploaded results for ${data.students.length} student(s).` };

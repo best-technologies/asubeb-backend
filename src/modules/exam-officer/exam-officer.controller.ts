@@ -156,9 +156,11 @@ export class ExamOfficerController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20
   ) {
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.max(1, Number(limit) || 20);
     return {
       success: true,
-      data: await this.examOfficerService.getAuditLogs(req.user.id, Number(page), Number(limit)),
+      data: await this.examOfficerService.getAuditLogs(req.user.id, pageNum, limitNum),
     };
   }
 }

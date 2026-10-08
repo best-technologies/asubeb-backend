@@ -275,18 +275,23 @@ export class AuthService {
       }
 
       try {
-        await this.auditLogService.createLog(
-          userId,
-          'USER_LOGOUT',
-          {
-            email: email || 'N/A',
-            role: role || 'USER',
-            name: fullName || email || 'User',
-          },
-          'Authentication',
-          userId,
-        );
-        this.logger.log(`Audit log USER_LOGOUT recorded for ${email || userId} (${role})`);
+        const cacheKey = `recent_logout_log:${userId}`;
+        const alreadyLogged = this.dataCacheService.get(cacheKey);
+        if (!alreadyLogged) {
+          this.dataCacheService.set(cacheKey, true, 5000);
+          await this.auditLogService.createLog(
+            userId,
+            'USER_LOGOUT',
+            {
+              email: email || 'N/A',
+              role: role || 'USER',
+              name: fullName || email || 'User',
+            },
+            'Authentication',
+            userId,
+          );
+          this.logger.log(`Audit log USER_LOGOUT recorded for ${email || userId} (${role})`);
+        }
       } catch (auditErr: any) {
         this.logger.error(`Failed to record logout audit log: ${auditErr?.message}`);
       }

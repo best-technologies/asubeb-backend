@@ -47,9 +47,8 @@ export class AuditLogInterceptor implements NestInterceptor {
 
     // Skip endpoints that already implement rich domain-specific audit logging to prevent duplicate entries
     if (
-      originalUrl?.includes('/exam-officer/results') ||
-      originalUrl?.includes('/school-it/students') ||
-      originalUrl?.includes('/school-it/results')
+      originalUrl?.includes('/exam-officer') ||
+      originalUrl?.includes('/school-it')
     ) {
       return next.handle();
     }

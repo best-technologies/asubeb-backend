@@ -1,11 +1,56 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
-export class AuditLogService {
+export class AuditLogService implements OnModuleInit {
   private readonly logger = new Logger(AuditLogService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  async onModuleInit() {
+    try {
+      // 1. Purge legacy HTTP interceptor logs for exam-officer and school-it that duplicate rich domain logs
+      const purgedInterceptor = await this.prisma.auditLog.deleteMany({
+        where: {
+          OR: [
+            { action: { contains: 'exam-officer/' } },
+            { action: { contains: 'school-it/' } },
+          ],
+        },
+      });
+      if (purgedInterceptor.count > 0) {
+        this.logger.log(`Purged ${purgedInterceptor.count} legacy duplicate interceptor audit logs.`);
+      }
+
+      // 2. Clean up duplicate USER_LOGOUT logs recorded within 5 seconds of each other
+      const logoutLogs = await this.prisma.auditLog.findMany({
+        where: { action: 'USER_LOGOUT' },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      const duplicateIds: string[] = [];
+      for (let i = 0; i < logoutLogs.length - 1; i++) {
+        const curr = logoutLogs[i];
+        const next = logoutLogs[i + 1];
+        if (
+          curr.userId === next.userId &&
+          Math.abs(new Date(next.createdAt).getTime() - new Date(curr.createdAt).getTime()) <= 5000
+        ) {
+          duplicateIds.push(next.id);
+          i++;
+        }
+      }
+
+      if (duplicateIds.length > 0) {
+        await this.prisma.auditLog.deleteMany({
+          where: { id: { in: duplicateIds } },
+        });
+        this.logger.log(`Purged ${duplicateIds.length} duplicate logout audit logs.`);
+      }
+    } catch (e: any) {
+      this.logger.warn(`AuditLog cleanup error on module init: ${e?.message || e}`);
+    }
+  }
 
   async createLog(userId: string, action: string, details: any, entity?: string, entityId?: string) {
     try {
@@ -49,11 +94,15 @@ export class AuditLogService {
         }
       }
 
+      if (!parsedDetails || (typeof parsedDetails === 'object' && Object.keys(parsedDetails).length === 0)) {
+        parsedDetails = { action, entity: determinedEntity };
+      }
+
       await this.prisma.auditLog.create({
         data: {
           userId,
           action,
-          details: parsedDetails || {},
+          details: parsedDetails,
           entity: determinedEntity,
           entityId: String(determinedEntityId),
         },
@@ -64,7 +113,9 @@ export class AuditLogService {
   }
 
   async getLogs(page: number = 1, limit: number = 20, userRole?: string, userId?: string) {
-    const skip = (page - 1) * limit;
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.max(1, Number(limit) || 20);
+    const skip = (pageNum - 1) * limitNum;
 
     const whereClause: any = {};
     if (userId) {
@@ -77,12 +128,18 @@ export class AuditLogService {
         whereClause.action = { notIn: ['USER_LOGIN', 'USER_LOGOUT', 'LOGIN', 'LOGOUT'] };
       }
     }
+
+    // Exclude raw HTTP interceptor logs for routes that already have domain-specific audit logging
+    whereClause.NOT = [
+      { action: { contains: 'exam-officer/' } },
+      { action: { contains: 'school-it/' } },
+    ];
     
     const [logs, total] = await Promise.all([
       this.prisma.auditLog.findMany({
         where: whereClause,
         skip,
-        take: limit,
+        take: limitNum,
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.auditLog.count({ where: whereClause }),
@@ -96,7 +153,7 @@ export class AuditLogService {
 
     const userMap = users.reduce((acc, user) => {
       const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-      acc[user.id] = fullName ? `${fullName} (${user.email})` : user.email;
+      acc[user.id] = fullName || user.email || 'System';
       return acc;
     }, {} as Record<string, string>);
 
@@ -108,10 +165,10 @@ export class AuditLogService {
     return {
       data: enrichedLogs,
       pagination: {
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limitNum),
       },
     };
   }

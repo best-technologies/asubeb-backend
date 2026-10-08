@@ -38,22 +38,41 @@ export class SchoolItStudentService {
     
     if (search && search.trim()) {
       const q = search.trim();
-      where.OR = [
-        { firstName: { contains: q, mode: 'insensitive' } },
-        { lastName: { contains: q, mode: 'insensitive' } },
-        { studentId: { contains: q, mode: 'insensitive' } },
-      ];
+      const terms = q.split(/\s+/).filter(Boolean);
+      if (terms.length > 1) {
+        where.AND = terms.map((term) => ({
+          OR: [
+            { firstName: { contains: term, mode: 'insensitive' } },
+            { lastName: { contains: term, mode: 'insensitive' } },
+            { studentId: { contains: term, mode: 'insensitive' } },
+          ],
+        }));
+      } else {
+        where.OR = [
+          { firstName: { contains: q, mode: 'insensitive' } },
+          { lastName: { contains: q, mode: 'insensitive' } },
+          { studentId: { contains: q, mode: 'insensitive' } },
+        ];
+      }
+      // Global search across all classes and statuses unhindered by filters
+    } else {
+      if (classId && classId !== 'ALL') {
+        where.classId = classId;
+      }
+
+      if (status === 'ACTIVE') {
+        where.isActive = true;
+      } else if (status === 'SUSPENDED') {
+        where.isActive = false;
+      }
     }
 
-    if (classId && classId !== 'ALL') {
-      where.classId = classId;
-    }
-
-    if (status === 'ACTIVE') {
-      where.isActive = true;
-    } else if (status === 'SUSPENDED') {
-      where.isActive = false;
-    }
+    const countScope = (search && search.trim())
+      ? where
+      : {
+          schoolId: profile.schoolId,
+          ...(classId && classId !== 'ALL' ? { classId } : {}),
+        };
 
     const [students, total, allCount, activeCount, suspendedCount] = await Promise.all([
       this.prisma.student.findMany({
@@ -67,24 +86,17 @@ export class SchoolItStudentService {
         include: { class: true },
       }),
       this.prisma.student.count({ where }),
+      this.prisma.student.count({ where: countScope }),
       this.prisma.student.count({
         where: {
-          schoolId: profile.schoolId,
-          ...(classId && classId !== 'ALL' ? { classId } : {}),
-        },
-      }),
-      this.prisma.student.count({
-        where: {
-          schoolId: profile.schoolId,
+          ...countScope,
           isActive: true,
-          ...(classId && classId !== 'ALL' ? { classId } : {}),
         },
       }),
       this.prisma.student.count({
         where: {
-          schoolId: profile.schoolId,
+          ...countScope,
           isActive: false,
-          ...(classId && classId !== 'ALL' ? { classId } : {}),
         },
       }),
     ]);

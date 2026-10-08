@@ -65,9 +65,12 @@ export class SchoolItStudentService {
       throw new BadRequestException('You can only enrol students to your assigned school.');
     }
 
+    const studentId = data.studentId?.trim() || `STU${Date.now().toString().slice(-6)}${Math.floor(100 + Math.random() * 900)}`;
+
     const student = await this.prisma.student.create({
       data: {
         ...data,
+        studentId,
         schoolId: profile.schoolId,
         stateId: stateId,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : new Date(),

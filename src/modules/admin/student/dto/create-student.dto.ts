@@ -11,9 +11,10 @@ export class CreateStudentDto {
   @IsString()
   lastName: string;
 
-  @ApiProperty({ description: 'Unique student ID', example: 'STU123456' })
+  @ApiProperty({ description: 'Unique student ID', example: 'STU123456', required: false })
+  @IsOptional()
   @IsString()
-  studentId: string;
+  studentId?: string;
 
   @ApiProperty({ description: 'Student email address', example: 'john.doe@example.com', required: false })
   @IsOptional()

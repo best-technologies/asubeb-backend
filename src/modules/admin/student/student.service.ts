@@ -874,8 +874,12 @@ export class StudentService {
   }
 
   async createStudent(createStudentDto: any) {
+    const studentId = createStudentDto.studentId?.trim() || `STU${Date.now().toString().slice(-6)}${Math.floor(100 + Math.random() * 900)}`;
     const student = await this.prisma.student.create({
-      data: createStudentDto,
+      data: {
+        ...createStudentDto,
+        studentId,
+      },
       include: {
         school: {
           select: {

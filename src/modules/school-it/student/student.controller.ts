@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -22,12 +22,16 @@ export class SchoolItStudentController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
     @Query('search') search?: string,
+    @Query('classId') classId?: string,
+    @Query('status') status?: string,
   ) {
     return this.studentService.getStudents(
       req.user.id,
-      parseInt(page, 10),
-      parseInt(limit, 10),
+      parseInt(page, 10) || 1,
+      parseInt(limit, 10) || 20,
       search,
+      classId,
+      status,
     );
   }
 
@@ -45,5 +49,20 @@ export class SchoolItStudentController {
     @Body() data: Partial<CreateStudentDto>,
   ) {
     return this.studentService.updateStudent(req.user.id, id, data);
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update student status (suspend, unsuspend, graduate)' })
+  async updateStudentStatus(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() body: { isActive: boolean; reason?: string },
+  ) {
+    return this.studentService.updateStudentStatus(
+      req.user.id,
+      id,
+      body.isActive,
+      body.reason,
+    );
   }
 }

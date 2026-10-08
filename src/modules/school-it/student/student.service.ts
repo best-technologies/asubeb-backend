@@ -21,38 +21,86 @@ export class SchoolItStudentService {
     return profile;
   }
 
-  async getStudents(userId: string, page: number = 1, limit: number = 20, search?: string) {
+  async getStudents(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+    classId?: string,
+    status?: string,
+  ) {
     const profile = await this.getSchoolItProfile(userId);
-    const skip = (page - 1) * limit;
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.max(1, Number(limit) || 20);
+    const skip = (pageNum - 1) * limitNum;
 
     const where: any = { schoolId: profile.schoolId };
     
-    if (search) {
+    if (search && search.trim()) {
+      const q = search.trim();
       where.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { studentId: { contains: search, mode: 'insensitive' } },
+        { firstName: { contains: q, mode: 'insensitive' } },
+        { lastName: { contains: q, mode: 'insensitive' } },
+        { studentId: { contains: q, mode: 'insensitive' } },
       ];
     }
 
-    const [students, total] = await Promise.all([
+    if (classId && classId !== 'ALL') {
+      where.classId = classId;
+    }
+
+    if (status === 'ACTIVE') {
+      where.isActive = true;
+    } else if (status === 'SUSPENDED') {
+      where.isActive = false;
+    }
+
+    const [students, total, allCount, activeCount, suspendedCount] = await Promise.all([
       this.prisma.student.findMany({
         where,
         skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
+        take: limitNum,
+        orderBy: [
+          { firstName: 'asc' },
+          { lastName: 'asc' },
+        ],
         include: { class: true },
       }),
       this.prisma.student.count({ where }),
+      this.prisma.student.count({
+        where: {
+          schoolId: profile.schoolId,
+          ...(classId && classId !== 'ALL' ? { classId } : {}),
+        },
+      }),
+      this.prisma.student.count({
+        where: {
+          schoolId: profile.schoolId,
+          isActive: true,
+          ...(classId && classId !== 'ALL' ? { classId } : {}),
+        },
+      }),
+      this.prisma.student.count({
+        where: {
+          schoolId: profile.schoolId,
+          isActive: false,
+          ...(classId && classId !== 'ALL' ? { classId } : {}),
+        },
+      }),
     ]);
 
     return {
       data: students,
+      counts: {
+        all: allCount,
+        active: activeCount,
+        suspended: suspendedCount,
+      },
       pagination: {
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limitNum),
       },
     };
   }
@@ -118,6 +166,35 @@ export class SchoolItStudentService {
       studentId: student.id,
       name: `${student.firstName} ${student.lastName}`,
       updates: data,
+    });
+
+    return student;
+  }
+
+  async updateStudentStatus(userId: string, studentId: string, isActive: boolean, reason?: string) {
+    const profile = await this.getSchoolItProfile(userId);
+
+    const existingStudent = await this.prisma.student.findUnique({
+      where: { id: studentId },
+    });
+
+    if (!existingStudent || existingStudent.schoolId !== profile.schoolId) {
+      throw new NotFoundException('Student not found in your school');
+    }
+
+    const student = await this.prisma.student.update({
+      where: { id: studentId },
+      data: { isActive },
+      include: { class: true },
+    });
+
+    const action = isActive ? 'UNSUSPENDED_STUDENT' : 'SUSPENDED_STUDENT';
+    const fullName = `${student.firstName} ${student.lastName}`.trim();
+
+    await this.auditLogService.createLog(userId, action, {
+      studentId: student.id,
+      name: fullName,
+      reason: reason || (isActive ? 'Reactivated by School IT' : 'Suspended by School IT'),
     });
 
     return student;

@@ -26,14 +26,18 @@ export class SchoolItResultController {
   async getResults(
     @Request() req,
     @Query('classId') classId?: string,
+    @Query('status') status?: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
+    @Query('search') search?: string,
   ) {
     return this.resultService.getResults(
       req.user.id,
       classId,
-      parseInt(page, 10),
-      parseInt(limit, 10),
+      status,
+      parseInt(page, 10) || 1,
+      parseInt(limit, 10) || 20,
+      search,
     );
   }
 

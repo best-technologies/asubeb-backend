@@ -29,21 +29,69 @@ export class SchoolItResultService {
     });
   }
 
-  async getResults(userId: string, classId?: string, page: number = 1, limit: number = 20) {
+  async getResults(
+    userId: string,
+    classId?: string,
+    status?: string,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+  ) {
     const profile = await this.getSchoolItProfile(userId);
-    const skip = (page - 1) * limit;
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.max(1, Number(limit) || 20);
+    const skip = (pageNum - 1) * limitNum;
 
     const where: any = {
       schoolId: profile.schoolId,
     };
-    if (classId) where.classId = classId;
 
-    const [students, total] = await Promise.all([
+    if (search && search.trim()) {
+      const q = search.trim();
+      const terms = q.split(/\s+/).filter(Boolean);
+      if (terms.length > 1) {
+        where.AND = terms.map((term) => ({
+          OR: [
+            { firstName: { contains: term, mode: 'insensitive' } },
+            { lastName: { contains: term, mode: 'insensitive' } },
+            { studentId: { contains: term, mode: 'insensitive' } },
+          ],
+        }));
+      } else {
+        where.OR = [
+          { firstName: { contains: q, mode: 'insensitive' } },
+          { lastName: { contains: q, mode: 'insensitive' } },
+          { studentId: { contains: q, mode: 'insensitive' } },
+        ];
+      }
+    }
+
+    if (classId && classId !== 'ALL') {
+      where.classId = classId;
+    }
+
+    const normalizedStatus = status?.toUpperCase();
+    if (normalizedStatus === 'GRADED') {
+      where.assessments = { some: { type: 'EXAM' } };
+    } else if (normalizedStatus === 'UNGRADED') {
+      where.assessments = { none: { type: 'EXAM' } };
+    }
+
+    const scopeWhere: any = {
+      schoolId: profile.schoolId,
+      ...(classId && classId !== 'ALL' ? { classId } : {}),
+      ...(search && search.trim() ? (where.AND ? { AND: where.AND } : { OR: where.OR }) : {}),
+    };
+
+    const [students, total, allCount, gradedCount, ungradedCount] = await Promise.all([
       this.prisma.student.findMany({
         where,
         skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
+        take: limitNum,
+        orderBy: [
+          { firstName: 'asc' },
+          { lastName: 'asc' },
+        ],
         include: {
           class: true,
           assessments: {
@@ -53,15 +101,33 @@ export class SchoolItResultService {
         },
       }),
       this.prisma.student.count({ where }),
+      this.prisma.student.count({ where: scopeWhere }),
+      this.prisma.student.count({
+        where: {
+          ...scopeWhere,
+          assessments: { some: { type: 'EXAM' } },
+        },
+      }),
+      this.prisma.student.count({
+        where: {
+          ...scopeWhere,
+          assessments: { none: { type: 'EXAM' } },
+        },
+      }),
     ]);
 
     return {
       data: students,
+      counts: {
+        all: allCount,
+        graded: gradedCount,
+        ungraded: ungradedCount,
+      },
       pagination: {
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limitNum),
       },
     };
   }

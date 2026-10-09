@@ -175,6 +175,11 @@ export class SchoolItResultService {
 
     // Atomic transaction: if any part fails, the whole transaction rolls back
     try {
+      const isSingleStudent = data.students.length === 1;
+      let savedStudentsCount = 0;
+      let skippedSuspendedCount = 0;
+      let totalResultsCount = 0;
+
       await this.prisma.$transaction(async (tx) => {
         for (const studentData of data.students) {
           // Verify student belongs to this school
@@ -184,6 +189,23 @@ export class SchoolItResultService {
 
           if (!student) {
             throw new Error(`Student ${studentData.studentId} not found in your school`);
+          }
+
+          if (!student.isActive) {
+            if (isSingleStudent) {
+              throw new BadRequestException(
+                `Cannot upload results: Student "${student.firstName} ${student.lastName}" is currently suspended. Please unsuspend the student in the Student Directory first.`
+              );
+            } else {
+              // In bulk upload, skip suspended student without rolling back other students
+              skippedSuspendedCount++;
+              continue;
+            }
+          }
+
+          savedStudentsCount++;
+          if (studentData.subjects && Array.isArray(studentData.subjects)) {
+            totalResultsCount += studentData.subjects.length;
           }
 
           for (const subjectScore of studentData.subjects) {
@@ -238,24 +260,34 @@ export class SchoolItResultService {
       });
 
       // If transaction succeeds, log total uploaded assessment results
-      let totalResultsCount = 0;
-      for (const studentData of data.students) {
-        if (studentData.subjects && Array.isArray(studentData.subjects)) {
-          totalResultsCount += studentData.subjects.length;
+      if (savedStudentsCount > 0) {
+        const countToLog = totalResultsCount > 0 ? totalResultsCount : savedStudentsCount;
+        await this.auditLogService.createLog(userId, 'UPLOADED_RESULTS', {
+          schoolId: data.schoolId,
+          classId: data.classId,
+          termId: data.termId,
+          totalStudents: savedStudentsCount,
+          totalResults: countToLog,
+          count: countToLog,
+          skippedSuspended: skippedSuspendedCount,
+        });
+      }
+
+      let message = `Successfully uploaded results for ${savedStudentsCount} student(s).`;
+      if (skippedSuspendedCount > 0) {
+        if (savedStudentsCount === 0) {
+          message = `All ${skippedSuspendedCount} student(s) in this batch are suspended and were skipped. No results were saved.`;
+        } else {
+          message = `Successfully uploaded results for ${savedStudentsCount} student(s). ${skippedSuspendedCount} suspended student(s) were skipped and not saved.`;
         }
       }
-      const countToLog = totalResultsCount > 0 ? totalResultsCount : data.students.length;
 
-      await this.auditLogService.createLog(userId, 'UPLOADED_RESULTS', {
-        schoolId: data.schoolId,
-        classId: data.classId,
-        termId: data.termId,
-        totalStudents: data.students.length,
-        totalResults: countToLog,
-        count: countToLog,
-      });
-
-      return { success: true, message: `Successfully uploaded results for ${data.students.length} student(s).` };
+      return {
+        success: true,
+        message,
+        savedCount: savedStudentsCount,
+        skippedCount: skippedSuspendedCount,
+      };
     } catch (error) {
       return { success: false, message: error.message };
     }
@@ -331,6 +363,28 @@ export class SchoolItResultService {
 
       if (!student) {
         throw new NotFoundException('Student not found in your school.');
+      }
+
+      if (!student.isActive) {
+        return {
+          canSubmit: false,
+          blockers: [
+            {
+              studentId: student.id,
+              studentCode: student.studentId,
+              studentName: `${student.firstName} ${student.lastName}`,
+              className: student.class?.name || 'Class',
+              uploadedSubjects: 0,
+              expectedSubjects: expectedSubjectCount,
+              missingSubjects: [],
+              message: `Student "${student.firstName} ${student.lastName}" (${student.studentId}) is currently suspended. Please unsuspend the student in the Student Directory before submitting results.`,
+            },
+          ],
+          warnings: [],
+          classesSummary: [],
+          totalReadyStudents: 0,
+          expectedSubjectCount,
+        };
       }
 
       const assessments = student.assessments || [];
@@ -433,7 +487,7 @@ export class SchoolItResultService {
       if (!classObj) continue;
 
       const students = await this.prisma.student.findMany({
-        where: { schoolId: profile.schoolId, classId },
+        where: { schoolId: profile.schoolId, classId, isActive: true },
         include: {
           assessments: {
             where: { termId: activeTerm.id, type: 'EXAM' },
@@ -587,10 +641,22 @@ export class SchoolItResultService {
 
     // Submit single student
     if (dto?.studentId) {
+      const student = await this.prisma.student.findFirst({
+        where: { id: dto.studentId, schoolId: profile.schoolId },
+      });
+      if (!student) {
+        throw new NotFoundException('Student not found in your school.');
+      }
+      if (!student.isActive) {
+        throw new BadRequestException(
+          `Cannot submit results: Student "${student.firstName} ${student.lastName}" is currently suspended. Please unsuspend the student first.`
+        );
+      }
+
       const updateResult = await this.prisma.assessment.updateMany({
         where: {
           studentId: dto.studentId,
-          student: { schoolId: profile.schoolId },
+          student: { schoolId: profile.schoolId, isActive: true },
           termId: activeTerm.id,
           status: { in: ['PENDING_SUBMISSION', 'REJECTED'] },
         },
@@ -623,6 +689,7 @@ export class SchoolItResultService {
       where: {
         student: {
           schoolId: profile.schoolId,
+          isActive: true,
           ...classFilter,
         },
         termId: activeTerm.id,
@@ -663,7 +730,7 @@ export class SchoolItResultService {
     // 2. Fetch all enrolled students in this class
     const students = await this.prisma.student.findMany({
       where: { schoolId: profile.schoolId, classId },
-      select: { id: true, studentId: true, firstName: true, lastName: true },
+      select: { id: true, studentId: true, firstName: true, lastName: true, isActive: true },
     });
 
     if (students.length === 0) {
@@ -729,6 +796,8 @@ export class SchoolItResultService {
         rowErrors.push(`Student ID "${rawStudentId}" is not enrolled in this class.`);
       }
 
+      const isSuspended = matchedStudent ? matchedStudent.isActive === false : false;
+
       // Collect subject scores
       const subjectScores: Record<string, number | null> = {};
       for (const subj of subjects) {
@@ -746,7 +815,7 @@ export class SchoolItResultService {
         }
       }
 
-      if (rowErrors.length > 0) {
+      if (!isSuspended && rowErrors.length > 0) {
         hasErrors = true;
       }
 
@@ -759,7 +828,11 @@ export class SchoolItResultService {
           : (rawData.studentName || 'Unknown'),
         scores: subjectScores,
         errors: rowErrors,
-        isValid: rowErrors.length === 0,
+        isSuspended,
+        suspendedReason: isSuspended
+          ? 'Student is currently suspended. This result will be skipped and not saved to awaiting approval.'
+          : undefined,
+        isValid: isSuspended ? true : rowErrors.length === 0,
       });
     }
 
@@ -786,8 +859,9 @@ export class SchoolItResultService {
         rows: previewRows,
         stats: {
           total: previewRows.length,
-          valid: previewRows.filter((r) => r.isValid).length,
-          invalid: previewRows.filter((r) => !r.isValid).length,
+          valid: previewRows.filter((r) => r.isValid && !r.isSuspended).length,
+          invalid: previewRows.filter((r) => !r.isValid && !r.isSuspended).length,
+          suspended: previewRows.filter((r) => r.isSuspended).length,
         },
         hasErrors,
       },

@@ -170,6 +170,7 @@ export class ExamOfficerService {
       where: {
         class: { schoolId: { in: schoolIds } },
         termId: activeTerm.id,
+        student: { isActive: true },
       },
       select: {
         studentId: true,
@@ -313,14 +314,14 @@ export class ExamOfficerService {
     // We will augment each school with how many distinct students have assessments awaiting approval or approved
     const schoolsWithStats = await Promise.all(schools.map(async (school) => {
       const awaitingStudents = await this.prisma.assessment.findMany({
-        where: { class: { schoolId: school.id }, termId: activeTerm.id, status: ApprovalStatus.AWAITING_APPROVAL },
+        where: { class: { schoolId: school.id }, termId: activeTerm.id, status: ApprovalStatus.AWAITING_APPROVAL, student: { isActive: true } },
         distinct: ['studentId'],
         select: { studentId: true }
       });
       const awaiting = awaitingStudents.length;
 
       const approvedStudents = await this.prisma.assessment.findMany({
-        where: { class: { schoolId: school.id }, termId: activeTerm.id, status: ApprovalStatus.APPROVED },
+        where: { class: { schoolId: school.id }, termId: activeTerm.id, status: ApprovalStatus.APPROVED, student: { isActive: true } },
         distinct: ['studentId'],
         select: { studentId: true }
       });
@@ -365,7 +366,7 @@ export class ExamOfficerService {
 
     // Get all students in this school who have assessments in the active term
     const assessments = await this.prisma.assessment.findMany({
-      where: { class: { schoolId: school.id }, termId: activeTerm.id },
+      where: { class: { schoolId: school.id }, termId: activeTerm.id, student: { isActive: true } },
       include: {
         student: true,
         class: true,
@@ -458,7 +459,8 @@ export class ExamOfficerService {
     const whereClause: any = {
       class: { schoolId: school.id },
       termId: activeTerm.id,
-      status: ApprovalStatus.AWAITING_APPROVAL
+      status: ApprovalStatus.AWAITING_APPROVAL,
+      student: { isActive: true },
     };
 
     if (studentIds && studentIds.length > 0) {
@@ -520,7 +522,8 @@ export class ExamOfficerService {
     const whereClause: any = {
       class: { schoolId: school.id },
       termId: activeTerm.id,
-      status: ApprovalStatus.AWAITING_APPROVAL
+      status: ApprovalStatus.AWAITING_APPROVAL,
+      student: { isActive: true },
     };
 
     if (studentIds && studentIds.length > 0) {

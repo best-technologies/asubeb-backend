@@ -386,10 +386,12 @@ export class ExamOfficerService {
     const result = Array.from(studentMap.values()).map(data => {
       const awaitingCount = data.assessments.filter((a: any) => a.status === ApprovalStatus.AWAITING_APPROVAL).length;
       const approvedCount = data.assessments.filter((a: any) => a.status === ApprovalStatus.APPROVED).length;
+      const rejectedCount = data.assessments.filter((a: any) => a.status === ApprovalStatus.REJECTED).length;
       
       let overallStatus = 'NO_RESULTS';
       if (awaitingCount > 0) overallStatus = 'AWAITING_APPROVAL';
       else if (approvedCount > 0) overallStatus = 'APPROVED';
+      else if (rejectedCount > 0) overallStatus = 'REJECTED';
 
       return {
         student: data.student,
@@ -406,7 +408,7 @@ export class ExamOfficerService {
     };
   }
 
-  async approveSchoolResults(userId: string, schoolId: string) {
+  async approveSchoolResults(userId: string, schoolId: string, studentIds?: string[]) {
     const officer = await this.getOfficer(userId);
     const activeTerm = await this.getActiveTerm(officer);
     const lgaId = officer.lgaId as string;
@@ -417,23 +419,25 @@ export class ExamOfficerService {
     });
     if (!school) throw new ForbiddenException('School not found or not in your LGA');
 
+    const whereClause: any = {
+      class: { schoolId: school.id },
+      termId: activeTerm.id,
+      status: ApprovalStatus.AWAITING_APPROVAL
+    };
+
+    if (studentIds && studentIds.length > 0) {
+      whereClause.studentId = { in: studentIds };
+    }
+
     const studentsWithAssessments = await this.prisma.assessment.findMany({
-      where: {
-        class: { schoolId: school.id },
-        termId: activeTerm.id,
-        status: ApprovalStatus.AWAITING_APPROVAL
-      },
+      where: whereClause,
       distinct: ['studentId'],
       select: { studentId: true }
     });
     const studentCount = studentsWithAssessments.length;
 
-    const result = await this.prisma.assessment.updateMany({
-      where: {
-        class: { schoolId: school.id },
-        termId: activeTerm.id,
-        status: ApprovalStatus.AWAITING_APPROVAL
-      },
+    await this.prisma.assessment.updateMany({
+      where: whereClause,
       data: {
         status: ApprovalStatus.APPROVED
       }
@@ -444,13 +448,14 @@ export class ExamOfficerService {
       schoolName: school.name,
       termId: activeTerm.id,
       action: 'APPROVED',
-      count: studentCount
+      count: studentCount,
+      studentIds: studentIds && studentIds.length > 0 ? studentIds : undefined,
     }, 'Results', school.id);
 
     return { message: `Successfully approved results for ${studentCount} students in ${school.name}` };
   }
 
-  async rejectSchoolResults(userId: string, schoolId: string) {
+  async rejectSchoolResults(userId: string, schoolId: string, studentIds?: string[]) {
     const officer = await this.getOfficer(userId);
     const activeTerm = await this.getActiveTerm(officer);
     const lgaId = officer.lgaId as string;
@@ -461,23 +466,25 @@ export class ExamOfficerService {
     });
     if (!school) throw new ForbiddenException('School not found or not in your LGA');
 
+    const whereClause: any = {
+      class: { schoolId: school.id },
+      termId: activeTerm.id,
+      status: ApprovalStatus.AWAITING_APPROVAL
+    };
+
+    if (studentIds && studentIds.length > 0) {
+      whereClause.studentId = { in: studentIds };
+    }
+
     const studentsWithAssessments = await this.prisma.assessment.findMany({
-      where: {
-        class: { schoolId: school.id },
-        termId: activeTerm.id,
-        status: ApprovalStatus.AWAITING_APPROVAL
-      },
+      where: whereClause,
       distinct: ['studentId'],
       select: { studentId: true }
     });
     const studentCount = studentsWithAssessments.length;
 
-    const result = await this.prisma.assessment.updateMany({
-      where: {
-        class: { schoolId: school.id },
-        termId: activeTerm.id,
-        status: ApprovalStatus.AWAITING_APPROVAL
-      },
+    await this.prisma.assessment.updateMany({
+      where: whereClause,
       data: {
         status: ApprovalStatus.REJECTED
       }
@@ -488,7 +495,8 @@ export class ExamOfficerService {
       schoolName: school.name,
       termId: activeTerm.id,
       action: 'REJECTED',
-      count: studentCount
+      count: studentCount,
+      studentIds: studentIds && studentIds.length > 0 ? studentIds : undefined,
     }, 'Results', school.id);
 
     return { message: `Successfully rejected results for ${studentCount} students in ${school.name}` };

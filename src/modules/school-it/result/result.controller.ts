@@ -69,10 +69,22 @@ export class SchoolItResultController {
     return this.resultService.checkMissingResults(req.user.id, req.user.stateId);
   }
 
+  @Post('check-submission')
+  @ApiOperation({ summary: 'Check submission readiness, blockers and warnings by class or student' })
+  async checkSubmission(
+    @Request() req,
+    @Body() dto: { classIds?: string[]; studentId?: string },
+  ) {
+    return this.resultService.checkSubmission(req.user.id, req.user.stateId, dto);
+  }
+
   @Post('submit')
-  @ApiOperation({ summary: 'Submit all draft results for approval' })
-  async submitResultsForApproval(@Request() req) {
-    return this.resultService.submitResultsForApproval(req.user.id, req.user.stateId);
+  @ApiOperation({ summary: 'Submit results for approval by class(es) or individual student' })
+  async submitResultsForApproval(
+    @Request() req,
+    @Body() dto?: { classIds?: string[]; studentId?: string },
+  ) {
+    return this.resultService.submitResultsForApproval(req.user.id, req.user.stateId, dto);
   }
 
   @Post('upload')

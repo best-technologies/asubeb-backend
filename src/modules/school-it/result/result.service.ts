@@ -261,7 +261,11 @@ export class SchoolItResultService {
     }
   }
 
-  async checkMissingResults(userId: string, stateId: string) {
+  async checkSubmission(
+    userId: string,
+    stateId: string,
+    dto?: { classIds?: string[]; studentId?: string },
+  ) {
     const profile = await this.getSchoolItProfile(userId);
 
     const activeTerm = await this.prisma.term.findFirst({
@@ -272,34 +276,291 @@ export class SchoolItResultService {
       throw new BadRequestException('No active term found.');
     }
 
-    const students = await this.prisma.student.findMany({
-      where: { schoolId: profile.schoolId },
-      include: {
-        assessments: {
-          where: { termId: activeTerm.id, type: 'EXAM' }
-        }
-      }
+    // Fetch all active subjects for this school's level
+    const activeSubjects = await this.prisma.subject.findMany({
+      where: { stateId, level: profile.school.level, isActive: true },
+      orderBy: { name: 'asc' },
     });
+    const expectedSubjectCount = activeSubjects.length;
 
-    const totalExpectedSubjects = profile.school.level === 'PRIMARY' ? 10 : 15;
+    const blockers: Array<{
+      studentId: string;
+      studentCode: string;
+      studentName: string;
+      className: string;
+      uploadedSubjects: number;
+      expectedSubjects: number;
+      missingSubjects: string[];
+      message: string;
+    }> = [];
 
-    let missingCount = 0;
-    for (const student of students) {
-      if (student.assessments.length < totalExpectedSubjects) {
-        missingCount++;
+    const warnings: Array<{
+      classId?: string;
+      className?: string;
+      totalEnrolled?: number;
+      readyCount?: number;
+      approvedCount?: number;
+      unuploadedCount?: number;
+      message: string;
+    }> = [];
+
+    const classesSummary: Array<{
+      classId: string;
+      className: string;
+      totalEnrolled: number;
+      readyCount: number;
+      approvedCount: number;
+      noResultsCount: number;
+      incompleteStudentsCount: number;
+    }> = [];
+
+    let totalReadyStudents = 0;
+
+    // Single student check
+    if (dto?.studentId) {
+      const student = await this.prisma.student.findFirst({
+        where: { id: dto.studentId, schoolId: profile.schoolId },
+        include: {
+          class: true,
+          assessments: {
+            where: { termId: activeTerm.id, type: 'EXAM' },
+            include: { subject: true },
+          },
+        },
+      });
+
+      if (!student) {
+        throw new NotFoundException('Student not found in your school.');
       }
+
+      const assessments = student.assessments || [];
+      const isAlreadyApproved = assessments.length > 0 && assessments.every((a) => a.status === 'APPROVED');
+
+      if (isAlreadyApproved) {
+        return {
+          canSubmit: false,
+          blockers: [
+            {
+              studentId: student.id,
+              studentCode: student.studentId,
+              studentName: `${student.firstName} ${student.lastName}`,
+              className: student.class?.name || 'Class',
+              uploadedSubjects: assessments.length,
+              expectedSubjects: expectedSubjectCount,
+              missingSubjects: [],
+              message: `Results for "${student.firstName} ${student.lastName}" are already approved and closed for this term.`,
+            },
+          ],
+          warnings: [],
+          classesSummary: [],
+          totalReadyStudents: 0,
+          expectedSubjectCount,
+        };
+      }
+
+      if (assessments.length === 0) {
+        return {
+          canSubmit: false,
+          blockers: [
+            {
+              studentId: student.id,
+              studentCode: student.studentId,
+              studentName: `${student.firstName} ${student.lastName}`,
+              className: student.class?.name || 'Class',
+              uploadedSubjects: 0,
+              expectedSubjects: expectedSubjectCount,
+              missingSubjects: activeSubjects.map((s) => s.name),
+              message: `No results have been uploaded for "${student.firstName} ${student.lastName}" yet.`,
+            },
+          ],
+          warnings: [],
+          classesSummary: [],
+          totalReadyStudents: 0,
+          expectedSubjectCount,
+        };
+      }
+
+      // Check if student has missing subjects
+      if (assessments.length < expectedSubjectCount) {
+        const gradedSubjectIds = new Set(assessments.map((a) => a.subjectId));
+        const missing = activeSubjects.filter((s) => !gradedSubjectIds.has(s.id)).map((s) => s.name);
+
+        return {
+          canSubmit: false,
+          blockers: [
+            {
+              studentId: student.id,
+              studentCode: student.studentId,
+              studentName: `${student.firstName} ${student.lastName}`,
+              className: student.class?.name || 'Class',
+              uploadedSubjects: assessments.length,
+              expectedSubjects: expectedSubjectCount,
+              missingSubjects: missing,
+              message: `Student "${student.firstName} ${student.lastName}" (${student.studentId}) only has ${assessments.length} of ${expectedSubjectCount} subject scores. Missing: ${missing.join(', ')}.`,
+            },
+          ],
+          warnings: [],
+          classesSummary: [],
+          totalReadyStudents: 0,
+          expectedSubjectCount,
+        };
+      }
+
+      return {
+        canSubmit: true,
+        blockers: [],
+        warnings: [],
+        classesSummary: [],
+        totalReadyStudents: 1,
+        expectedSubjectCount,
+      };
     }
 
+    // Classes-based check
+    let targetClassIds = dto?.classIds;
+    if (!targetClassIds || targetClassIds.length === 0) {
+      const allSchoolClasses = await this.prisma.class.findMany({
+        where: { schoolId: profile.schoolId },
+        select: { id: true },
+      });
+      targetClassIds = allSchoolClasses.map((c) => c.id);
+    }
+
+    for (const classId of targetClassIds) {
+      const classObj = await this.prisma.class.findUnique({
+        where: { id: classId },
+      });
+      if (!classObj) continue;
+
+      const students = await this.prisma.student.findMany({
+        where: { schoolId: profile.schoolId, classId },
+        include: {
+          assessments: {
+            where: { termId: activeTerm.id, type: 'EXAM' },
+            include: { subject: true },
+          },
+        },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      });
+
+      let readyCount = 0;
+      let approvedCount = 0;
+      let noResultsCount = 0;
+      let classBlockersCount = 0;
+
+      for (const student of students) {
+        const assessments = student.assessments || [];
+        if (assessments.length === 0) {
+          noResultsCount++;
+          continue;
+        }
+
+        const isApproved = assessments.every((a) => a.status === 'APPROVED');
+        if (isApproved) {
+          approvedCount++;
+          continue;
+        }
+
+        // Student has assessments that need submission (PENDING_SUBMISSION or REJECTED)
+        if (assessments.length < expectedSubjectCount) {
+          classBlockersCount++;
+          const gradedSubjectIds = new Set(assessments.map((a) => a.subjectId));
+          const missing = activeSubjects.filter((s) => !gradedSubjectIds.has(s.id)).map((s) => s.name);
+
+          blockers.push({
+            studentId: student.id,
+            studentCode: student.studentId,
+            studentName: `${student.firstName} ${student.lastName}`,
+            className: classObj.name,
+            uploadedSubjects: assessments.length,
+            expectedSubjects: expectedSubjectCount,
+            missingSubjects: missing,
+            message: `Student "${student.firstName} ${student.lastName}" (${student.studentId}) in ${classObj.name} only has ${assessments.length} of ${expectedSubjectCount} subject scores recorded. Missing: ${missing.join(', ')}.`,
+          });
+        } else {
+          readyCount++;
+          totalReadyStudents++;
+        }
+      }
+
+      // Class-level warnings (non-blocking)
+      if (students.length > 0) {
+        const unuploadedCount = students.length - (readyCount + approvedCount + classBlockersCount);
+        if (unuploadedCount > 0 && readyCount > 0) {
+          warnings.push({
+            classId,
+            className: classObj.name,
+            totalEnrolled: students.length,
+            readyCount,
+            approvedCount,
+            unuploadedCount,
+            message: `Class "${classObj.name}" has ${students.length} enrolled student(s), but results for only ${readyCount} student(s) will be submitted (${unuploadedCount} student(s) have no results uploaded yet).`,
+          });
+        } else if (readyCount === 0 && approvedCount === students.length) {
+          warnings.push({
+            classId,
+            className: classObj.name,
+            totalEnrolled: students.length,
+            readyCount: 0,
+            approvedCount,
+            unuploadedCount: 0,
+            message: `All ${students.length} student(s) in "${classObj.name}" have already been approved and closed for this term.`,
+          });
+        } else if (readyCount === 0 && approvedCount === 0 && classBlockersCount === 0) {
+          warnings.push({
+            classId,
+            className: classObj.name,
+            totalEnrolled: students.length,
+            readyCount: 0,
+            approvedCount,
+            unuploadedCount: students.length,
+            message: `No results have been uploaded for "${classObj.name}" yet.`,
+          });
+        }
+      }
+
+      classesSummary.push({
+        classId,
+        className: classObj.name,
+        totalEnrolled: students.length,
+        readyCount,
+        approvedCount,
+        noResultsCount,
+        incompleteStudentsCount: classBlockersCount,
+      });
+    }
+
+    const canSubmit = blockers.length === 0 && totalReadyStudents > 0;
+
     return {
-      hasMissing: missingCount > 0,
-      missingCount,
-      message: missingCount > 0 
-        ? `${missingCount} student(s) have incomplete results for the current term.`
-        : 'All students have complete results.'
+      canSubmit,
+      blockers,
+      warnings,
+      classesSummary,
+      totalReadyStudents,
+      expectedSubjectCount,
     };
   }
 
-  async submitResultsForApproval(userId: string, stateId: string) {
+  async checkMissingResults(userId: string, stateId: string) {
+    const check = await this.checkSubmission(userId, stateId);
+    return {
+      hasMissing: check.warnings.length > 0 || check.blockers.length > 0,
+      missingCount: check.blockers.length,
+      message:
+        check.blockers.length > 0
+          ? `${check.blockers.length} student(s) have incomplete subject scores.`
+          : check.warnings.length > 0
+          ? check.warnings[0].message
+          : 'All students have complete results.',
+    };
+  }
+
+  async submitResultsForApproval(
+    userId: string,
+    stateId: string,
+    dto?: { classIds?: string[]; studentId?: string },
+  ) {
     const profile = await this.getSchoolItProfile(userId);
 
     const activeTerm = await this.prisma.term.findFirst({
@@ -310,11 +571,62 @@ export class SchoolItResultService {
       throw new BadRequestException('No active term found.');
     }
 
+    // Run strict pre-submission validation
+    const check = await this.checkSubmission(userId, stateId, dto);
+
+    if (!check.canSubmit) {
+      if (check.blockers.length > 0) {
+        throw new BadRequestException(
+          `Cannot submit for approval: ${check.blockers[0].message}`
+        );
+      }
+      if (check.totalReadyStudents === 0) {
+        throw new BadRequestException('No eligible results found ready for submission.');
+      }
+    }
+
+    // Submit single student
+    if (dto?.studentId) {
+      const updateResult = await this.prisma.assessment.updateMany({
+        where: {
+          studentId: dto.studentId,
+          student: { schoolId: profile.schoolId },
+          termId: activeTerm.id,
+          status: { in: ['PENDING_SUBMISSION', 'REJECTED'] },
+        },
+        data: {
+          status: 'AWAITING_APPROVAL',
+        },
+      });
+
+      await this.auditLogService.createLog(userId, 'SUBMITTED_RESULTS', {
+        schoolId: profile.schoolId,
+        studentId: dto.studentId,
+        count: updateResult.count,
+        termId: activeTerm.id,
+      });
+
+      return {
+        success: true,
+        message: `Successfully submitted results for student for approval.`,
+        count: updateResult.count,
+      };
+    }
+
+    // Submit selected class(es)
+    const classFilter =
+      dto?.classIds && dto.classIds.length > 0
+        ? { classId: { in: dto.classIds } }
+        : {};
+
     const updateResult = await this.prisma.assessment.updateMany({
       where: {
-        student: { schoolId: profile.schoolId },
+        student: {
+          schoolId: profile.schoolId,
+          ...classFilter,
+        },
         termId: activeTerm.id,
-        status: 'PENDING_SUBMISSION',
+        status: { in: ['PENDING_SUBMISSION', 'REJECTED'] },
       },
       data: {
         status: 'AWAITING_APPROVAL',
@@ -323,13 +635,15 @@ export class SchoolItResultService {
 
     await this.auditLogService.createLog(userId, 'SUBMITTED_RESULTS', {
       schoolId: profile.schoolId,
+      classIds: dto?.classIds,
       count: updateResult.count,
       termId: activeTerm.id,
     });
 
     return {
       success: true,
-      message: `Successfully submitted ${updateResult.count} results for approval.`,
+      message: `Successfully submitted results for ${check.totalReadyStudents} student(s) for approval.`,
+      count: updateResult.count,
     };
   }
 

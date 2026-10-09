@@ -332,4 +332,151 @@ export class SchoolItResultService {
       message: `Successfully submitted ${updateResult.count} results for approval.`,
     };
   }
+
+  async previewBulkResults(userId: string, classId: string, file: Express.Multer.File) {
+    const profile = await this.getSchoolItProfile(userId);
+
+    // 1. Fetch all subjects available for this school level
+    const subjects = await this.prisma.subject.findMany({
+      where: { stateId: profile.stateId, level: profile.school.level, isActive: true },
+      orderBy: { name: 'asc' },
+    });
+
+    if (subjects.length === 0) {
+      throw new BadRequestException('No active subjects found for this school level.');
+    }
+
+    // 2. Fetch all enrolled students in this class
+    const students = await this.prisma.student.findMany({
+      where: { schoolId: profile.schoolId, classId },
+      select: { id: true, studentId: true, firstName: true, lastName: true },
+    });
+
+    if (students.length === 0) {
+      throw new BadRequestException('No active students found in this class.');
+    }
+
+    // 3. Build dynamic schema for bulk-d
+    const targetSchema: Record<string, any> = {
+      studentId: {
+        type: 'string',
+        required: true,
+        description: 'Student admission number, registration code, or student ID (e.g. STU699598749)',
+      },
+      studentName: {
+        type: 'string',
+        required: false,
+        description: 'Student full name, surname, or first name',
+      },
+    };
+
+    // Add each subject name to targetSchema
+    for (const subj of subjects) {
+      targetSchema[subj.name] = {
+        type: 'number',
+        required: false,
+        description: `${subj.name} exam score between 0 and 100`,
+      };
+    }
+
+    // 4. Run bulk-d
+    const BulkD = require('bulk-d');
+    const mapper = new BulkD({
+      provider: 'google',
+      apiKey: process.env.GEMINI_API_KEY,
+      model: 'gemini-3.1-flash-lite',
+      strictness: 'high',
+    });
+
+    const parseResult = await mapper.processFile({
+      buffer: file.buffer,
+      mimetype: file.mimetype,
+      filename: file.originalname,
+      schema: targetSchema,
+    });
+
+    // 5. Match students and format preview rows
+    const studentByIdCode = new Map<string, typeof students[0]>();
+    for (const s of students) {
+      if (s.studentId) studentByIdCode.set(s.studentId.trim().toLowerCase(), s);
+    }
+
+    const previewRows: any[] = [];
+    let hasErrors = false;
+
+    for (let i = 0; i < parseResult.data.length; i++) {
+      const rawData = parseResult.data[i];
+      const rowErrors: string[] = [];
+      const rawStudentId = (rawData.studentId ? String(rawData.studentId) : '').trim();
+
+      const matchedStudent = studentByIdCode.get(rawStudentId.toLowerCase());
+
+      if (!matchedStudent) {
+        rowErrors.push(`Student ID "${rawStudentId}" is not enrolled in this class.`);
+      }
+
+      // Collect subject scores
+      const subjectScores: Record<string, number | null> = {};
+      for (const subj of subjects) {
+        const val = rawData[subj.name];
+        if (val !== undefined && val !== null && val !== '') {
+          const numScore = Number(val);
+          if (isNaN(numScore) || numScore < 0 || numScore > 100) {
+            rowErrors.push(`${subj.name} score must be between 0 and 100 (got ${val}).`);
+            subjectScores[subj.id] = null;
+          } else {
+            subjectScores[subj.id] = numScore;
+          }
+        } else {
+          subjectScores[subj.id] = null;
+        }
+      }
+
+      if (rowErrors.length > 0) {
+        hasErrors = true;
+      }
+
+      previewRows.push({
+        rowIndex: i + 1,
+        studentDbId: matchedStudent?.id || null,
+        studentId: matchedStudent?.studentId || rawStudentId,
+        studentName: matchedStudent
+          ? `${matchedStudent.firstName} ${matchedStudent.lastName}`
+          : (rawData.studentName || 'Unknown'),
+        scores: subjectScores,
+        errors: rowErrors,
+        isValid: rowErrors.length === 0,
+      });
+    }
+
+    // Include parser errors if any
+    for (const err of parseResult.errors) {
+      hasErrors = true;
+      previewRows.push({
+        rowIndex: err.row,
+        studentDbId: null,
+        studentId: err.raw?.studentId || 'N/A',
+        studentName: err.raw?.studentName || 'N/A',
+        scores: {},
+        errors: err.errors,
+        isValid: false,
+      });
+    }
+
+    return {
+      success: true,
+      data: {
+        mapping: parseResult.mapping,
+        unmapped: parseResult.unmapped,
+        subjects: subjects.map((s) => ({ id: s.id, name: s.name, code: s.code })),
+        rows: previewRows,
+        stats: {
+          total: previewRows.length,
+          valid: previewRows.filter((r) => r.isValid).length,
+          invalid: previewRows.filter((r) => !r.isValid).length,
+        },
+        hasErrors,
+      },
+    };
+  }
 }

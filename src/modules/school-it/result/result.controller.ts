@@ -1,5 +1,18 @@
-import { Controller, Get, Post, Body, Query, Param, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  Param,
+  UseGuards,
+  Request,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
@@ -66,5 +79,23 @@ export class SchoolItResultController {
   @ApiOperation({ summary: 'Atomically upload manual or bulk results for students' })
   async uploadResults(@Request() req, @Body() data: UploadResultsDto) {
     return this.resultService.uploadResultsAtomic(req.user.id, req.user.stateId, data);
+  }
+
+  @Post('preview-bulk')
+  @ApiOperation({ summary: 'Preview and AI-map student results from uploaded spreadsheet using bulk-d' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async previewBulkResults(
+    @Request() req,
+    @Body('classId') classId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Please provide a spreadsheet file (.csv or .xlsx).');
+    }
+    if (!classId) {
+      throw new BadRequestException('Please provide a classId.');
+    }
+    return this.resultService.previewBulkResults(req.user.id, classId, file);
   }
 }

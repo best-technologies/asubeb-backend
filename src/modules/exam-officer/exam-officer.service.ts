@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../admin/audit-log/audit-log.service';
 import { MailService } from '../../common/mailer/mail.service';
+import { DataCacheService } from '../../common/cache/data-cache.service';
 import { ApprovalStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { CreateSchoolItDto, UpdateSchoolItDto } from './dto/school-it.dto';
@@ -12,6 +13,7 @@ export class ExamOfficerService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
     private readonly mailService: MailService,
+    private readonly dataCacheService: DataCacheService,
   ) {}
 
   private async getOfficer(userId: string) {
@@ -401,14 +403,45 @@ export class ExamOfficerService {
       };
     });
 
+    // Group classes summary
+    const classMap = new Map();
+    for (const item of result) {
+      const clsId = item.class?.id;
+      if (!clsId) continue;
+      if (!classMap.has(clsId)) {
+        classMap.set(clsId, {
+          id: clsId,
+          name: item.class.name,
+          totalStudents: 0,
+          awaitingCount: 0,
+          approvedCount: 0,
+          rejectedCount: 0,
+        });
+      }
+      const clsData = classMap.get(clsId);
+      clsData.totalStudents++;
+      if (item.status === 'AWAITING_APPROVAL') clsData.awaitingCount++;
+      else if (item.status === 'APPROVED') clsData.approvedCount++;
+      else if (item.status === 'REJECTED') clsData.rejectedCount++;
+    }
+
+    const classesSummary = Array.from(classMap.values()).sort((a: any, b: any) =>
+      a.name.localeCompare(b.name)
+    );
+
     return {
       school,
       term: activeTerm,
-      students: result
+      students: result,
+      classes: classesSummary,
     };
   }
 
-  async approveSchoolResults(userId: string, schoolId: string, studentIds?: string[]) {
+  async approveSchoolResults(
+    userId: string,
+    schoolId: string,
+    payload?: { studentIds?: string[]; classIds?: string[] } | string[],
+  ) {
     const officer = await this.getOfficer(userId);
     const activeTerm = await this.getActiveTerm(officer);
     const lgaId = officer.lgaId as string;
@@ -419,6 +452,9 @@ export class ExamOfficerService {
     });
     if (!school) throw new ForbiddenException('School not found or not in your LGA');
 
+    const studentIds = Array.isArray(payload) ? payload : payload?.studentIds;
+    const classIds = Array.isArray(payload) ? undefined : payload?.classIds;
+
     const whereClause: any = {
       class: { schoolId: school.id },
       termId: activeTerm.id,
@@ -427,6 +463,9 @@ export class ExamOfficerService {
 
     if (studentIds && studentIds.length > 0) {
       whereClause.studentId = { in: studentIds };
+    }
+    if (classIds && classIds.length > 0) {
+      whereClause.classId = { in: classIds };
     }
 
     const studentsWithAssessments = await this.prisma.assessment.findMany({
@@ -450,12 +489,21 @@ export class ExamOfficerService {
       action: 'APPROVED',
       count: studentCount,
       studentIds: studentIds && studentIds.length > 0 ? studentIds : undefined,
+      classIds: classIds && classIds.length > 0 ? classIds : undefined,
     }, 'Results', school.id);
+
+    this.dataCacheService.invalidatePrefix('students-dashboard:');
+    this.dataCacheService.invalidatePrefix('students-analytics:');
+    this.dataCacheService.invalidatePrefix('admin-dashboard:');
 
     return { message: `Successfully approved results for ${studentCount} students in ${school.name}` };
   }
 
-  async rejectSchoolResults(userId: string, schoolId: string, studentIds?: string[]) {
+  async rejectSchoolResults(
+    userId: string,
+    schoolId: string,
+    payload?: { studentIds?: string[]; classIds?: string[] } | string[],
+  ) {
     const officer = await this.getOfficer(userId);
     const activeTerm = await this.getActiveTerm(officer);
     const lgaId = officer.lgaId as string;
@@ -466,6 +514,9 @@ export class ExamOfficerService {
     });
     if (!school) throw new ForbiddenException('School not found or not in your LGA');
 
+    const studentIds = Array.isArray(payload) ? payload : payload?.studentIds;
+    const classIds = Array.isArray(payload) ? undefined : payload?.classIds;
+
     const whereClause: any = {
       class: { schoolId: school.id },
       termId: activeTerm.id,
@@ -474,6 +525,9 @@ export class ExamOfficerService {
 
     if (studentIds && studentIds.length > 0) {
       whereClause.studentId = { in: studentIds };
+    }
+    if (classIds && classIds.length > 0) {
+      whereClause.classId = { in: classIds };
     }
 
     const studentsWithAssessments = await this.prisma.assessment.findMany({
@@ -497,7 +551,12 @@ export class ExamOfficerService {
       action: 'REJECTED',
       count: studentCount,
       studentIds: studentIds && studentIds.length > 0 ? studentIds : undefined,
+      classIds: classIds && classIds.length > 0 ? classIds : undefined,
     }, 'Results', school.id);
+
+    this.dataCacheService.invalidatePrefix('students-dashboard:');
+    this.dataCacheService.invalidatePrefix('students-analytics:');
+    this.dataCacheService.invalidatePrefix('admin-dashboard:');
 
     return { message: `Successfully rejected results for ${studentCount} students in ${school.name}` };
   }

@@ -423,7 +423,7 @@ export class SchoolService {
       let hasAssessments = false;
       if (termCondition !== Prisma.empty) {
         const check = await this.prisma.$queryRaw<any[]>`
-          SELECT 1 FROM assessments a WHERE 1=1 ${termCondition} LIMIT 1;
+          SELECT 1 FROM assessments a WHERE a.status = 'APPROVED' ${termCondition} LIMIT 1;
         `;
         hasAssessments = Boolean(check && check.length > 0);
       }
@@ -533,7 +533,7 @@ export class SchoolService {
           FROM local_government_areas l
           LEFT JOIN schools sch ON sch."lgaId" = l.id AND sch."isActive" = true
           LEFT JOIN students s ON s."schoolId" = sch.id AND s."isActive" = true
-          LEFT JOIN assessments a ON a."studentId" = s.id ${termCondition}
+          LEFT JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED' ${termCondition}
           GROUP BY l.id, l.name, l.code
           ORDER BY l.name ASC;
         `,
@@ -545,7 +545,7 @@ export class SchoolService {
               FROM local_government_areas l
               LEFT JOIN schools sch ON sch."lgaId" = l.id AND sch."isActive" = true
               LEFT JOIN students s ON s."schoolId" = sch.id AND s."isActive" = true
-              LEFT JOIN assessments a ON a."studentId" = s.id ${prevTermCondition}
+              LEFT JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED' ${prevTermCondition}
               GROUP BY l.id;
             `
           : Promise.resolve([]),
@@ -564,7 +564,7 @@ export class SchoolService {
           FROM schools sch
           JOIN local_government_areas l ON l.id = sch."lgaId"
           JOIN students s ON s."schoolId" = sch.id AND s."isActive" = true
-          JOIN assessments a ON a."studentId" = s.id ${termCondition}
+          JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED' ${termCondition}
           WHERE sch."isActive" = true ${lgaCondition}
           GROUP BY sch.id, sch.name, l.name
           HAVING COUNT(a.id) > 0
@@ -578,7 +578,7 @@ export class SchoolService {
               AVG((a.score::float / NULLIF(a."maxScore", 0)) * 100) as avg_pct
             FROM schools sch
             JOIN students s ON s."schoolId" = sch.id AND s."isActive" = true
-            JOIN assessments a ON a."studentId" = s.id ${termCondition}
+            JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED' ${termCondition}
             WHERE sch."isActive" = true ${lgaCondition}
             GROUP BY sch.id
           )
@@ -598,7 +598,7 @@ export class SchoolService {
               COALESCE(AVG((a.score::float / NULLIF(a."maxScore", 0)) * 100), 0)::float as avg_pct
             FROM schools sch
             LEFT JOIN students s ON s."schoolId" = sch.id AND s."isActive" = true
-            LEFT JOIN assessments a ON a."studentId" = s.id ${termCondition}
+            LEFT JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED' ${termCondition}
             WHERE sch."isActive" = true ${lgaCondition}
             GROUP BY sch.id
           )
@@ -924,6 +924,7 @@ export class SchoolService {
           FROM assessments a
           JOIN students s ON s.id = a."studentId" AND s."isActive" = true
           WHERE s."schoolId" IN (${Prisma.join(schoolIds)})
+          AND a.status = 'APPROVED'
           ${termCondition}
           GROUP BY s."schoolId";
         `;

@@ -623,6 +623,7 @@ export class ClassService {
         LEFT JOIN terms t ON a."termId" = t.id
         LEFT JOIN sessions sess ON t."sessionId" = sess.id
         WHERE s."isActive" = true
+        AND a.status = 'APPROVED'
         ${termCondition}
         ${sessionCondition}
         ${lgaPerfCondition}

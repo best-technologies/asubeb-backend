@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ResponseHelper } from '../../../common/helpers/response.helper';
-import { TermType, Prisma } from '@prisma/client';
+import { TermType, Prisma, ApprovalStatus } from '@prisma/client';
 import { generateStudentResultPdf } from '../../../common/helpers/pdf.helper';
 import { generateClassResultsPdf } from '../../../common/helpers/pdf-class.helper';
 import { StudentAnalyticsQueryDto } from './dto';
@@ -210,11 +210,18 @@ export class StudentService {
         isActive: true,
       };
 
-      // Require assessments for the specified session & term so search and table results are strictly scoped to that academic period
+      // Require approved assessments for the specified session & term so search and table results are strictly scoped to that academic period
       if (Object.keys(termQueryCondition).length > 0) {
         studentWhereConditions.assessments = {
           some: {
             term: termQueryCondition,
+            status: ApprovalStatus.APPROVED,
+          },
+        };
+      } else {
+        studentWhereConditions.assessments = {
+          some: {
+            status: ApprovalStatus.APPROVED,
           },
         };
       }
@@ -317,6 +324,7 @@ export class StudentService {
           class: { select: { name: true } },
           assessments: {
             where: {
+              status: ApprovalStatus.APPROVED,
               ...(Object.keys(termQueryCondition).length > 0 && {
                 term: termQueryCondition,
               }),
@@ -523,6 +531,7 @@ export class StudentService {
         where: {
           studentId: studentId,
           term: termQueryCondition,
+          status: ApprovalStatus.APPROVED,
         },
         select: {
           id: true,
@@ -745,6 +754,7 @@ export class StudentService {
           class: { select: { name: true } },
           assessments: {
             where: {
+              status: ApprovalStatus.APPROVED,
               term: {
                 ...(currentTerm.includes('_') ? { name: currentTerm as TermType } : { id: currentTerm }),
                 session: {
@@ -1256,6 +1266,7 @@ export class StudentService {
           },
           assessments: {
             where: {
+              status: ApprovalStatus.APPROVED,
               term: {
                 name: currentTerm,
                 session: {
@@ -1421,12 +1432,15 @@ export class StudentService {
           school: { select: { id: true, name: true } },
           class: { select: { id: true, name: true } },
           assessments: {
-            where: activeTerm && activeSession ? {
-              term: {
-                id: activeTerm.id,
-                sessionId: activeSession.id,
-              },
-            } : undefined,
+            where: {
+              status: ApprovalStatus.APPROVED,
+              ...(activeTerm && activeSession ? {
+                term: {
+                  id: activeTerm.id,
+                  sessionId: activeSession.id,
+                },
+              } : {}),
+            },
             select: {
               id: true,
               score: true,
@@ -1526,9 +1540,12 @@ export class StudentService {
             school: { select: { id: true, name: true } },
             class: { select: { id: true, name: true } },
             assessments: {
-              where: activeTerm && activeSession ? {
-                term: { id: activeTerm.id, sessionId: activeSession.id },
-              } : undefined,
+              where: {
+                status: ApprovalStatus.APPROVED,
+                ...(activeTerm && activeSession ? {
+                  term: { id: activeTerm.id, sessionId: activeSession.id },
+                } : {}),
+              },
               select: {
                 id: true,
                 score: true,
@@ -1921,6 +1938,7 @@ export class StudentService {
             ? await this.prisma.assessment.findMany({
                 where: {
                   studentId: studentId,
+                  status: ApprovalStatus.APPROVED,
                   term: {
                     sessionId: sessionData.id,
                   },
@@ -1968,6 +1986,7 @@ export class StudentService {
                 where: {
                   studentId: studentId,
                   termId: termData.id,
+                  status: ApprovalStatus.APPROVED,
                 },
                 select: {
                   id: true,
@@ -2289,7 +2308,7 @@ export class StudentService {
       let hasAssessments = false;
       if (termCondition !== Prisma.empty) {
         const check = await this.prisma.$queryRaw<any[]>`
-          SELECT 1 FROM assessments a WHERE 1=1 ${termCondition} LIMIT 1;
+          SELECT 1 FROM assessments a WHERE a.status = 'APPROVED' ${termCondition} LIMIT 1;
         `;
         hasAssessments = Boolean(check && check.length > 0);
       }
@@ -2348,6 +2367,7 @@ export class StudentService {
           JOIN classes c ON s."classId" = c.id
           JOIN schools sch ON s."schoolId" = sch.id
           WHERE s."isActive" = true
+          AND a.status = 'APPROVED'
           ${termCondition}
           ${lgaCondition}
           ${schoolCondition}
@@ -2369,6 +2389,7 @@ export class StudentService {
           JOIN schools sch ON s."schoolId" = sch.id
           LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
           WHERE s."isActive" = true
+          AND a.status = 'APPROVED'
           ${termCondition}
           ${lgaCondition}
           ${schoolCondition}
@@ -2393,7 +2414,7 @@ export class StudentService {
           FROM local_government_areas lga
           LEFT JOIN schools sch ON sch."lgaId" = lga.id
           LEFT JOIN students s ON s."schoolId" = sch.id AND s."isActive" = true
-          LEFT JOIN assessments a ON a."studentId" = s.id ${termCondition}
+          LEFT JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED' ${termCondition}
           GROUP BY lga.id, lga.name, lga.code
           ORDER BY lga.name ASC;
         `,
@@ -2407,7 +2428,7 @@ export class StudentService {
               FROM local_government_areas lga
               JOIN schools sch ON sch."lgaId" = lga.id
               JOIN students s ON s."schoolId" = sch.id AND s."isActive" = true
-              JOIN assessments a ON a."studentId" = s.id ${prevCondition}
+              JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED' ${prevCondition}
               GROUP BY lga.id;
             `
           : Promise.resolve([]),
@@ -2423,6 +2444,7 @@ export class StudentService {
           JOIN students s ON a."studentId" = s.id
           JOIN schools sch ON s."schoolId" = sch.id
           WHERE s."isActive" = true
+          AND a.status = 'APPROVED'
           ${termCondition}
           ${lgaCondition}
           ${schoolCondition}
@@ -2452,6 +2474,7 @@ export class StudentService {
             JOIN students s ON a."studentId" = s.id
             JOIN schools sch ON s."schoolId" = sch.id
             WHERE s."isActive" = true
+            AND a.status = 'APPROVED'
             ${termCondition}
             ${lgaCondition}
             ${schoolCondition}

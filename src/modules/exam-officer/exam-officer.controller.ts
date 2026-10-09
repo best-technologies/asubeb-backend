@@ -114,35 +114,35 @@ export class ExamOfficerController {
   }
 
   @Post('results/:schoolId/approve')
-  @ApiOperation({ summary: 'Approve results for a specific school' })
+  @ApiOperation({ summary: 'Approve results for a specific school, class(es), or student(s)' })
   async approveResults(
     @Request() req,
     @Param('schoolId') schoolId: string,
-    @Body() body?: { studentIds?: string[] },
+    @Body() body?: { studentIds?: string[]; classIds?: string[] },
   ) {
     return {
       success: true,
       data: await this.examOfficerService.approveSchoolResults(
         req.user.id,
         schoolId,
-        body?.studentIds,
+        body,
       ),
     };
   }
 
   @Post('results/:schoolId/reject')
-  @ApiOperation({ summary: 'Reject results for a specific school' })
+  @ApiOperation({ summary: 'Reject results for a specific school, class(es), or student(s)' })
   async rejectResults(
     @Request() req,
     @Param('schoolId') schoolId: string,
-    @Body() body?: { studentIds?: string[] },
+    @Body() body?: { studentIds?: string[]; classIds?: string[] },
   ) {
     return {
       success: true,
       data: await this.examOfficerService.rejectSchoolResults(
         req.user.id,
         schoolId,
-        body?.studentIds,
+        body,
       ),
     };
   }

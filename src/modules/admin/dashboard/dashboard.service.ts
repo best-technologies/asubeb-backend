@@ -420,7 +420,7 @@ export class DashboardService {
             SELECT COUNT(DISTINCT s.id)::int AS "count"
             FROM students s
             JOIN schools sch ON s."schoolId" = sch.id
-            JOIN assessments a ON a."studentId" = s.id
+            JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED'
             JOIN terms t ON a."termId" = t.id ${isCombined || !termData ? Prisma.empty : Prisma.sql`AND t.id = ${termData.id}`}
             JOIN sessions sess ON t."sessionId" = sess.id AND (sess.id = ${sessionData.id} OR sess.name = ${sessionData.name})
             WHERE s."isActive" = true
@@ -460,7 +460,7 @@ export class DashboardService {
             JOIN schools sch ON s."schoolId" = sch.id
             LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
             LEFT JOIN classes c ON s."classId" = c.id
-            JOIN assessments a ON a."studentId" = s.id
+            JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED'
             JOIN terms t ON a."termId" = t.id ${isCombined || !termData ? Prisma.empty : Prisma.sql`AND t.id = ${termData.id}`}
             JOIN sessions sess ON t."sessionId" = sess.id AND (sess.id = ${sessionData.id} OR sess.name = ${sessionData.name})
             WHERE s."isActive" = true
@@ -747,7 +747,7 @@ export class DashboardService {
         SELECT COUNT(DISTINCT s.id)::int AS "count"
         FROM students s
         JOIN schools sch ON s."schoolId" = sch.id
-        JOIN assessments a ON a."studentId" = s.id
+        JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED'
         JOIN terms t ON a."termId" = t.id ${isCombined ? Prisma.empty : Prisma.sql`AND t.id = ${termData.id}`}
         JOIN sessions sess ON t."sessionId" = sess.id AND (sess.id = ${sessionData.id} OR sess.name = ${sessionData.name})
         WHERE s."isActive" = true
@@ -781,7 +781,7 @@ export class DashboardService {
         JOIN schools sch ON s."schoolId" = sch.id
         LEFT JOIN local_government_areas lga ON sch."lgaId" = lga.id
         LEFT JOIN classes c ON s."classId" = c.id
-        JOIN assessments a ON a."studentId" = s.id
+        JOIN assessments a ON a."studentId" = s.id AND a.status = 'APPROVED'
         JOIN terms t ON a."termId" = t.id ${isCombined ? Prisma.empty : Prisma.sql`AND t.id = ${termData.id}`}
         JOIN sessions sess ON t."sessionId" = sess.id AND (sess.id = ${sessionData.id} OR sess.name = ${sessionData.name})
         WHERE s."isActive" = true
